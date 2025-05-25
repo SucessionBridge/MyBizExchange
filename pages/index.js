@@ -4,7 +4,7 @@ export default function Home() {
       <div className="max-w-xl w-full">
         <h1 className="text-4xl font-bold mb-4">Succession Bridge</h1>
         <p className="text-lg text-gray-700 mb-8">
-          Helping Baby Boomer business owners exit gracefully — and matching them with ambitious entrepreneurs ready to carry the torch.
+    Helping business owners retire with confidence by connecting them to qualified successors.
         </p>
 
         <div className="flex justify-center gap-4">
