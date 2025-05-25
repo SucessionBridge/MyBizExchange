@@ -57,22 +57,29 @@ export default function SellerOnboarding() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const fileName = `business-${Date.now()}-${file.name}`;
- console.log(`Uploading file: ${fileName}`); // Log the file being uploaded
 
+      console.log(`Uploading file: ${fileName}`);  // Log the file being uploaded
+
+      // Upload the image to Supabase
       const { data, error } = await supabase.storage
-        .from('business-photos')
+        .from('business-photos')  // Ensure the bucket name is correct
         .upload(fileName, file);
 
       if (error) {
-        console.error('Error uploading image:', error.message);
-        return;
+        console.error('Error uploading image:', error.message); // Log error message
+        alert(`Error uploading image: ${error.message}`);  // Show an alert with the error message
+        return;  // Stop processing if there's an error
       }
 
+      // Get the public URL of the uploaded image
       const url = supabase.storage.from('business-photos').getPublicUrl(fileName).publicURL;
-      uploadedUrls.push(url);
+
+      console.log(`Image uploaded: ${url}`);  // Log the URL of the uploaded image
+
+      uploadedUrls.push(url);  // Push the image URL to the array
     }
 
-    return uploadedUrls;
+    return uploadedUrls;  // Return the uploaded URLs
   };
 
   // Handle form submission
@@ -158,3 +165,6 @@ export default function SellerOnboarding() {
   );
 }
 
+
+
+ 
