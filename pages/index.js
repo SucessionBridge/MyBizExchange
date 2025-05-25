@@ -1,6 +1,6 @@
 export default function Home() {
   return (
-    <main className="min-h-screen flex items-center justify-center bg-white text-center px-4">
+    <main className="min-h-screen flex items-center justify-center bg-blue-100 text-center px-4">
       <div className="max-w-xl w-full">
         <h1 className="text-4xl font-bold mb-4">Succession Bridge</h1>
         <p className="text-lg text-gray-700 mb-8">
