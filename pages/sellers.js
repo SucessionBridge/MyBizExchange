@@ -68,43 +68,48 @@ export default function SellerOnboarding() {
     setErrorMessage("");
   };
 
-  // Upload a single image to Supabase and return the URL
-  const uploadImage = async (file) => {
-    const fileName = `business-${Date.now()}-${file.name}`;
+  // Upload images to Supabase and return their URLs
+  const uploadImages = async (files) => {
+    const uploadedUrls = [];
+    const errors = [];
 
-    // Upload the image to Supabase storage
-    const { data, error } = await supabase.storage
-      .from('business-photos')
-      .upload(fileName, file);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileName = `business-${Date.now()}-${file.name}`;
 
-    // If there's an error, log it
-    if (error) {
-      console.error('Error uploading image:', error.message);
-      return null;
+      console.log(`Uploading file: ${fileName}`);
+
+      const { data, error } = await supabase.storage
+        .from('business-photos')
+        .upload(fileName, file);
+
+      if (error) {
+        console.error('Error uploading image:', error.message);
+        errors.push(error.message);
+        continue;  // Move to the next file if one fails
+      }
+
+      const url = supabase.storage.from('business-photos').getPublicUrl(fileName).publicURL;
+
+      console.log(`Image uploaded: ${url}`);
+      uploadedUrls.push(url);
     }
 
-    // Get the public URL of the uploaded image
-    const url = supabase.storage.from('business-photos').getPublicUrl(fileName).publicURL;
+    if (errors.length > 0) {
+      alert(`Some images failed to upload: ${errors.join(', ')}`);
+    }
 
-    // Log the URL of the uploaded image
-    console.log('Image uploaded:', url);
-
-    return url;
+    return uploadedUrls;
   };
 
   // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Upload the first image (for testing)
-    const uploadedUrl = await uploadImage(formData.images[0]);
+    // Upload images and get URLs
+    const uploadedUrls = await uploadImages(formData.images);
 
-    if (!uploadedUrl) {
-      alert("There was a problem uploading the image.");
-      return;
-    }
-
-    // Submit form data including image URL
+    // Submit form data including image URLs
     const { name, email, businessName, industry, location, financingType } = formData;
 
     const { data, error } = await supabase.from('sellers').insert([
@@ -115,7 +120,7 @@ export default function SellerOnboarding() {
         industry,
         location,
         financing_type: financingType,
-        images: [uploadedUrl],  // Save single image URL in the database
+        images: uploadedUrls,  // Save image URLs in the database
       },
     ]);
 
@@ -184,6 +189,7 @@ export default function SellerOnboarding() {
     </main>
   );
 }
+
 
 
 
