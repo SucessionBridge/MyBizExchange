@@ -80,16 +80,16 @@ export default function SellerOnboarding() {
       console.log(`Uploading file: ${fileName}`);
 
       const { data, error } = await supabase.storage
-        .from('business-photos')
+        .from('new-business-photos') // Use the new bucket name here
         .upload(fileName, file);
 
       if (error) {
         console.error('Error uploading image:', error.message);
         errors.push(error.message);
-        continue;  // Move to the next file if one fails
+        continue;
       }
 
-      const url = supabase.storage.from('business-photos').getPublicUrl(fileName).publicURL;
+      const url = supabase.storage.from('new-business-photos').getPublicUrl(fileName).publicURL;
 
       console.log(`Image uploaded: ${url}`);
       uploadedUrls.push(url);
@@ -189,6 +189,7 @@ export default function SellerOnboarding() {
     </main>
   );
 }
+
 
 
 
