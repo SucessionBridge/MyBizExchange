@@ -9,10 +9,12 @@ export default function SellerOnboarding() {
     industry: "",
     location: "",
     financingType: "rent-to-own",
-    images: [],  // Add this field to hold the image URLs
+    images: [],  // To store valid image files
   });
 
-  const [imagePreviews, setImagePreviews] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState([]);  // For storing preview images
+  const [errorMessage, setErrorMessage] = useState("");  // To display validation errors
+  const [invalidFiles, setInvalidFiles] = useState([]);  // To store invalid files based on size
 
   // Handle changes to form fields
   const handleChange = (e) => {
@@ -26,13 +28,26 @@ export default function SellerOnboarding() {
   // Handle image selection
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
+    const maxSize = 5 * 1024 * 1024; // 5MB limit
 
-    if (files.length + formData.images.length <= 8) {
-      const previews = files.map((file) => URL.createObjectURL(file));
+    const validFiles = files.filter(file => file.size <= maxSize);
+    const invalidFiles = files.filter(file => file.size > maxSize);
+
+    // Handle invalid files and set error message
+    if (invalidFiles.length > 0) {
+      setErrorMessage(`Some files exceed the 5MB size limit and will not be uploaded.`);
+      setInvalidFiles(invalidFiles.map(file => file.name));  // Track invalid files by name or unique identifier
+    } else {
+      setErrorMessage("");  // Clear the error message if all files are valid
+      setInvalidFiles([]);  // Clear invalid files
+    }
+
+    if (validFiles.length + formData.images.length <= 8) {
+      const previews = validFiles.map((file) => URL.createObjectURL(file));
 
       setFormData((prev) => ({
         ...prev,
-        images: [...prev.images, ...files],
+        images: [...prev.images, ...validFiles],
       }));
 
       setImagePreviews((prev) => [...prev, ...previews]);
@@ -48,38 +63,43 @@ export default function SellerOnboarding() {
 
     setFormData({ ...formData, images: updatedImages });
     setImagePreviews(updatedPreviews);
+
+    // Reset error message if removing an invalid file
+    setErrorMessage("");
   };
 
   // Upload images to Supabase and return their URLs
   const uploadImages = async (files) => {
     const uploadedUrls = [];
+    const errors = [];
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const fileName = `business-${Date.now()}-${file.name}`;
 
-      console.log(`Uploading file: ${fileName}`);  // Log the file being uploaded
+      console.log(`Uploading file: ${fileName}`);
 
-      // Upload the image to Supabase
       const { data, error } = await supabase.storage
-        .from('business-photos')  // Ensure the bucket name is correct
+        .from('business-photos')
         .upload(fileName, file);
 
       if (error) {
-        console.error('Error uploading image:', error.message); // Log error message
-        alert(`Error uploading image: ${error.message}`);  // Show an alert with the error message
-        return;  // Stop processing if there's an error
+        console.error('Error uploading image:', error.message);
+        errors.push(error.message);
+        continue;
       }
 
-      // Get the public URL of the uploaded image
       const url = supabase.storage.from('business-photos').getPublicUrl(fileName).publicURL;
 
-      console.log(`Image uploaded: ${url}`);  // Log the URL of the uploaded image
-
-      uploadedUrls.push(url);  // Push the image URL to the array
+      console.log(`Image uploaded: ${url}`);
+      uploadedUrls.push(url);
     }
 
-    return uploadedUrls;  // Return the uploaded URLs
+    if (errors.length > 0) {
+      alert(`Some images failed to upload: ${errors.join(', ')}`);
+    }
+
+    return uploadedUrls;
   };
 
   // Handle form submission
@@ -122,6 +142,7 @@ export default function SellerOnboarding() {
         images: [],  // Clear images
       });
       setImagePreviews([]);  // Clear previews
+      setErrorMessage("");  // Clear any error messages
     }
   };
 
@@ -153,9 +174,13 @@ export default function SellerOnboarding() {
                 <div key={index} className="relative">
                   <img src={preview} alt={`Preview ${index}`} className="h-20 w-20 object-cover rounded-md" />
                   <button onClick={() => removeImage(index)} className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-full">X</button>
+                  {invalidFiles.includes(formData.images[index].name) && (
+                    <span className="absolute top-0 left-0 bg-red-500 text-white text-xs p-1">Invalid</span>
+                  )}
                 </div>
               ))}
             </div>
+            {errorMessage && <div className="text-red-500 text-sm">{errorMessage}</div>} {/* Display error message */}
           </div>
 
           <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">Submit Listing</button>
@@ -166,5 +191,3 @@ export default function SellerOnboarding() {
 }
 
 
-
- 
