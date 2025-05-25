@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { supabase } from '../lib/supabaseClient';
+import React, { useState } from "react";
 
 export default function BuyerOnboarding() {
   const [formData, setFormData] = useState({
@@ -35,32 +36,52 @@ export default function BuyerOnboarding() {
     return true;
   };
 
-  // Handle form submission (without Supabase for now)
+  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     // Validate the form
     if (!validateForm()) return;
 
-    // Just log form data for now (without Supabase)
-    console.log("Form data submitted:", formData);
+    // Send form data to Supabase for storage
+    const { name, email, financingType, location, experience, industryPreference, capitalInvestment, shortIntroduction, priorIndustryExperience, willingToRelocate } = formData;
 
-    // If you had Supabase, you would insert data here, but we'll skip that for now.
-    alert("Buyer profile submitted (but no database connection for now).");
+    const { data, error } = await supabase.from('buyers').insert([
+      {
+        name,
+        email,
+        financing_type: financingType,
+        location,
+        experience,
+        industry_preference: industryPreference,
+        capital_investment: capitalInvestment,
+        short_introduction: shortIntroduction,
+        prior_industry_experience: priorIndustryExperience,
+        willing_to_relocate: willingToRelocate,
+      },
+    ]);
 
-    // Reset form data
-    setFormData({
-      name: "",
-      email: "",
-      financingType: "rent-to-own",
-      location: "",
-      experience: 3, // Default value
-      industryPreference: "",
-      capitalInvestment: "",
-      shortIntroduction: "",
-      priorIndustryExperience: "No", // Default
-      willingToRelocate: "No", // Default
-    });
+    if (error) {
+      console.error("❌ Error submitting form:", error);
+      alert("There was a problem submitting your form.");
+    } else {
+      console.log("✅ Submitted:", data);
+      alert("Your buyer profile was submitted successfully!");
+
+      // Reset form data
+      setFormData({
+        name: "",
+        email: "",
+        financingType: "rent-to-own",
+        location: "",
+        experience: 3, // Default value
+        industryPreference: "",
+        capitalInvestment: "",
+        shortIntroduction: "",
+        priorIndustryExperience: "No", // Default
+        willingToRelocate: "No", // Default
+      });
+    }
   };
 
   return (
