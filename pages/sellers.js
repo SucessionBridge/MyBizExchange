@@ -10,6 +10,7 @@ export default function SellerOnboarding() {
     location: "",
     financingType: "rent-to-own",
     images: [],  // To store valid image files
+    businessDescription: "", // New business description field
   });
 
   const [imagePreviews, setImagePreviews] = useState([]);  // For storing preview images
@@ -109,8 +110,8 @@ export default function SellerOnboarding() {
     // Upload images and get URLs
     const uploadedUrls = await uploadImages(formData.images);
 
-    // Submit form data including image URLs
-    const { name, email, businessName, industry, location, financingType } = formData;
+    // Submit form data including business description
+    const { name, email, businessName, industry, location, financingType, businessDescription } = formData;
 
     const { data, error } = await supabase.from('sellers').insert([
       {
@@ -120,7 +121,8 @@ export default function SellerOnboarding() {
         industry,
         location,
         financing_type: financingType,
-        images: uploadedUrls,  // Save image URLs in the database
+        images: uploadedUrls,
+        business_description: businessDescription, // Include the business description
       },
     ]);
 
@@ -140,6 +142,7 @@ export default function SellerOnboarding() {
         location: "",
         financingType: "rent-to-own",
         images: [],  // Clear images
+        businessDescription: "", // Clear business description field
       });
       setImagePreviews([]);  // Clear previews
       setErrorMessage("");  // Clear any error messages
@@ -151,44 +154,123 @@ export default function SellerOnboarding() {
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Seller Onboarding</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
-          <input name="email" type="email" placeholder="Email Address" value={formData.email} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
-          <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
-          <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
-          <input name="location" placeholder="Location" value={formData.location} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
-          
+          <input
+            name="name"
+            placeholder="Your Name"
+            value={formData.name}
+            onChange={handleChange}
+            className="w-full border border-gray-300 p-3 rounded-xl"
+            required
+          />
+          <input
+            name="email"
+            type="email"
+            placeholder="Email Address"
+            value={formData.email}
+            onChange={handleChange}
+            className="w-full border border-gray-300 p-3 rounded-xl"
+            required
+          />
+          <input
+            name="businessName"
+            placeholder="Business Name"
+            value={formData.businessName}
+            onChange={handleChange}
+            className="w-full border border-gray-300 p-3 rounded-xl"
+            required
+          />
+          <input
+            name="industry"
+            placeholder="Industry"
+            value={formData.industry}
+            onChange={handleChange}
+            className="w-full border border-gray-300 p-3 rounded-xl"
+            required
+          />
+          <input
+            name="location"
+            placeholder="Location"
+            value={formData.location}
+            onChange={handleChange}
+            className="w-full border border-gray-300 p-3 rounded-xl"
+            required
+          />
+
+          {/* Business Description Field */}
+          <textarea
+            name="businessDescription"
+            placeholder="Brief description of the business"
+            value={formData.businessDescription}
+            onChange={handleChange}
+            className="w-full border border-gray-300 p-3 rounded-xl"
+            rows="4"
+            required
+          />
+
+          {/* Financing Type */}
           <div>
             <label className="block text-sm font-medium mb-2">Preferred Financing Option:</label>
-            <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl">
+            <select
+              name="financingType"
+              value={formData.financingType}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl"
+            >
               <option value="rent-to-own">Rent-to-Own</option>
               <option value="seller-financing">Seller Financing</option>
               <option value="third-party">3rd-Party Financing</option>
             </select>
           </div>
 
+          {/* Image Upload */}
           <div>
             <label className="block text-sm font-medium mb-2">Upload up to 8 photos:</label>
-            <input type="file" name="images" accept="image/*" multiple onChange={handleImageUpload} className="w-full border border-gray-300 p-3 rounded-xl" />
+            <input
+              type="file"
+              name="images"
+              accept="image/*"
+              multiple
+              onChange={handleImageUpload}
+              className="w-full border border-gray-300 p-3 rounded-xl"
+            />
             <div className="mt-4 flex flex-wrap gap-2">
               {imagePreviews.map((preview, index) => (
                 <div key={index} className="relative">
-                  <img src={preview} alt={`Preview ${index}`} className="h-20 w-20 object-cover rounded-md" />
-                  <button onClick={() => removeImage(index)} className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-full">X</button>
+                  <img
+                    src={preview}
+                    alt={`Preview ${index}`}
+                    className="h-20 w-20 object-cover rounded-md"
+                  />
+                  <button
+                    onClick={() => removeImage(index)}
+                    className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-full"
+                  >
+                    X
+                  </button>
                   {invalidFiles.includes(formData.images[index].name) && (
-                    <span className="absolute top-0 left-0 bg-red-500 text-white text-xs p-1">Invalid</span>
+                    <span className="absolute top-0 left-0 bg-red-500 text-white text-xs p-1">
+                      Invalid
+                    </span>
                   )}
                 </div>
               ))}
             </div>
-            {errorMessage && <div className="text-red-500 text-sm">{errorMessage}</div>} {/* Display error message */}
+            {errorMessage && <div className="text-red-500 text-sm">{errorMessage}</div>}
           </div>
 
-          <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">Submit Listing</button>
+          {/* Submit Button */}
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold"
+          >
+            Submit Listing
+          </button>
         </form>
       </div>
     </main>
   );
 }
+
 
 
 
