@@ -57,6 +57,7 @@ export default function SellerOnboarding() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const fileName = `business-${Date.now()}-${file.name}`;
+ console.log(`Uploading file: ${fileName}`); // Log the file being uploaded
 
       const { data, error } = await supabase.storage
         .from('business-photos')
