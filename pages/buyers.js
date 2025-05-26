@@ -1,5 +1,4 @@
-
-           import { supabase } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 import React, { useState } from "react";
 
 export default function BuyerOnboarding() {
@@ -16,9 +15,12 @@ export default function BuyerOnboarding() {
     willingToRelocate: "No", // Yes/No
     city: "", // Add city field
     stateOrProvince: "", // Add state or province field
+    videoUrl: "", // To store the video URL after uploading
   });
 
   const [errorMessage, setErrorMessage] = useState(""); // For any validation errors
+  const [videoPreview, setVideoPreview] = useState(null); // To display video preview before upload
+  const [videoFile, setVideoFile] = useState(null); // To store the selected video file
 
   // Handle changes to form fields
   const handleChange = (e) => {
@@ -29,10 +31,24 @@ export default function BuyerOnboarding() {
     }));
   };
 
+  // Handle video file selection
+  const handleVideoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const videoUrl = URL.createObjectURL(file); // Preview the video
+      setVideoPreview(videoUrl);
+      setVideoFile(file);
+    }
+  };
+
   // Form validation
   const validateForm = () => {
     if (!formData.name || !formData.email || !formData.location || !formData.city || !formData.stateOrProvince) {
       setErrorMessage("Please fill in all the required fields.");
+      return false;
+    }
+    if (!videoFile) {
+      setErrorMessage("Please upload a video introduction.");
       return false;
     }
     setErrorMessage(""); // Clear error if validation passes
@@ -46,7 +62,21 @@ export default function BuyerOnboarding() {
     // Validate the form
     if (!validateForm()) return;
 
-    // Send form data to Supabase for storage
+    // Upload video file to Supabase storage
+    const videoFileName = `buyer-video-${Date.now()}-${videoFile.name}`;
+    const { data: videoData, error: videoError } = await supabase.storage
+      .from('buyer-videos') // Specify the bucket for videos
+      .upload(videoFileName, videoFile);
+
+    if (videoError) {
+      console.error("❌ Error uploading video:", videoError.message);
+      alert("There was a problem uploading your video.");
+      return;
+    }
+
+    const videoUrl = supabase.storage.from('buyer-videos').getPublicUrl(videoFileName).publicURL;
+
+    // Send form data including the video URL to Supabase for storage
     const { name, email, financingType, location, experience, industryPreference, capitalInvestment, shortIntroduction, priorIndustryExperience, willingToRelocate, city, stateOrProvince } = formData;
 
     const { data, error } = await supabase.from('buyers').insert([
@@ -63,6 +93,7 @@ export default function BuyerOnboarding() {
         willing_to_relocate: willingToRelocate,
         city, // Save city data
         state_or_province: stateOrProvince, // Save state/province data
+        video_url: videoUrl, // Save video URL
       },
     ]);
 
@@ -87,7 +118,10 @@ export default function BuyerOnboarding() {
         willingToRelocate: "No", // Default
         city: "", // Reset city
         stateOrProvince: "", // Reset state/province
+        videoUrl: "", // Reset video URL
       });
+      setVideoPreview(null); // Clear video preview
+      setVideoFile(null); // Clear video file
     }
   };
 
@@ -240,6 +274,24 @@ export default function BuyerOnboarding() {
             />
           </div>
 
+          {/* Video Upload */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Video Introduction (Optional):</label>
+            <input
+              type="file"
+              accept="video/*"
+              onChange={handleVideoUpload}
+              className="w-full border border-gray-300 p-3 rounded-xl"
+            />
+            {videoPreview && (
+              <div className="mt-4">
+                <video width="200" controls>
+                  <source src={videoPreview} type="video/mp4" />
+                </video>
+              </div>
+            )}
+          </div>
+
           {/* Submit Button */}
           <button
             type="submit"
@@ -252,3 +304,5 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
+
+
