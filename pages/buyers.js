@@ -15,12 +15,11 @@ export default function BuyerOnboarding() {
     willingToRelocate: "No", // Yes/No
     city: "", // Add city field
     stateOrProvince: "", // Add state or province field
-    videoUrl: "", // To store the video URL after uploading
+    video: null, // New field for video introduction
   });
 
   const [errorMessage, setErrorMessage] = useState(""); // For any validation errors
-  const [videoPreview, setVideoPreview] = useState(null); // To display video preview before upload
-  const [videoFile, setVideoFile] = useState(null); // To store the selected video file
+  const [videoPreview, setVideoPreview] = useState(null); // To store video preview URL
 
   // Handle changes to form fields
   const handleChange = (e) => {
@@ -31,13 +30,16 @@ export default function BuyerOnboarding() {
     }));
   };
 
-  // Handle video file selection
+  // Handle video file upload
   const handleVideoUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const videoUrl = URL.createObjectURL(file); // Preview the video
-      setVideoPreview(videoUrl);
-      setVideoFile(file);
+      setFormData((prev) => ({
+        ...prev,
+        video: file,
+      }));
+      const videoURL = URL.createObjectURL(file);
+      setVideoPreview(videoURL);
     }
   };
 
@@ -45,10 +47,6 @@ export default function BuyerOnboarding() {
   const validateForm = () => {
     if (!formData.name || !formData.email || !formData.location || !formData.city || !formData.stateOrProvince) {
       setErrorMessage("Please fill in all the required fields.");
-      return false;
-    }
-    if (!videoFile) {
-      setErrorMessage("Please upload a video introduction.");
       return false;
     }
     setErrorMessage(""); // Clear error if validation passes
@@ -62,22 +60,25 @@ export default function BuyerOnboarding() {
     // Validate the form
     if (!validateForm()) return;
 
-    // Upload video file to Supabase storage
-    const videoFileName = `buyer-video-${Date.now()}-${videoFile.name}`;
-    const { data: videoData, error: videoError } = await supabase.storage
-      .from('buyer-videos') // Specify the bucket for videos
-      .upload(videoFileName, videoFile);
+    // Send form data to Supabase for storage
+    const { name, email, financingType, location, experience, industryPreference, capitalInvestment, shortIntroduction, priorIndustryExperience, willingToRelocate, city, stateOrProvince, video } = formData;
 
-    if (videoError) {
-      console.error("❌ Error uploading video:", videoError.message);
-      alert("There was a problem uploading your video.");
-      return;
+    // If video is included, upload it to Supabase storage
+    let videoUrl = null;
+    if (video) {
+      const videoName = `buyer-video-${Date.now()}-${video.name}`;
+      const { data, error } = await supabase.storage
+        .from('buyer-videos') // Upload to your Supabase storage bucket
+        .upload(videoName, video);
+
+      if (error) {
+        console.error("❌ Error uploading video:", error);
+        alert("There was a problem uploading your video.");
+        return;
+      }
+
+      videoUrl = supabase.storage.from('buyer-videos').getPublicUrl(videoName).publicURL;
     }
-
-    const videoUrl = supabase.storage.from('buyer-videos').getPublicUrl(videoFileName).publicURL;
-
-    // Send form data including the video URL to Supabase for storage
-    const { name, email, financingType, location, experience, industryPreference, capitalInvestment, shortIntroduction, priorIndustryExperience, willingToRelocate, city, stateOrProvince } = formData;
 
     const { data, error } = await supabase.from('buyers').insert([
       {
@@ -91,9 +92,9 @@ export default function BuyerOnboarding() {
         short_introduction: shortIntroduction,
         prior_industry_experience: priorIndustryExperience,
         willing_to_relocate: willingToRelocate,
-        city, // Save city data
-        state_or_province: stateOrProvince, // Save state/province data
-        video_url: videoUrl, // Save video URL
+        city,
+        state_or_province: stateOrProvince,
+        video_introduction: videoUrl, // Save video URL if uploaded
       },
     ]);
 
@@ -118,10 +119,9 @@ export default function BuyerOnboarding() {
         willingToRelocate: "No", // Default
         city: "", // Reset city
         stateOrProvince: "", // Reset state/province
-        videoUrl: "", // Reset video URL
+        video: null, // Reset video
       });
       setVideoPreview(null); // Clear video preview
-      setVideoFile(null); // Clear video file
     }
   };
 
@@ -274,9 +274,12 @@ export default function BuyerOnboarding() {
             />
           </div>
 
-          {/* Video Upload */}
+          {/* Video Introduction */}
           <div>
             <label className="block text-sm font-medium mb-2">Video Introduction (Optional):</label>
+            <p className="text-sm text-gray-500 mt-2">
+              <em>Shoot a short video with your phone introducing yourself and explaining why you want to own this business. This will help business owners get to know you and initiate the conversation.</em>
+            </p>
             <input
               type="file"
               accept="video/*"
@@ -304,5 +307,4 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
-
 
