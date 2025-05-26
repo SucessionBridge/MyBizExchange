@@ -1,4 +1,5 @@
-import { supabase } from '../lib/supabaseClient';
+
+           import { supabase } from '../lib/supabaseClient';
 import React, { useState } from "react";
 
 export default function BuyerOnboarding() {
@@ -13,6 +14,8 @@ export default function BuyerOnboarding() {
     shortIntroduction: "",
     priorIndustryExperience: "No", // Yes/No
     willingToRelocate: "No", // Yes/No
+    city: "", // Add city field
+    stateOrProvince: "", // Add state or province field
   });
 
   const [errorMessage, setErrorMessage] = useState(""); // For any validation errors
@@ -28,7 +31,7 @@ export default function BuyerOnboarding() {
 
   // Form validation
   const validateForm = () => {
-    if (!formData.name || !formData.email || !formData.location) {
+    if (!formData.name || !formData.email || !formData.location || !formData.city || !formData.stateOrProvince) {
       setErrorMessage("Please fill in all the required fields.");
       return false;
     }
@@ -44,7 +47,7 @@ export default function BuyerOnboarding() {
     if (!validateForm()) return;
 
     // Send form data to Supabase for storage
-    const { name, email, financingType, location, experience, industryPreference, capitalInvestment, shortIntroduction, priorIndustryExperience, willingToRelocate } = formData;
+    const { name, email, financingType, location, experience, industryPreference, capitalInvestment, shortIntroduction, priorIndustryExperience, willingToRelocate, city, stateOrProvince } = formData;
 
     const { data, error } = await supabase.from('buyers').insert([
       {
@@ -58,6 +61,8 @@ export default function BuyerOnboarding() {
         short_introduction: shortIntroduction,
         prior_industry_experience: priorIndustryExperience,
         willing_to_relocate: willingToRelocate,
+        city, // Save city data
+        state_or_province: stateOrProvince, // Save state/province data
       },
     ]);
 
@@ -80,6 +85,8 @@ export default function BuyerOnboarding() {
         shortIntroduction: "",
         priorIndustryExperience: "No", // Default
         willingToRelocate: "No", // Default
+        city: "", // Reset city
+        stateOrProvince: "", // Reset state/province
       });
     }
   };
@@ -207,6 +214,30 @@ export default function BuyerOnboarding() {
               <option value="No">No</option>
               <option value="Yes">Yes</option>
             </select>
+          </div>
+
+          {/* City */}
+          <div>
+            <label className="block text-sm font-medium mb-2">City:</label>
+            <input
+              name="city"
+              value={formData.city}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl"
+              placeholder="Enter your city"
+            />
+          </div>
+
+          {/* State or Province */}
+          <div>
+            <label className="block text-sm font-medium mb-2">State/Province:</label>
+            <input
+              name="stateOrProvince"
+              value={formData.stateOrProvince}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl"
+              placeholder="Enter your state or province"
+            />
           </div>
 
           {/* Submit Button */}
