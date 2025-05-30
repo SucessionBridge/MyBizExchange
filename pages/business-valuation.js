@@ -8,9 +8,10 @@ export default function BusinessValuation() {
     annualProfit: "",
     inventoryValue: "",
     capitalInvestment: "",
-    industryPreference: "", // New field for industry
-    location: "", // New field for location
+    industryPreference: "",
+    location: "",
     equipmentValue: "", // New field for equipment (mowers, forklifts, etc.)
+    assetValue: "", // New field for business assets like buildings, vehicles (food truck, etc.)
     performanceBasedDeal: false, // New field for performance-based deal
     revenuePercentage: "", // Seller percentage of revenue for performance-based deal
     annualSales: "", // New field for annual sales
@@ -36,6 +37,7 @@ export default function BusinessValuation() {
       capitalInvestment,
       industryPreference,
       equipmentValue,
+      assetValue,
       performanceBasedDeal,
       revenuePercentage,
       annualSales,
@@ -44,24 +46,29 @@ export default function BusinessValuation() {
     // Set industry multipliers based on the business type
     let industryMultiplier = 2; // Default multiplier for small businesses
     if (industryPreference === "tech") {
-      industryMultiplier = 5; // Higher multiple for tech businesses
+      industryMultiplier = 5;
     }
 
     let estimatedValue = annualProfit * industryMultiplier;
 
     // Add inventory value if provided
     if (inventoryValue) {
-      estimatedValue += inventoryValue * 0.10; // Add 10% of inventory value
+      estimatedValue += inventoryValue * 0.10;
     }
 
     // Add capital investment if provided
     if (capitalInvestment) {
-      estimatedValue += capitalInvestment * 0.05; // Add 5% of capital investment
+      estimatedValue += capitalInvestment * 0.05;
     }
 
     // Include equipment value (mowers, forklifts, etc.) if provided
     if (equipmentValue) {
       estimatedValue += parseFloat(equipmentValue);
+    }
+
+    // Include business assets value (e.g., food truck, building) if provided
+    if (assetValue) {
+      estimatedValue += parseFloat(assetValue); // Market value or original purchase price
     }
 
     // Include annual sales if provided (especially relevant for stores or retail)
@@ -71,7 +78,7 @@ export default function BusinessValuation() {
 
     // Adjust valuation if performance-based deal
     if (performanceBasedDeal && revenuePercentage) {
-      estimatedValue -= estimatedValue * (revenuePercentage / 100); // Reduce by the agreed revenue share percentage
+      estimatedValue -= estimatedValue * (revenuePercentage / 100);
     }
 
     return estimatedValue;
@@ -96,6 +103,7 @@ export default function BusinessValuation() {
   return (
     <main className="min-h-screen bg-blue-50 p-8">
       <div className="max-w-2xl mx-auto">
+        {/* Disclaimer and Heading */}
         <div className="text-center mb-8">
           <h2 className="text-3xl font-semibold mb-4">AI-Driven Business Valuation Tool</h2>
           <p className="text-lg mb-6">
@@ -174,7 +182,7 @@ export default function BusinessValuation() {
           {/* Equipment Value */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Equipment Value (e.g., Mowers if you are in landscaping, Forklifts if you are in manufacturing):
+              Equipment Value (e.g., Mowers, Forklifts, etc.):
             </label>
             <input
               type="number"
@@ -186,23 +194,32 @@ export default function BusinessValuation() {
             />
           </div>
 
-          {/* Performance-Based Deal Explanation */}
+          {/* Asset Value (e.g., Food truck, building) */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Performance-Based Deal
+              Asset Value (e.g., Food Truck, Building, etc.):
             </label>
+            <input
+              type="number"
+              name="assetValue"
+              value={formData.assetValue}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+              placeholder="Enter the market value of your assets (food truck, building, etc.)"
+            />
+          </div>
+
+          {/* Performance-Based Deal Explanation */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Performance-Based Deal</label>
             <p className="text-sm text-gray-500 mt-2">
               <em>
                 You can structure a deal where the buyer pays a portion of the business value upfront, and the remaining
-                amount is paid over time based on the business performance. For example, the seller keeps 90% of the sales,
-                and the buyer pays 10% of the revenue until the price is met. This helps reduce upfront costs for the buyer
-                and ensures ongoing cash flow for the seller.
+                amount is paid over time based on the business performance. For example, the seller keeps 90% of the
+                business's revenue, and the buyer gets 10% until they’ve paid off the price. This allows the buyer to retain
+                some cash flow and complete the purchase without paying the full amount immediately.
               </em>
             </p>
-          </div>
-
-          {/* Performance-Based Deal Checkbox */}
-          <div>
             <input
               type="checkbox"
               name="performanceBasedDeal"
@@ -213,13 +230,9 @@ export default function BusinessValuation() {
             <span>Yes, I want to offer performance-based payment (revenue share).</span>
           </div>
 
-          {/* Revenue Share Percentage (appears only if Performance-Based Deal is checked) */}
           {formData.performanceBasedDeal && (
             <div>
-              <label className="block text-sm font-medium mb-2">
-                Revenue Share Percentage:
-                <span className="text-xs text-gray-500"> (e.g., You keep 90%, and the buyer gets 10% of the revenue until the full price is met.)</span>
-              </label>
+              <label className="block text-sm font-medium mb-2">Revenue Share Percentage:</label>
               <input
                 type="number"
                 name="revenuePercentage"
@@ -250,7 +263,4 @@ export default function BusinessValuation() {
             <p className="text-3xl font-bold text-blue-600">${valuation.toFixed(2)}</p>
           </div>
         )}
-      </div>
-    </main>
-  );
-}
+     
