@@ -16,6 +16,7 @@ export default function BuyerOnboarding() {
     city: "", // Add city field
     stateOrProvince: "", // Add state or province field
     video: null, // New field for video introduction
+    budgetForPurchase: "", // New field for the buyer's budget for purchase
   });
 
   const [errorMessage, setErrorMessage] = useState(""); // For any validation errors
@@ -61,7 +62,7 @@ export default function BuyerOnboarding() {
     if (!validateForm()) return;
 
     // Send form data to Supabase for storage
-    const { name, email, financingType, location, experience, industryPreference, capitalInvestment, shortIntroduction, priorIndustryExperience, willingToRelocate, city, stateOrProvince, video } = formData;
+    const { name, email, financingType, location, experience, industryPreference, capitalInvestment, shortIntroduction, priorIndustryExperience, willingToRelocate, city, stateOrProvince, video, budgetForPurchase } = formData;
 
     // If video is included, upload it to Supabase storage
     let videoUrl = null;
@@ -95,6 +96,7 @@ export default function BuyerOnboarding() {
         city,
         state_or_province: stateOrProvince,
         video_introduction: videoUrl, // Save video URL if uploaded
+        budget_for_purchase: budgetForPurchase, // Save budget for purchase field
       },
     ]);
 
@@ -120,13 +122,14 @@ export default function BuyerOnboarding() {
         city: "", // Reset city
         stateOrProvince: "", // Reset state/province
         video: null, // Reset video
+        budgetForPurchase: "", // Reset budget
       });
       setVideoPreview(null); // Clear video preview
     }
   };
 
   return (
-    <main className="min-h-screen bg-white p-8">
+    <main className="min-h-screen bg-blue-50 p-8">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Buyer Onboarding</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -136,10 +139,10 @@ export default function BuyerOnboarding() {
             placeholder="Your Name"
             value={formData.name}
             onChange={handleChange}
-            className="w-full border border-gray-300 p-3 rounded-xl"
+            className="w-full border border-gray-300 p-3 rounded-xl text-black"
             required
           />
-          
+
           {/* Email */}
           <input
             name="email"
@@ -147,7 +150,7 @@ export default function BuyerOnboarding() {
             placeholder="Email Address"
             value={formData.email}
             onChange={handleChange}
-            className="w-full border border-gray-300 p-3 rounded-xl"
+            className="w-full border border-gray-300 p-3 rounded-xl text-black"
             required
           />
 
@@ -158,7 +161,7 @@ export default function BuyerOnboarding() {
               name="financingType"
               value={formData.financingType}
               onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl"
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
             >
               <option value="rent-to-own">Rent-to-Own</option>
               <option value="seller-financing">Seller Financing</option>
@@ -176,7 +179,7 @@ export default function BuyerOnboarding() {
               max="5"
               value={formData.experience}
               onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl"
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
               required
             />
           </div>
@@ -188,7 +191,7 @@ export default function BuyerOnboarding() {
               name="industryPreference"
               value={formData.industryPreference}
               onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl"
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
               placeholder="Industry you are interested in"
             />
           </div>
@@ -201,12 +204,25 @@ export default function BuyerOnboarding() {
               name="capitalInvestment"
               value={formData.capitalInvestment}
               onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl"
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
               required
             />
             <p className="text-sm text-gray-500 mt-2">
               <em>No one will see this publicly. Used for matching purposes only.</em>
             </p>
+          </div>
+
+          {/* Budget for Purchase */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Budget for Purchase:</label>
+            <input
+              type="number"
+              name="budgetForPurchase"
+              value={formData.budgetForPurchase}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+              placeholder="Enter your budget for purchase"
+            />
           </div>
 
           {/* Short Introduction */}
@@ -216,7 +232,7 @@ export default function BuyerOnboarding() {
               name="shortIntroduction"
               value={formData.shortIntroduction}
               onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl"
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
               placeholder="Tell us a bit about yourself."
               rows="4"
             />
@@ -229,7 +245,7 @@ export default function BuyerOnboarding() {
               name="priorIndustryExperience"
               value={formData.priorIndustryExperience}
               onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl"
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
             >
               <option value="No">No</option>
               <option value="Yes">Yes</option>
@@ -243,7 +259,7 @@ export default function BuyerOnboarding() {
               name="willingToRelocate"
               value={formData.willingToRelocate}
               onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl"
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
             >
               <option value="No">No</option>
               <option value="Yes">Yes</option>
@@ -257,7 +273,7 @@ export default function BuyerOnboarding() {
               name="city"
               value={formData.city}
               onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl"
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
               placeholder="Enter your city"
             />
           </div>
@@ -269,7 +285,7 @@ export default function BuyerOnboarding() {
               name="stateOrProvince"
               value={formData.stateOrProvince}
               onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl"
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
               placeholder="Enter your state or province"
             />
           </div>
@@ -307,4 +323,3 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
-
