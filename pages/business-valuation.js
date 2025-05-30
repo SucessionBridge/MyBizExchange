@@ -119,6 +119,19 @@ export default function BusinessValuation() {
             />
           </div>
 
+          {/* Annual Sales */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Annual Sales:</label>
+            <input
+              type="number"
+              name="annualSales"
+              value={formData.annualSales}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+              placeholder="Enter your annual sales (for retail businesses)"
+            />
+          </div>
+
           {/* Annual Profit */}
           <div>
             <label className="block text-sm font-medium mb-2">Annual Profit (EBITDA):</label>
@@ -173,22 +186,23 @@ export default function BusinessValuation() {
             />
           </div>
 
-          {/* Annual Sales */}
+          {/* Performance-Based Deal Explanation */}
           <div>
-            <label className="block text-sm font-medium mb-2">Annual Sales:</label>
-            <input
-              type="number"
-              name="annualSales"
-              value={formData.annualSales}
-              onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl text-black"
-              placeholder="Enter your annual sales (for retail businesses)"
-            />
+            <label className="block text-sm font-medium mb-2">
+              Performance-Based Deal
+            </label>
+            <p className="text-sm text-gray-500 mt-2">
+              <em>
+                You can structure a deal where the buyer pays a portion of the business value upfront, and the remaining
+                amount is paid over time based on the business performance. For example, the seller keeps 90% of the sales,
+                and the buyer pays 10% of the revenue until the price is met. This helps reduce upfront costs for the buyer
+                and ensures ongoing cash flow for the seller.
+              </em>
+            </p>
           </div>
 
-          {/* Performance-Based Deal */}
+          {/* Performance-Based Deal Checkbox */}
           <div>
-            <label className="block text-sm font-medium mb-2">Performance-Based Deal?</label>
             <input
               type="checkbox"
               name="performanceBasedDeal"
@@ -204,7 +218,7 @@ export default function BusinessValuation() {
             <div>
               <label className="block text-sm font-medium mb-2">
                 Revenue Share Percentage:
-                <span className="text-xs text-gray-500"> (e.g., You keep 85%, and the buyer gets 15% of the revenue for the first season.)</span>
+                <span className="text-xs text-gray-500"> (e.g., You keep 90%, and the buyer gets 10% of the revenue until the full price is met.)</span>
               </label>
               <input
                 type="number"
