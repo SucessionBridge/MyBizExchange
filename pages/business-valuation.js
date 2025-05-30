@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function BusinessValuation() {
   const [formData, setFormData] = useState({
@@ -64,6 +64,12 @@ export default function BusinessValuation() {
     setValuation(estimatedValue);
 
     setLoading(false); // Hide loading indicator after calculation
+
+    // Scroll to the result
+    window.scrollTo({
+      top: document.getElementById("valuation-result").offsetTop,
+      behavior: "smooth",
+    });
   };
 
   return (
@@ -183,15 +189,20 @@ export default function BusinessValuation() {
         </form>
 
         {/* Valuation Result */}
-        {valuation && (
-          <div className="mt-8 text-center">
-            <h3 className="text-2xl font-semibold mb-4">Estimated Business Value</h3>
-            <p className="text-xl">
-              Based on the information provided, your business is estimated to be worth:
-            </p>
-            <p className="text-3xl font-bold text-blue-600">${valuation.toFixed(2)}</p>
-          </div>
-        )}
+        <div id="valuation-result" className="mt-8 text-center">
+          {valuation && (
+            <>
+              <h3 className="text-2xl font-semibold mb-4">Estimated Business Value</h3>
+              <p className="text-xl">
+                Based on the information provided, your business is estimated to be worth:
+              </p>
+              <p className="text-3xl font-bold text-blue-600">${valuation.toFixed(2)}</p>
+            </>
+          )}
+
+          {/* Loading Indicator */}
+          {loading && <p className="text-lg text-blue-600">Calculating your valuation...</p>}
+        </div>
 
         {/* Error Message */}
         {errorMessage && (
@@ -203,3 +214,4 @@ export default function BusinessValuation() {
     </main>
   );
 }
+
