@@ -10,7 +10,7 @@ export default function BusinessValuation() {
     capitalInvestment: "",
     industryPreference: "",
     location: "",
-    equipmentValue: "", // New field for equipment (mowers, etc.)
+    equipmentValue: "", // New field for equipment (mowers, forklifts, etc.)
     performanceBasedDeal: false, // New field for performance-based deal
     revenuePercentage: "", // Seller percentage of revenue for performance-based deal
   });
@@ -37,7 +37,6 @@ export default function BusinessValuation() {
       industryMultiplier = 5;
     }
 
-    // Calculate base business value based on annual profit and industry multiplier
     let estimatedValue = annualProfit * industryMultiplier;
 
     // Add inventory value if provided
@@ -50,12 +49,12 @@ export default function BusinessValuation() {
       estimatedValue += capitalInvestment * 0.05;
     }
 
-    // Include equipment value (mowers, etc.) if provided
+    // Include equipment value (mowers, forklifts, etc.) if provided
     if (equipmentValue) {
       estimatedValue += parseFloat(equipmentValue);
     }
 
-    // If performance-based deal, adjust valuation
+    // Adjust valuation if performance-based deal
     if (performanceBasedDeal && revenuePercentage) {
       estimatedValue -= estimatedValue * (revenuePercentage / 100);
     }
@@ -75,7 +74,6 @@ export default function BusinessValuation() {
 
     setErrorMessage(""); // Clear error if validation passes
 
-    // Calculate business valuation
     const estimatedValue = calculateBusinessValue();
     setValuation(estimatedValue);
   };
@@ -83,6 +81,7 @@ export default function BusinessValuation() {
   return (
     <main className="min-h-screen bg-blue-50 p-8">
       <div className="max-w-2xl mx-auto">
+        {/* Disclaimer and Heading */}
         <div className="text-center mb-8">
           <h2 className="text-3xl font-semibold mb-4">AI-Driven Business Valuation Tool</h2>
           <p className="text-lg mb-6">
@@ -92,6 +91,7 @@ export default function BusinessValuation() {
           </p>
         </div>
 
+        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Business Name */}
           <div>
@@ -120,16 +120,18 @@ export default function BusinessValuation() {
             />
           </div>
 
-          {/* Equipment Value (Mowers, etc.) */}
+          {/* Equipment Value */}
           <div>
-            <label className="block text-sm font-medium mb-2">Equipment Value (e.g., Mowers):</label>
+            <label className="block text-sm font-medium mb-2">
+              Equipment Value (e.g., Mowers if you are in landscaping, Forklifts if you are in manufacturing):
+            </label>
             <input
               type="number"
               name="equipmentValue"
               value={formData.equipmentValue}
               onChange={handleChange}
               className="w-full border border-gray-300 p-3 rounded-xl text-black"
-              placeholder="Enter your equipment value"
+              placeholder="Enter the value of your equipment (mowers, forklifts, etc.)"
             />
           </div>
 
