@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-blue-600 text-white p-8">
+    <main className="min-h-screen bg-blue-800 text-white p-8">
       <div className="max-w-2xl mx-auto">
         {/* Valuation Tool Section at the top */}
         <div className="text-center mb-8">
