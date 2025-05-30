@@ -1,19 +1,26 @@
-import { useState, useEffect } from "react";
+import { supabase } from '../lib/supabaseClient';
+import React, { useState } from "react";
 
-export default function BusinessValuation() {
+export default function BuyerOnboarding() {
   const [formData, setFormData] = useState({
-    businessName: "",
-    annualRevenue: "",
-    annualProfit: "",
-    inventoryValue: "",
-    capitalInvestment: "",
-    industryPreference: "",
+    name: "",
+    email: "",
+    financingType: "rent-to-own",
     location: "",
+    experience: 3, // Default value for experience on a scale of 1-5
+    industryPreference: "", // Industry preference text input
+    capitalInvestment: "",
+    shortIntroduction: "",
+    priorIndustryExperience: "No", // Yes/No
+    willingToRelocate: "No", // Yes/No
+    city: "", // Add city field
+    stateOrProvince: "", // Add state or province field
+    video: null, // New field for video introduction
+    budgetForPurchase: "", // New field for the buyer's budget for purchase
   });
 
-  const [valuation, setValuation] = useState(null);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(""); // For any validation errors
+  const [videoPreview, setVideoPreview] = useState(null); // To store video preview URL
 
   // Handle changes to form fields
   const handleChange = (e) => {
@@ -24,26 +31,27 @@ export default function BusinessValuation() {
     }));
   };
 
-  // Business Valuation Calculation
-  const calculateBusinessValue = () => {
-    const { annualProfit, inventoryValue, capitalInvestment, industryPreference } = formData;
-
-    let industryMultiplier = 2; // Default multiplier for small businesses
-    if (industryPreference === "tech") {
-      industryMultiplier = 5; // Tech businesses typically have higher multiples
+  // Handle video file upload
+  const handleVideoUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData((prev) => ({
+        ...prev,
+        video: file,
+      }));
+      const videoURL = URL.createObjectURL(file);
+      setVideoPreview(videoURL);
     }
+  };
 
-    let estimatedValue = annualProfit * industryMultiplier;
-
-    if (inventoryValue) {
-      estimatedValue += inventoryValue * 0.10; // Add 10% of inventory value
+  // Form validation
+  const validateForm = () => {
+    if (!formData.name || !formData.email || !formData.location || !formData.city || !formData.stateOrProvince) {
+      setErrorMessage("Please fill in all the required fields.");
+      return false;
     }
-
-    if (capitalInvestment) {
-      estimatedValue += capitalInvestment * 0.05; // Add 5% of capital investment
-    }
-
-    return estimatedValue;
+    setErrorMessage(""); // Clear error if validation passes
+    return true;
   };
 
   // Handle form submission
@@ -51,106 +59,128 @@ export default function BusinessValuation() {
     e.preventDefault();
 
     // Validate the form
-    if (!formData.businessName || !formData.annualProfit || !formData.location) {
-      setErrorMessage("Please fill in all the required fields.");
-      return;
+    if (!validateForm()) return;
+
+    // Send form data to Supabase for storage
+    const { name, email, financingType, location, experience, industryPreference, capitalInvestment, shortIntroduction, priorIndustryExperience, willingToRelocate, city, stateOrProvince, video, budgetForPurchase } = formData;
+
+    // If video is included, upload it to Supabase storage
+    let videoUrl = null;
+    if (video) {
+      const videoName = `buyer-video-${Date.now()}-${video.name}`;
+      const { data, error } = await supabase.storage
+        .from('buyer-videos') // Upload to your Supabase storage bucket
+        .upload(videoName, video);
+
+      if (error) {
+        console.error("❌ Error uploading video:", error);
+        alert("There was a problem uploading your video.");
+        return;
+      }
+
+      videoUrl = supabase.storage.from('buyer-videos').getPublicUrl(videoName).publicURL;
     }
 
-    setErrorMessage(""); // Clear error if validation passes
-    setLoading(true); // Show loading indicator while calculating
+    const { data, error } = await supabase.from('buyers').insert([
+      {
+        name,
+        email,
+        financing_type: financingType,
+        location,
+        experience,
+        industry_preference: industryPreference,
+        capital_investment: capitalInvestment,
+        short_introduction: shortIntroduction,
+        prior_industry_experience: priorIndustryExperience,
+        willing_to_relocate: willingToRelocate,
+        city,
+        state_or_province: stateOrProvince,
+        video_introduction: videoUrl, // Save video URL if uploaded
+        budget_for_purchase: budgetForPurchase, // Save budget for purchase field
+      },
+    ]);
 
-    // Calculate business valuation
-    const estimatedValue = calculateBusinessValue();
-    setValuation(estimatedValue);
+    if (error) {
+      console.error("❌ Error submitting form:", error);
+      alert("There was a problem submitting your form.");
+    } else {
+      console.log("✅ Submitted:", data);
+      alert("Your buyer profile was submitted successfully!");
 
-    setLoading(false); // Hide loading indicator after calculation
-
-    // Scroll to the result
-    window.scrollTo({
-      top: document.getElementById("valuation-result").offsetTop,
-      behavior: "smooth",
-    });
+      // Reset form data
+      setFormData({
+        name: "",
+        email: "",
+        financingType: "rent-to-own",
+        location: "",
+        experience: 3, // Default value
+        industryPreference: "",
+        capitalInvestment: "",
+        shortIntroduction: "",
+        priorIndustryExperience: "No", // Default
+        willingToRelocate: "No", // Default
+        city: "", // Reset city
+        stateOrProvince: "", // Reset state/province
+        video: null, // Reset video
+        budgetForPurchase: "", // Reset budget
+      });
+      setVideoPreview(null); // Clear video preview
+    }
   };
 
   return (
     <main className="min-h-screen bg-blue-50 p-8">
       <div className="max-w-2xl mx-auto">
-        {/* Disclaimer and Heading */}
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-semibold mb-4">AI-Driven Business Valuation Tool</h2>
-          <p className="text-lg mb-6">
-            This AI-powered tool provides an estimated value of your business based on the information provided.
-            Please note that the accuracy of the valuation is dependent on the details you input. The more accurate your
-            information, the better the estimate.
-          </p>
-        </div>
-
-        {/* Valuation Form */}
+        <h1 className="text-3xl font-bold mb-6 text-center">Buyer Onboarding</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Business Name */}
+          {/* Name */}
+          <input
+            name="name"
+            placeholder="Your Name"
+            value={formData.name}
+            onChange={handleChange}
+            className="w-full border border-gray-300 p-3 rounded-xl text-black"
+            required
+          />
+
+          {/* Email */}
+          <input
+            name="email"
+            type="email"
+            placeholder="Email Address"
+            value={formData.email}
+            onChange={handleChange}
+            className="w-full border border-gray-300 p-3 rounded-xl text-black"
+            required
+          />
+
+          {/* Financing Type */}
           <div>
-            <label className="block text-sm font-medium mb-2">Business Name:</label>
-            <input
-              name="businessName"
-              value={formData.businessName}
+            <label className="block text-sm font-medium mb-2">Preferred Financing Option:</label>
+            <select
+              name="financingType"
+              value={formData.financingType}
               onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your business name"
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+            >
+              <option value="rent-to-own">Rent-to-Own</option>
+              <option value="seller-financing">Seller Financing</option>
+              <option value="third-party">3rd-Party Financing</option>
+            </select>
+          </div>
+
+          {/* Experience in Business Ownership (Scale 1-5) */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Experience in Business Ownership (Scale 1-5):</label>
+            <input
+              type="number"
+              name="experience"
+              min="1"
+              max="5"
+              value={formData.experience}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
               required
-            />
-          </div>
-
-          {/* Annual Revenue */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Annual Revenue:</label>
-            <input
-              type="number"
-              name="annualRevenue"
-              value={formData.annualRevenue}
-              onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your annual revenue"
-              required
-            />
-          </div>
-
-          {/* Annual Profit */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Annual Profit (EBITDA):</label>
-            <input
-              type="number"
-              name="annualProfit"
-              value={formData.annualProfit}
-              onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your annual profit"
-              required
-            />
-          </div>
-
-          {/* Inventory Value */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Inventory Value:</label>
-            <input
-              type="number"
-              name="inventoryValue"
-              value={formData.inventoryValue}
-              onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter the value of your inventory"
-            />
-          </div>
-
-          {/* Capital Investment */}
-          <div>
-            <label className="block text-sm font-medium mb-2">Capital Investment:</label>
-            <input
-              type="number"
-              name="capitalInvestment"
-              value={formData.capitalInvestment}
-              onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your capital investment"
             />
           </div>
 
@@ -161,22 +191,124 @@ export default function BusinessValuation() {
               name="industryPreference"
               value={formData.industryPreference}
               onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter your industry (e.g., Tech, Retail)"
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+              placeholder="Industry you are interested in"
             />
           </div>
 
-          {/* Location */}
+          {/* Capital Investment */}
           <div>
-            <label className="block text-sm font-medium mb-2">Business Location:</label>
+            <label className="block text-sm font-medium mb-2">Available Capital:</label>
             <input
-              name="location"
-              value={formData.location}
+              type="number"
+              name="capitalInvestment"
+              value={formData.capitalInvestment}
               onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl text-black focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Enter the business location"
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
               required
             />
+            <p className="text-sm text-gray-500 mt-2">
+              <em>No one will see this publicly. Used for matching purposes only.</em>
+            </p>
+          </div>
+
+          {/* Budget for Purchase */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Budget for Purchase:</label>
+            <input
+              type="number"
+              name="budgetForPurchase"
+              value={formData.budgetForPurchase}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+              placeholder="Enter your budget for purchase"
+            />
+          </div>
+
+          {/* Short Introduction */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Short Introduction:</label>
+            <textarea
+              name="shortIntroduction"
+              value={formData.shortIntroduction}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+              placeholder="Tell us a bit about yourself."
+              rows="4"
+            />
+          </div>
+
+          {/* Prior Industry Experience */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Do you have prior industry experience?</label>
+            <select
+              name="priorIndustryExperience"
+              value={formData.priorIndustryExperience}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+            >
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+
+          {/* Willing to Relocate */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Willing to Relocate?</label>
+            <select
+              name="willingToRelocate"
+              value={formData.willingToRelocate}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+            >
+              <option value="No">No</option>
+              <option value="Yes">Yes</option>
+            </select>
+          </div>
+
+          {/* City */}
+          <div>
+            <label className="block text-sm font-medium mb-2">City:</label>
+            <input
+              name="city"
+              value={formData.city}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+              placeholder="Enter your city"
+            />
+          </div>
+
+          {/* State or Province */}
+          <div>
+            <label className="block text-sm font-medium mb-2">State/Province:</label>
+            <input
+              name="stateOrProvince"
+              value={formData.stateOrProvince}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+              placeholder="Enter your state or province"
+            />
+          </div>
+
+          {/* Video Introduction */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Video Introduction (Optional):</label>
+            <p className="text-sm text-gray-500 mt-2">
+              <em>Shoot a short video with your phone introducing yourself and explaining why you want to own this business. This will help business owners get to know you and initiate the conversation.</em>
+            </p>
+            <input
+              type="file"
+              accept="video/*"
+              onChange={handleVideoUpload}
+              className="w-full border border-gray-300 p-3 rounded-xl"
+            />
+            {videoPreview && (
+              <div className="mt-4">
+                <video width="200" controls>
+                  <source src={videoPreview} type="video/mp4" />
+                </video>
+              </div>
+            )}
           </div>
 
           {/* Submit Button */}
@@ -184,34 +316,10 @@ export default function BusinessValuation() {
             type="submit"
             className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold"
           >
-            Get My Business Valuation
+            Submit Buyer Profile
           </button>
         </form>
-
-        {/* Valuation Result */}
-        <div id="valuation-result" className="mt-8 text-center">
-          {valuation && (
-            <>
-              <h3 className="text-2xl font-semibold mb-4">Estimated Business Value</h3>
-              <p className="text-xl">
-                Based on the information provided, your business is estimated to be worth:
-              </p>
-              <p className="text-3xl font-bold text-blue-600">${valuation.toFixed(2)}</p>
-            </>
-          )}
-
-          {/* Loading Indicator */}
-          {loading && <p className="text-lg text-blue-600">Calculating your valuation...</p>}
-        </div>
-
-        {/* Error Message */}
-        {errorMessage && (
-          <div className="mt-8 text-center text-red-600">
-            <p>{errorMessage}</p>
-          </div>
-        )}
       </div>
     </main>
   );
 }
-
