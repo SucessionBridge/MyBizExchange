@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-blue-900 text-white p-8"> {/* Updated background color */}
+    <main className="min-h-screen bg-white p-8">
       <div className="max-w-2xl mx-auto">
         {/* Valuation Tool Section at the top */}
         <div className="text-center mb-8">
@@ -28,7 +28,7 @@ export default function Home() {
             best buyers.
           </p>
           <div className="flex justify-center mb-4">
-            <Link href="/sellers-onboarding">
+            <Link href="/sellers">
               <button className="bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 text-lg font-semibold">
                 List Your Business
               </button>
@@ -44,7 +44,7 @@ export default function Home() {
             started on your journey to business ownership.
           </p>
           <div className="flex justify-center mb-4">
-            <Link href="/buyer-onboarding">
+            <Link href="/buyers">
               <button className="bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 text-lg font-semibold">
                 Browse Businesses
               </button>
@@ -65,4 +65,3 @@ export default function Home() {
     </main>
   );
 }
-
