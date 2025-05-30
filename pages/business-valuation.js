@@ -8,11 +8,12 @@ export default function BusinessValuation() {
     annualProfit: "",
     inventoryValue: "",
     capitalInvestment: "",
-    industryPreference: "",
-    location: "",
+    industryPreference: "", // New field for industry
+    location: "", // New field for location
     equipmentValue: "", // New field for equipment (mowers, forklifts, etc.)
     performanceBasedDeal: false, // New field for performance-based deal
     revenuePercentage: "", // Seller percentage of revenue for performance-based deal
+    annualSales: "", // New field for annual sales
   });
 
   const [valuation, setValuation] = useState(null);
@@ -29,24 +30,33 @@ export default function BusinessValuation() {
 
   // Business Valuation Calculation
   const calculateBusinessValue = () => {
-    const { annualProfit, inventoryValue, capitalInvestment, industryPreference, equipmentValue, performanceBasedDeal, revenuePercentage } = formData;
+    const {
+      annualProfit,
+      inventoryValue,
+      capitalInvestment,
+      industryPreference,
+      equipmentValue,
+      performanceBasedDeal,
+      revenuePercentage,
+      annualSales,
+    } = formData;
 
     // Set industry multipliers based on the business type
     let industryMultiplier = 2; // Default multiplier for small businesses
     if (industryPreference === "tech") {
-      industryMultiplier = 5;
+      industryMultiplier = 5; // Higher multiple for tech businesses
     }
 
     let estimatedValue = annualProfit * industryMultiplier;
 
     // Add inventory value if provided
     if (inventoryValue) {
-      estimatedValue += inventoryValue * 0.10;
+      estimatedValue += inventoryValue * 0.10; // Add 10% of inventory value
     }
 
     // Add capital investment if provided
     if (capitalInvestment) {
-      estimatedValue += capitalInvestment * 0.05;
+      estimatedValue += capitalInvestment * 0.05; // Add 5% of capital investment
     }
 
     // Include equipment value (mowers, forklifts, etc.) if provided
@@ -54,9 +64,14 @@ export default function BusinessValuation() {
       estimatedValue += parseFloat(equipmentValue);
     }
 
+    // Include annual sales if provided (especially relevant for stores or retail)
+    if (annualSales) {
+      estimatedValue += annualSales * 0.02; // Add 2% of annual sales to value
+    }
+
     // Adjust valuation if performance-based deal
     if (performanceBasedDeal && revenuePercentage) {
-      estimatedValue -= estimatedValue * (revenuePercentage / 100);
+      estimatedValue -= estimatedValue * (revenuePercentage / 100); // Reduce by the agreed revenue share percentage
     }
 
     return estimatedValue;
@@ -81,7 +96,6 @@ export default function BusinessValuation() {
   return (
     <main className="min-h-screen bg-blue-50 p-8">
       <div className="max-w-2xl mx-auto">
-        {/* Disclaimer and Heading */}
         <div className="text-center mb-8">
           <h2 className="text-3xl font-semibold mb-4">AI-Driven Business Valuation Tool</h2>
           <p className="text-lg mb-6">
@@ -91,7 +105,6 @@ export default function BusinessValuation() {
           </p>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Business Name */}
           <div>
@@ -120,6 +133,31 @@ export default function BusinessValuation() {
             />
           </div>
 
+          {/* Industry Preference */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Industry Preference:</label>
+            <input
+              name="industryPreference"
+              value={formData.industryPreference}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+              placeholder="Enter your industry (e.g., Tech, Retail, Landscaping)"
+            />
+          </div>
+
+          {/* Location */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Business Location:</label>
+            <input
+              name="location"
+              value={formData.location}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+              placeholder="Enter the business location"
+              required
+            />
+          </div>
+
           {/* Equipment Value */}
           <div>
             <label className="block text-sm font-medium mb-2">
@@ -132,6 +170,19 @@ export default function BusinessValuation() {
               onChange={handleChange}
               className="w-full border border-gray-300 p-3 rounded-xl text-black"
               placeholder="Enter the value of your equipment (mowers, forklifts, etc.)"
+            />
+          </div>
+
+          {/* Annual Sales */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Annual Sales:</label>
+            <input
+              type="number"
+              name="annualSales"
+              value={formData.annualSales}
+              onChange={handleChange}
+              className="w-full border border-gray-300 p-3 rounded-xl text-black"
+              placeholder="Enter your annual sales (for retail businesses)"
             />
           </div>
 
@@ -148,9 +199,13 @@ export default function BusinessValuation() {
             <span>Yes, I want to offer performance-based payment (revenue share).</span>
           </div>
 
+          {/* Revenue Share Percentage (appears only if Performance-Based Deal is checked) */}
           {formData.performanceBasedDeal && (
             <div>
-              <label className="block text-sm font-medium mb-2">Revenue Share Percentage:</label>
+              <label className="block text-sm font-medium mb-2">
+                Revenue Share Percentage:
+                <span className="text-xs text-gray-500"> (e.g., You keep 85%, and the buyer gets 15% of the revenue for the first season.)</span>
+              </label>
               <input
                 type="number"
                 name="revenuePercentage"
