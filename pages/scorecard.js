@@ -48,18 +48,18 @@ export default function ScorecardPage() {
       const ratio = asking / profit;
       if (ratio <= 1.5) priceToProfitScore = 5;
       else if (ratio <= 2.5) priceToProfitScore = 3;
-      else priceToProfitScore = hasAssetExplanation ? 3 : 1; // Less penalty if explained
+      else priceToProfitScore = hasAssetExplanation ? 3 : 1;
     }
 
     const total = values.reduce((acc, val) => acc + val, 0) + ageScore + revenueScore + priceToProfitScore;
-    return (total / (values.length + 3)).toFixed(1);
+    return (total / (values.length + 3) * 2).toFixed(1); // out of 10
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const calculated = calculateScore();
     setScore(calculated);
-    alert(`Submitted! Your Sellability Score is ${calculated}/5. It will be emailed to you.`);
+    alert(`Submitted! Your Sellability Score is ${calculated}/10. It will be emailed to you.`);
     // Save to Supabase + email logic goes here
   };
 
@@ -76,132 +76,61 @@ export default function ScorecardPage() {
         {/* Contact Info */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Email Address</label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            required
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-          />
+          <input type="email" name="email" value={formData.email} onChange={handleChange} required className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm" />
         </div>
 
         {/* Business Info */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Industry</label>
-          <input
-            type="text"
-            name="industry"
-            value={formData.industry}
-            onChange={handleChange}
-            required
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-          />
+          <input type="text" name="industry" value={formData.industry} onChange={handleChange} required className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm" />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">Brief description of your business</label>
-          <textarea
-            name="description"
-            value={formData.description}
-            onChange={handleChange}
-            rows="4"
-            required
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-          />
+          <textarea name="description" value={formData.description} onChange={handleChange} rows="4" required className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm" />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">Asking Price</label>
-          <small className="text-gray-500">
-            What would you realistically expect to sell for? Many businesses sell for 2–3× annual profit.
-          </small>
-          <input
-            type="number"
-            name="askingPrice"
-            value={formData.askingPrice}
-            onChange={handleChange}
-            required
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-          />
+          <small className="text-gray-500">What would you realistically expect to sell for? Many businesses sell for 2–3× annual profit.</small>
+          <input type="number" name="askingPrice" value={formData.askingPrice} onChange={handleChange} required className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm" />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">What’s included in your asking price?</label>
-          <small className="text-gray-500">
-            Optional: real estate, inventory, vehicles, equipment, trademarks, or digital assets.
-          </small>
-          <textarea
-            name="includedAssets"
-            value={formData.includedAssets}
-            onChange={handleChange}
-            rows="3"
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-          />
+          <small className="text-gray-500">Optional: real estate, inventory, vehicles, equipment, trademarks, or digital assets.</small>
+          <textarea name="includedAssets" value={formData.includedAssets} onChange={handleChange} rows="3" className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm" />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700">Annual Revenue</label>
-          <input
-            type="number"
-            name="annualRevenue"
-            value={formData.annualRevenue}
-            onChange={handleChange}
-            required
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-          />
+          <input type="number" name="annualRevenue" value={formData.annualRevenue} onChange={handleChange} required className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm" />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Annual Profit (or Seller Discretionary Earnings – SDE)
-          </label>
-          <input
-            type="number"
-            name="annualProfit"
-            value={formData.annualProfit}
-            onChange={handleChange}
-            required
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-          />
+          <label className="block text-sm font-medium text-gray-700">Annual Profit (or Seller Discretionary Earnings – SDE)</label>
+          <input type="number" name="annualProfit" value={formData.annualProfit} onChange={handleChange} required className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm" />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">
-            How many years has your business been running?
-          </label>
-          <small className="text-gray-500">
-            Buyers prefer businesses that are at least 2+ years old.
-          </small>
-          <input
-            type="number"
-            name="ageOfBusiness"
-            value={formData.ageOfBusiness}
-            onChange={handleChange}
-            required
-            min="0"
-            className="mt-2 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-          />
+          <label className="block text-sm font-medium text-gray-700">How many years has your business been running?</label>
+          <small className="text-gray-500">Buyers prefer businesses that are at least 2+ years old.</small>
+          <input type="number" name="ageOfBusiness" value={formData.ageOfBusiness} onChange={handleChange} required min="0" className="mt-2 block w-full rounded-md border border-gray-300 p-2 shadow-sm" />
         </div>
 
-        {/* Scored Radio Questions */}
-        {[
-          {
-            label: 'Is your business consistently profitable?',
-            name: 'profitability',
-            help: 'Consistent profitability means your business brings in more than it spends — after paying you.',
-          },
-          {
-            label: 'Do you have documented systems/processes?',
-            name: 'hasSystems',
-            help: 'Example: checklists, SOPs, or videos for onboarding, fulfillment, etc.',
-          },
-          {
-            label: 'Do you have a team helping run the business?',
-            name: 'hasTeam',
-            help: 'A team (employees, VAs, or contractors) makes the business less owner-dependent.',
-          },
-        ].map(({ label, name, help }) => (
+        {[{
+          label: 'Is your business consistently profitable?',
+          name: 'profitability',
+          help: 'Consistent profitability means your business brings in more than it spends — after paying you.',
+        }, {
+          label: 'Do you have documented systems/processes?',
+          name: 'hasSystems',
+          help: 'Example: checklists, SOPs, or videos for onboarding, fulfillment, etc.',
+        }, {
+          label: 'Do you have a team helping run the business?',
+          name: 'hasTeam',
+          help: 'A team (employees, VAs, or contractors) makes the business less owner-dependent.',
+        }].map(({ label, name, help }) => (
           <div key={name}>
             <label className="block text-sm font-medium text-gray-700">{label}</label>
             <small className="text-gray-500">{help}</small>
@@ -213,10 +142,7 @@ export default function ScorecardPage() {
           </div>
         ))}
 
-        <button
-          type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md font-semibold"
-        >
+        <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md font-semibold">
           Get My Sellability Score
         </button>
       </form>
@@ -224,7 +150,7 @@ export default function ScorecardPage() {
       {score && (
         <div className="mt-8 bg-white shadow-md rounded-md p-6 text-center">
           <h2 className="text-xl font-bold text-blue-700 mb-2">Your Sellability Score</h2>
-          <p className="text-3xl font-semibold text-green-700">{score} / 5</p>
+          <p className="text-3xl font-semibold text-green-700">{score} / 10</p>
           <p className="text-gray-600 mt-2">Check your inbox shortly for a full breakdown and next steps.</p>
 
           {formData.includedAssets && formData.includedAssets.length > 10 && (
@@ -232,8 +158,13 @@ export default function ScorecardPage() {
               💡 Your asking price includes additional assets (e.g., property, inventory, or equipment). Buyers may evaluate your business ROI separately from these.
             </div>
           )}
+
+          <div className="mt-6 text-sm text-gray-600 bg-yellow-50 border border-yellow-300 rounded p-4">
+            <strong>Disclaimer:</strong> Your score is based on general sellability factors. But every buyer is different — and timing matters. For example, a snow plow company might buy a grass-cutting route to keep their staff working in summer. The right buyer may already be looking.
+          </div>
         </div>
       )}
     </div>
   );
 }
+
