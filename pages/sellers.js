@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabaseClient'
+import { supabase } from '../lib/supabaseClient';
 import React, { useState } from "react";
 
 export default function SellerOnboarding() {
@@ -73,16 +73,27 @@ export default function SellerOnboarding() {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const fileName = `business-${Date.now()}-${file.name}`;
-      const { error } = await supabase.storage.from('new-business-photos').upload(fileName, file);
+      const { error: uploadError } = await supabase.storage
+        .from('new-business-photos')
+        .upload(fileName, file);
 
-      if (error) {
-        console.error('Error uploading image:', error.message);
-        errors.push(error.message);
+      if (uploadError) {
+        console.error('Error uploading image:', uploadError.message);
+        errors.push(uploadError.message);
         continue;
       }
 
-      const url = supabase.storage.from('new-business-photos').getPublicUrl(fileName).publicURL;
-      uploadedUrls.push(url);
+      const { data, error: urlError } = await supabase.storage
+        .from('new-business-photos')
+        .createSignedUrl(fileName, 60 * 60 * 24 * 7); // 7-day URL
+
+      if (urlError) {
+        console.error('Error creating signed URL:', urlError.message);
+        errors.push(urlError.message);
+        continue;
+      }
+
+      uploadedUrls.push(data.signedUrl);
     }
 
     setUploadStatus("");
