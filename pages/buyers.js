@@ -140,9 +140,15 @@ export default function BuyerOnboarding() {
     <main className="min-h-screen bg-blue-50 p-8">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Buyer Onboarding</h1>
+
+        {isUploading && (
+          <div className="text-center text-blue-600 font-medium mb-4">
+            ⏳ Uploading video, please keep this browser window open…
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           {errorMessage && <p className="text-red-500 font-semibold">{errorMessage}</p>}
-          {isUploading && <p className="text-blue-600 font-medium text-center">Uploading video, please wait...</p>}
 
           <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} required className="w-full border p-3 rounded text-black" />
           <input name="email" type="email" placeholder="Email Address" value={formData.email} onChange={handleChange} required className="w-full border p-3 rounded text-black" />
@@ -184,6 +190,12 @@ export default function BuyerOnboarding() {
             </video>
           )}
 
+          {isUploading && (
+            <div className="text-center text-blue-600 font-medium mt-4">
+              ⏳ Uploading video, please keep this browser window open…
+            </div>
+          )}
+
           <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold">
             Submit Buyer Profile
           </button>
@@ -192,4 +204,3 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
-
