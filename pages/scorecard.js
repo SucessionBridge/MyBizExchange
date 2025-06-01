@@ -12,6 +12,7 @@ export default function ScorecardPage() {
     profitability: '',
     hasSystems: '',
     hasTeam: '',
+    includedAssets: '',
   });
 
   const [score, setScore] = useState(null);
@@ -25,20 +26,33 @@ export default function ScorecardPage() {
     const fields = ['profitability', 'hasSystems', 'hasTeam'];
     const values = fields.map((field) => parseInt(formData[field] || '0'));
 
-    // Age score logic
+    // Age score
     const age = parseInt(formData.ageOfBusiness || '0');
     let ageScore = 1;
     if (age >= 3 && age < 5) ageScore = 3;
     else if (age >= 5) ageScore = 5;
 
-    // Revenue score logic
+    // Revenue score
     const revenue = parseInt(formData.annualRevenue || '0');
     let revenueScore = 1;
     if (revenue >= 100000 && revenue < 300000) revenueScore = 3;
     else if (revenue >= 300000) revenueScore = 5;
 
-    const total = values.reduce((acc, val) => acc + val, 0) + ageScore + revenueScore;
-    return (total / (values.length + 2)).toFixed(1);
+    // Price-to-Profit score
+    const asking = parseFloat(formData.askingPrice || '0');
+    const profit = parseFloat(formData.annualProfit || '0');
+    const hasAssetExplanation = formData.includedAssets && formData.includedAssets.length > 10;
+
+    let priceToProfitScore = 3;
+    if (asking > 0 && profit > 0) {
+      const ratio = asking / profit;
+      if (ratio <= 1.5) priceToProfitScore = 5;
+      else if (ratio <= 2.5) priceToProfitScore = 3;
+      else priceToProfitScore = hasAssetExplanation ? 3 : 1; // Less penalty if explained
+    }
+
+    const total = values.reduce((acc, val) => acc + val, 0) + ageScore + revenueScore + priceToProfitScore;
+    return (total / (values.length + 3)).toFixed(1);
   };
 
   const handleSubmit = async (e) => {
@@ -46,7 +60,7 @@ export default function ScorecardPage() {
     const calculated = calculateScore();
     setScore(calculated);
     alert(`Submitted! Your Sellability Score is ${calculated}/5. It will be emailed to you.`);
-    // Save to Supabase + trigger email logic here later
+    // Save to Supabase + email logic goes here
   };
 
   return (
@@ -98,12 +112,30 @@ export default function ScorecardPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Asking Price (optional)</label>
+          <label className="block text-sm font-medium text-gray-700">Asking Price</label>
+          <small className="text-gray-500">
+            What would you realistically expect to sell for? Many businesses sell for 2–3× annual profit.
+          </small>
           <input
             type="number"
             name="askingPrice"
             value={formData.askingPrice}
             onChange={handleChange}
+            required
+            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">What’s included in your asking price?</label>
+          <small className="text-gray-500">
+            Optional: real estate, inventory, vehicles, equipment, trademarks, or digital assets.
+          </small>
+          <textarea
+            name="includedAssets"
+            value={formData.includedAssets}
+            onChange={handleChange}
+            rows="3"
             className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
           />
         </div>
@@ -134,7 +166,6 @@ export default function ScorecardPage() {
           />
         </div>
 
-        {/* Age of Business */}
         <div>
           <label className="block text-sm font-medium text-gray-700">
             How many years has your business been running?
@@ -153,22 +184,22 @@ export default function ScorecardPage() {
           />
         </div>
 
-        {/* Scorecard Radio Questions */}
+        {/* Scored Radio Questions */}
         {[
           {
             label: 'Is your business consistently profitable?',
             name: 'profitability',
-            help: 'Consistent profitability means your business brings in more than it spends — after paying you. This builds buyer trust and affects financing.',
+            help: 'Consistent profitability means your business brings in more than it spends — after paying you.',
           },
           {
             label: 'Do you have documented systems/processes?',
             name: 'hasSystems',
-            help: 'Example: step-by-step instructions for tasks like onboarding customers, fulfilling orders, or handling refunds. These can be checklists, Google Docs, SOPs, or training videos.',
+            help: 'Example: checklists, SOPs, or videos for onboarding, fulfillment, etc.',
           },
           {
             label: 'Do you have a team helping run the business?',
             name: 'hasTeam',
-            help: 'A team (employees, VAs, or contractors) makes your business less dependent on you and easier for a buyer to take over.',
+            help: 'A team (employees, VAs, or contractors) makes the business less owner-dependent.',
           },
         ].map(({ label, name, help }) => (
           <div key={name}>
@@ -195,6 +226,12 @@ export default function ScorecardPage() {
           <h2 className="text-xl font-bold text-blue-700 mb-2">Your Sellability Score</h2>
           <p className="text-3xl font-semibold text-green-700">{score} / 5</p>
           <p className="text-gray-600 mt-2">Check your inbox shortly for a full breakdown and next steps.</p>
+
+          {formData.includedAssets && formData.includedAssets.length > 10 && (
+            <div className="mt-4 text-sm text-gray-700">
+              💡 Your asking price includes additional assets (e.g., property, inventory, or equipment). Buyers may evaluate your business ROI separately from these.
+            </div>
+          )}
         </div>
       )}
     </div>
