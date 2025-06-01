@@ -146,8 +146,27 @@ export default function ScorecardPage() {
       </form>
 
       {score && (
-        $1
-<a href=\"/seller-onboarding\" className=\"inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-semibold\">Let’s Sell Your Business</a>
+        <div ref={resultRef} className="mt-8 bg-white shadow-md rounded-md p-6 text-center">
+          <h2 className="text-xl font-bold text-blue-700 mb-2">Your Sellability Score</h2>
+          <p className="text-3xl font-semibold text-green-700">{score} / 10</p>
+          <p className="text-gray-600 mt-2">Check your inbox shortly for a full breakdown and next steps.</p>
+
+          {formData.includedAssets && formData.includedAssets.length > 10 && (
+            <div className="mt-4 text-sm text-gray-700">
+              💡 Your asking price includes additional assets (e.g., property, inventory, or equipment). Buyers may evaluate your business ROI separately from these.
+            </div>
+          )}
+
+          <div className="mt-6 text-sm text-gray-600 bg-yellow-50 border border-yellow-300 rounded p-4">
+            <strong>Disclaimer:</strong> Your score is based on general sellability factors. But every buyer is different — and timing matters. For example, a snow plow company might buy a grass-cutting route to keep their staff working in summer. The right buyer may already be looking.
+          </div>
+
+          <a
+            href="/seller-onboarding"
+            className="inline-block mt-4 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-semibold"
+          >
+            Let’s Sell Your Business
+          </a>
         </div>
       )}
     </div>
