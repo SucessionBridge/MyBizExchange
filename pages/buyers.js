@@ -71,15 +71,10 @@ export default function BuyerOnboarding() {
 
     let videoUrl = null;
     if (video) {
-      const safeName = video.name.replace(/\s+/g, '_').replace(/[^\w.-]/g, '');
-      const videoName = `buyer-video-${Date.now()}-${safeName}`;
-
+      const videoName = `buyer-video-${Date.now()}-${video.name}`;
       const { error: uploadError } = await supabase.storage
-        .from('buyer-videos')
-        .upload(videoName, video, {
-          cacheControl: '3600',
-          upsert: false
-        });
+        .from('buyers-videos') // ✅ Correct bucket name
+        .upload(videoName, video);
 
       if (uploadError) {
         console.error("❌ Error uploading video:", uploadError);
@@ -88,7 +83,7 @@ export default function BuyerOnboarding() {
       }
 
       const { data: publicUrlData } = supabase.storage
-        .from('buyer-videos')
+        .from('buyers-videos')
         .getPublicUrl(videoName);
 
       videoUrl = publicUrlData?.publicUrl;
