@@ -15,13 +15,26 @@ export default function ScorecardPage() {
     hasTeam: '',
   });
 
+  const [score, setScore] = useState(null);
+
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const calculateScore = () => {
+    const fields = ['ageOfBusiness', 'revenue', 'profitability', 'hasSystems', 'hasTeam'];
+    const values = fields.map((field) => parseInt(formData[field] || '0'));
+    const total = values.reduce((acc, val) => acc + val, 0);
+    return (total / fields.length).toFixed(1);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    alert("Submitted! We'll send your score via email.");
+    const calculated = calculateScore();
+    setScore(calculated);
+    alert(`Submitted! Your Sellability Score is ${calculated}/5. It will be emailed to you.`);
+    // Here you'd insert logic to save to Supabase and trigger an email
   };
 
   return (
@@ -30,9 +43,11 @@ export default function ScorecardPage() {
         Sellability Scorecard
       </h1>
       <p className="text-center text-gray-700 mb-8">
-        Answer a few quick questions to see how sellable your business is. Results will be emailed to you.
+        Answer a few questions to get your Sellability Score. We’ll email the results with personalized tips.
       </p>
+
       <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Contact Info */}
         <div>
           <label className="block text-sm font-medium text-gray-700">Email Address</label>
           <input
@@ -45,8 +60,9 @@ export default function ScorecardPage() {
           />
         </div>
 
+        {/* Business Info */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">What industry are you in?</label>
+          <label className="block text-sm font-medium text-gray-700">Industry</label>
           <input
             type="text"
             name="industry"
@@ -63,14 +79,14 @@ export default function ScorecardPage() {
             name="description"
             value={formData.description}
             onChange={handleChange}
-            required
             rows="4"
+            required
             className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Asking price (optional)</label>
+          <label className="block text-sm font-medium text-gray-700">Asking Price (optional)</label>
           <input
             type="number"
             name="askingPrice"
@@ -81,7 +97,7 @@ export default function ScorecardPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Approximate annual revenue</label>
+          <label className="block text-sm font-medium text-gray-700">Annual Revenue</label>
           <input
             type="number"
             name="annualRevenue"
@@ -93,7 +109,9 @@ export default function ScorecardPage() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">Approximate annual profit or owner earnings (SDE)</label>
+          <label className="block text-sm font-medium text-gray-700">
+            Annual Profit (or Seller Discretionary Earnings – SDE)
+          </label>
           <input
             type="number"
             name="annualProfit"
@@ -104,27 +122,42 @@ export default function ScorecardPage() {
           />
         </div>
 
+        {/* Scorecard Section */}
         {[
-          { label: 'How many years has your business been running?', name: 'ageOfBusiness' },
-          { label: 'Is your revenue over $100K/year?', name: 'revenue' },
-          { label: 'Is your business profitable?', name: 'profitability' },
-          { label: 'Do you have documented systems/processes?', name: 'hasSystems' },
-          { label: 'Do you have a team (employees or contractors)?', name: 'hasTeam' },
-        ].map((q) => (
-          <div key={q.name}>
-            <label className="block text-sm font-medium text-gray-700">{q.label}</label>
-            <select
-              name={q.name}
-              value={formData[q.name]}
-              onChange={handleChange}
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
-            >
-              <option value="">Select an option</option>
-              <option value="1">No</option>
-              <option value="3">Somewhat</option>
-              <option value="5">Yes</option>
-            </select>
+          {
+            label: 'How many years has your business been running?',
+            name: 'ageOfBusiness',
+            help: 'Buyers prefer businesses that are at least 2+ years old.',
+          },
+          {
+            label: 'Is your revenue over $100K/year?',
+            name: 'revenue',
+            help: 'Higher revenue signals proven demand.',
+          },
+          {
+            label: 'Is your business consistently profitable?',
+            name: 'profitability',
+            help: 'Profitability affects financing and buyer confidence.',
+          },
+          {
+            label: 'Do you have documented systems/processes?',
+            name: 'hasSystems',
+            help: 'SOPs make your business easier to transfer and scale.',
+          },
+          {
+            label: 'Do you have a team helping run the business?',
+            name: 'hasTeam',
+            help: 'A strong team means less dependency on the owner.',
+          },
+        ].map(({ label, name, help }) => (
+          <div key={name}>
+            <label className="block text-sm font-medium text-gray-700">{label}</label>
+            <small className="text-gray-500">{help}</small>
+            <div className="flex gap-4 mt-2">
+              <label><input type="radio" name={name} value="1" onChange={handleChange} /> No</label>
+              <label><input type="radio" name={name} value="3" onChange={handleChange} /> Somewhat</label>
+              <label><input type="radio" name={name} value="5" onChange={handleChange} /> Yes</label>
+            </div>
           </div>
         ))}
 
@@ -135,6 +168,14 @@ export default function ScorecardPage() {
           Get My Sellability Score
         </button>
       </form>
+
+      {score && (
+        <div className="mt-8 bg-white shadow-md rounded-md p-6 text-center">
+          <h2 className="text-xl font-bold text-blue-700 mb-2">Your Sellability Score</h2>
+          <p className="text-3xl font-semibold text-green-700">{score} / 5</p>
+          <p className="text-gray-600 mt-2">Check your inbox shortly for a full breakdown and next steps.</p>
+        </div>
+      )}
     </div>
   );
 }
