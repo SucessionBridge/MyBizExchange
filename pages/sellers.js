@@ -8,7 +8,10 @@ export default function SellerOnboarding() {
     businessName: "",
     industry: "",
     location: "",
-    financingType: "rent-to-own",
+    financingType: "seller-financing",
+    askingPrice: "",
+    includesInventory: "",
+    includesBuilding: "",
     images: [],
     businessDescription: "",
   });
@@ -92,7 +95,7 @@ export default function SellerOnboarding() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const uploadedUrls = await uploadImages(formData.images);
-    const { name, email, businessName, industry, location, financingType, businessDescription } = formData;
+    const { name, email, businessName, industry, location, financingType, askingPrice, includesInventory, includesBuilding, businessDescription } = formData;
 
     const { error } = await supabase.from('sellers').insert([
       {
@@ -102,6 +105,9 @@ export default function SellerOnboarding() {
         industry,
         location,
         financing_type: financingType,
+        asking_price: parseFloat(askingPrice),
+        includes_inventory: includesInventory,
+        includes_building: includesBuilding,
         images: uploadedUrls,
         business_description: businessDescription,
       },
@@ -118,7 +124,10 @@ export default function SellerOnboarding() {
         businessName: "",
         industry: "",
         location: "",
-        financingType: "rent-to-own",
+        financingType: "seller-financing",
+        askingPrice: "",
+        includesInventory: "",
+        includesBuilding: "",
         images: [],
         businessDescription: "",
       });
@@ -140,15 +149,37 @@ export default function SellerOnboarding() {
           <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
           <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
           <input name="location" placeholder="Location" value={formData.location} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
+          <input name="askingPrice" type="number" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Does the asking price include inventory?</label>
+            <select name="includesInventory" value={formData.includesInventory} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required>
+              <option value="">Select</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Does the asking price include a building?</label>
+            <select name="includesBuilding" value={formData.includesBuilding} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required>
+              <option value="">Select</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+
           <textarea name="businessDescription" placeholder="Brief description of the business" value={formData.businessDescription} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" rows="4" required />
+
           <div>
             <label className="block text-sm font-medium mb-2">Preferred Financing Option:</label>
             <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl">
-              <option value="rent-to-own">Rent-to-Own</option>
               <option value="seller-financing">Seller Financing</option>
+              <option value="rent-to-own">Rent-to-Own</option>
               <option value="third-party">3rd-Party Financing</option>
             </select>
           </div>
+
           <div>
             <label className="block text-sm font-medium mb-2">Upload up to 8 photos:</label>
             <input type="file" name="images" accept="image/*" multiple onChange={handleImageUpload} className="w-full border border-gray-300 p-3 rounded-xl" />
@@ -165,17 +196,13 @@ export default function SellerOnboarding() {
             </div>
             {errorMessage && <div className="text-red-500 text-sm">{errorMessage}</div>}
           </div>
-          {uploadStatus && (
-            <div className="text-center text-blue-600 font-semibold mt-4">{uploadStatus}</div>
-          )}
+
           <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">Submit Listing</button>
         </form>
       </div>
     </main>
   );
 }
-
-
 
 
 
