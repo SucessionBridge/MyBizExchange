@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { supabase } from '../lib/supabaseClient';
 
 export default function ScorecardPage() {
   const [formData, setFormData] = useState({
@@ -61,6 +62,27 @@ export default function ScorecardPage() {
     setTimeout(() => {
       resultRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, 100);
+
+    const { error } = await supabase.from('sellability_scores').insert([{
+      email: formData.email,
+      industry: formData.industry,
+      description: formData.description,
+      asking_price: parseFloat(formData.askingPrice),
+      included_assets: formData.includedAssets,
+      annual_revenue: parseFloat(formData.annualRevenue),
+      annual_profit: parseFloat(formData.annualProfit),
+      age_of_business: parseInt(formData.ageOfBusiness),
+      profitability: parseInt(formData.profitability),
+      has_systems: parseInt(formData.hasSystems),
+      has_team: parseInt(formData.hasTeam),
+      score: parseFloat(calculated),
+    }]);
+
+    if (error) {
+      console.error('Supabase insert error:', error.message);
+      alert('Something went wrong saving your score. Please try again.');
+      return;
+    }
 
     alert(`Submitted! Your Sellability Score is ${calculated}/10. It will be emailed to you.`);
   };
@@ -172,3 +194,5 @@ export default function ScorecardPage() {
     </div>
   );
 }
+
+
