@@ -10,11 +10,11 @@ export default function ScorecardPage() {
     hasTeam: '',
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     // Supabase logic will go here
     alert("Submitted! We'll send your score via email.");
@@ -52,7 +52,7 @@ export default function ScorecardPage() {
             <label className="block text-sm font-medium text-gray-700">{q.label}</label>
             <select
               name={q.name}
-              value={formData[q.name as keyof typeof formData]}
+              value={formData[q.name]}
               onChange={handleChange}
               required
               className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
@@ -75,3 +75,4 @@ export default function ScorecardPage() {
     </div>
   );
 }
+
