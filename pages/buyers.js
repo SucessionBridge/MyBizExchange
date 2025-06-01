@@ -71,15 +71,14 @@ export default function BuyerOnboarding() {
 
     let videoUrl = null;
     if (video) {
-      const safeName = video.name?.replace(/\s+/g, "_") || `video_${Date.now()}.mp4`;
-      const videoName = `public/buyer-video-${Date.now()}-${safeName}`;
+      const safeName = video.name.replace(/\s+/g, '_').replace(/[^\w.-]/g, '');
+      const videoName = `buyer-video-${Date.now()}-${safeName}`;
 
       const { error: uploadError } = await supabase.storage
         .from('buyer-videos')
         .upload(videoName, video, {
           cacheControl: '3600',
-          upsert: false,
-          contentType: video.type,
+          upsert: false
         });
 
       if (uploadError) {
