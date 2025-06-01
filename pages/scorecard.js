@@ -3,6 +3,9 @@ import { useState } from 'react';
 export default function ScorecardPage() {
   const [formData, setFormData] = useState({
     email: '',
+    industry: '',
+    description: '',
+    askingPrice: '',
     ageOfBusiness: '',
     revenue: '',
     profitability: '',
@@ -16,16 +19,15 @@ export default function ScorecardPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // Supabase logic will go here
     alert("Submitted! We'll send your score via email.");
   };
 
   return (
-    <div className="min-h-screen bg-white px-4 py-12 max-w-xl mx-auto">
-      <h1 className="text-3xl font-bold text-center text-gray-800 mb-6">
+    <div className="min-h-screen bg-blue-50 px-4 py-12 max-w-2xl mx-auto">
+      <h1 className="text-3xl font-bold text-center text-blue-800 mb-6">
         Sellability Scorecard
       </h1>
-      <p className="text-center text-gray-600 mb-8">
+      <p className="text-center text-gray-700 mb-8">
         Answer a few quick questions to see how sellable your business is. Results will be emailed to you.
       </p>
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -37,6 +39,41 @@ export default function ScorecardPage() {
             value={formData.email}
             onChange={handleChange}
             required
+            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">What industry are you in?</label>
+          <input
+            type="text"
+            name="industry"
+            value={formData.industry}
+            onChange={handleChange}
+            required
+            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Brief description of your business</label>
+          <textarea
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            required
+            rows="4"
+            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Asking price (optional)</label>
+          <input
+            type="number"
+            name="askingPrice"
+            value={formData.askingPrice}
+            onChange={handleChange}
             className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
           />
         </div>
@@ -67,7 +104,7 @@ export default function ScorecardPage() {
 
         <button
           type="submit"
-          className="w-full bg-teal-500 hover:bg-teal-600 text-white py-2 px-4 rounded-md font-semibold"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md font-semibold"
         >
           Get My Sellability Score
         </button>
@@ -75,4 +112,3 @@ export default function ScorecardPage() {
     </div>
   );
 }
-
