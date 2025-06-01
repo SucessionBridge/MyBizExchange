@@ -20,6 +20,7 @@ export default function BuyerOnboarding() {
 
   const [errorMessage, setErrorMessage] = useState("");
   const [videoPreview, setVideoPreview] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -71,10 +72,14 @@ export default function BuyerOnboarding() {
 
     let videoUrl = null;
     if (video) {
+      setIsUploading(true);
+
       const videoName = `buyer-video-${Date.now()}-${video.name}`;
       const { error: uploadError } = await supabase.storage
-        .from('buyers-videos') // ✅ Correct bucket name
+        .from('buyers-videos')
         .upload(videoName, video);
+
+      setIsUploading(false);
 
       if (uploadError) {
         console.error("❌ Error uploading video:", uploadError);
@@ -137,6 +142,7 @@ export default function BuyerOnboarding() {
         <h1 className="text-3xl font-bold mb-6 text-center">Buyer Onboarding</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
           {errorMessage && <p className="text-red-500 font-semibold">{errorMessage}</p>}
+          {isUploading && <p className="text-blue-600 font-medium text-center">Uploading video, please wait...</p>}
 
           <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} required className="w-full border p-3 rounded text-black" />
           <input name="email" type="email" placeholder="Email Address" value={formData.email} onChange={handleChange} required className="w-full border p-3 rounded text-black" />
