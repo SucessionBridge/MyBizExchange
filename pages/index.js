@@ -42,14 +42,14 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Sellability Scorecard Section */}
-        <section className="bg-teal-50 rounded-xl p-8 mb-12 border border-teal-100">
+        {/* Sellability Scorecard Section (Updated Color) */}
+        <section className="bg-blue-50 rounded-xl p-8 mb-12 border border-blue-100">
           <div className="text-center">
-            <h2 className="text-2xl font-semibold text-teal-800 mb-4">
+            <h2 className="text-2xl font-semibold text-blue-800 mb-4">
               Not sure if your business is ready to sell?
             </h2>
             <Link href="/scorecard">
-              <a className="inline-block bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded-md shadow-md">
+              <a className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md shadow-md">
                 👉 Take the Sellability Scorecard
               </a>
             </Link>
@@ -85,3 +85,4 @@ export default function Home() {
     </main>
   );
 }
+
