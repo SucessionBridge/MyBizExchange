@@ -1,32 +1,32 @@
 import { supabase } from '../lib/supabaseClient';
-import React, { useState } from "react";
+import React, { useState } from 'react';
 
 export default function BuyerOnboarding() {
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    financingType: "rent-to-own",
-    location: "",
+    name: '',
+    email: '',
+    financingType: 'rent-to-own',
+    location: '',
     experience: 3,
-    industryPreference: "",
-    capitalInvestment: "",
-    shortIntroduction: "",
-    priorIndustryExperience: "No",
-    willingToRelocate: "No",
-    city: "",
-    stateOrProvince: "",
+    industryPreference: '',
+    capitalInvestment: '',
+    shortIntroduction: '',
+    priorIndustryExperience: 'No',
+    willingToRelocate: 'No',
+    city: '',
+    stateOrProvince: '',
     video: null,
-    budgetForPurchase: "",
+    budgetForPurchase: '',
   });
 
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState('');
   const [videoPreview, setVideoPreview] = useState(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: value ?? "",
+      [name]: value || '',
     }));
   };
 
@@ -43,20 +43,20 @@ export default function BuyerOnboarding() {
   };
 
   const validateForm = () => {
-    const requiredFields = ["name", "email", "location", "city", "stateOrProvince"];
-    for (let field of requiredFields) {
+    const required = ['name', 'email', 'location', 'city', 'stateOrProvince'];
+    for (let field of required) {
       if (!formData[field]) {
-        setErrorMessage("Please fill in all the required fields.");
+        setErrorMessage('Please fill in all required fields.');
         return false;
       }
     }
-    setErrorMessage("");
+    setErrorMessage('');
     return true;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("🔁 Submit button clicked");
+    console.log('🔁 Submit clicked');
 
     if (!validateForm()) return;
 
@@ -79,25 +79,25 @@ export default function BuyerOnboarding() {
 
     let videoUrl = null;
     if (video) {
-      const videoName = `buyer-video-${Date.now()}-${video.name}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const fileName = `buyer-video-${Date.now()}-${video.name}`;
+      const { error: uploadError } = await supabase.storage
         .from('buyer-videos')
-        .upload(videoName, video);
+        .upload(fileName, video);
 
       if (uploadError) {
-        console.error("❌ Error uploading video:", uploadError);
-        alert("There was a problem uploading your video.");
+        console.error('❌ Video upload failed:', uploadError);
+        alert('Error uploading video.');
         return;
       }
 
       const { data: publicUrlData } = supabase.storage
         .from('buyer-videos')
-        .getPublicUrl(videoName);
+        .getPublicUrl(fileName);
 
-      videoUrl = publicUrlData?.publicUrl;
+      videoUrl = publicUrlData?.publicUrl || null;
     }
 
-    const { data: insertData, error: insertError } = await supabase.from('buyers').insert([
+    const { error: insertError } = await supabase.from('buyers').insert([
       {
         name,
         email,
@@ -117,26 +117,25 @@ export default function BuyerOnboarding() {
     ]);
 
     if (insertError) {
-      console.error("❌ Error submitting form:", insertError);
-      alert("There was a problem submitting your form.");
+      console.error('❌ Error submitting buyer:', insertError);
+      alert('Something went wrong submitting your form.');
     } else {
-      console.log("✅ Submitted:", insertData);
-      alert("Your buyer profile was submitted successfully!");
+      alert('✅ Buyer profile submitted successfully!');
       setFormData({
-        name: "",
-        email: "",
-        financingType: "rent-to-own",
-        location: "",
+        name: '',
+        email: '',
+        financingType: 'rent-to-own',
+        location: '',
         experience: 3,
-        industryPreference: "",
-        capitalInvestment: "",
-        shortIntroduction: "",
-        priorIndustryExperience: "No",
-        willingToRelocate: "No",
-        city: "",
-        stateOrProvince: "",
+        industryPreference: '',
+        capitalInvestment: '',
+        shortIntroduction: '',
+        priorIndustryExperience: 'No',
+        willingToRelocate: 'No',
+        city: '',
+        stateOrProvince: '',
         video: null,
-        budgetForPurchase: "",
+        budgetForPurchase: '',
       });
       setVideoPreview(null);
     }
@@ -147,53 +146,52 @@ export default function BuyerOnboarding() {
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Buyer Onboarding</h1>
         <form onSubmit={handleSubmit} className="space-y-6">
-          {errorMessage && <p className="text-red-500 font-semibold">{errorMessage}</p>}
+          {errorMessage && <p className="text-red-600">{errorMessage}</p>}
 
-          <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} required className="w-full border border-gray-300 p-3 rounded-xl text-black" />
-          <input name="email" type="email" placeholder="Email Address" value={formData.email} onChange={handleChange} required className="w-full border border-gray-300 p-3 rounded-xl text-black" />
-          
-          <label className="block text-sm font-medium mb-2">Preferred Financing Option:</label>
-          <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl text-black">
+          <input name="name" value={formData.name} onChange={handleChange} placeholder="Name" required className="w-full border p-3 rounded" />
+          <input name="email" value={formData.email} onChange={handleChange} placeholder="Email" type="email" required className="w-full border p-3 rounded" />
+          <input name="location" value={formData.location} onChange={handleChange} placeholder="General Location" required className="w-full border p-3 rounded" />
+
+          <input name="city" value={formData.city} onChange={handleChange} placeholder="City" className="w-full border p-3 rounded" />
+          <input name="stateOrProvince" value={formData.stateOrProvince} onChange={handleChange} placeholder="State/Province" className="w-full border p-3 rounded" />
+
+          <input type="number" name="experience" value={formData.experience} min="1" max="5" onChange={handleChange} placeholder="Business Experience (1-5)" className="w-full border p-3 rounded" />
+
+          <input name="industryPreference" value={formData.industryPreference} onChange={handleChange} placeholder="Industry Preference" className="w-full border p-3 rounded" />
+          <input type="number" name="capitalInvestment" value={formData.capitalInvestment} onChange={handleChange} placeholder="Available Capital" className="w-full border p-3 rounded" />
+          <input type="number" name="budgetForPurchase" value={formData.budgetForPurchase} onChange={handleChange} placeholder="Budget for Purchase" className="w-full border p-3 rounded" />
+
+          <textarea name="shortIntroduction" value={formData.shortIntroduction} onChange={handleChange} placeholder="Short Introduction" rows={4} className="w-full border p-3 rounded" />
+
+          <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded">
             <option value="rent-to-own">Rent-to-Own</option>
             <option value="seller-financing">Seller Financing</option>
-            <option value="third-party">3rd-Party Financing</option>
+            <option value="third-party">Third Party</option>
           </select>
 
-          <label className="block text-sm font-medium mb-2">Experience in Business Ownership (1–5):</label>
-          <input type="number" name="experience" min="1" max="5" value={formData.experience} onChange={handleChange} required className="w-full border border-gray-300 p-3 rounded-xl text-black" />
-
-          <input name="industryPreference" placeholder="Industry Preference" value={formData.industryPreference} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl text-black" />
-          <input type="number" name="capitalInvestment" placeholder="Available Capital" value={formData.capitalInvestment} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl text-black" />
-          <input type="number" name="budgetForPurchase" placeholder="Budget for Purchase" value={formData.budgetForPurchase} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl text-black" />
-
-          <textarea name="shortIntroduction" value={formData.shortIntroduction} onChange={handleChange} placeholder="Short Introduction" rows="4" className="w-full border border-gray-300 p-3 rounded-xl text-black" />
-
-          <select name="priorIndustryExperience" value={formData.priorIndustryExperience} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl text-black">
-            <option value="No">Prior Industry Experience? No</option>
+          <select name="priorIndustryExperience" value={formData.priorIndustryExperience} onChange={handleChange} className="w-full border p-3 rounded">
+            <option value="No">Prior Industry Experience: No</option>
             <option value="Yes">Yes</option>
           </select>
 
-          <select name="willingToRelocate" value={formData.willingToRelocate} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl text-black">
-            <option value="No">Willing to Relocate? No</option>
+          <select name="willingToRelocate" value={formData.willingToRelocate} onChange={handleChange} className="w-full border p-3 rounded">
+            <option value="No">Willing to Relocate: No</option>
             <option value="Yes">Yes</option>
           </select>
 
-          <input name="city" placeholder="City" value={formData.city} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl text-black" />
-          <input name="stateOrProvince" placeholder="State/Province" value={formData.stateOrProvince} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl text-black" />
-
-          <label className="block text-sm font-medium mb-2">Upload a short intro video (.mp4/.mov/.webm)</label>
-          <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={handleVideoUpload} className="w-full border border-gray-300 p-3 rounded-xl" />
+          <label className="block font-medium">Video Introduction (optional):</label>
+          <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={handleVideoUpload} className="w-full border p-3 rounded" />
           {videoPreview && (
-            <video width="200" controls className="mt-4">
+            <video controls width="300" className="mt-2">
               <source src={videoPreview} type="video/mp4" />
             </video>
           )}
 
-          <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">
-            Submit Buyer Profile
-          </button>
+          <button type="submit" className="bg-blue-600 text-white py-3 px-6 rounded hover:bg-blue-700">Submit Buyer Profile</button>
         </form>
       </div>
     </main>
   );
 }
+
+
