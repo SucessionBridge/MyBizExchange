@@ -44,6 +44,18 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Sellability Scorecard Section */}
+        <div className="text-center mb-12">
+          <h2 className="text-xl font-semibold text-white mb-4">
+            Not sure if your business is ready to sell?
+          </h2>
+          <Link href="/scorecard">
+            <a className="inline-block bg-teal-500 hover:bg-teal-600 text-white font-semibold py-2 px-4 rounded-md shadow-md">
+              👉 Take the Sellability Scorecard
+            </a>
+          </Link>
+        </div>
+
         {/* Buyers Section */}
         <div className="text-center mb-12">
           <h2 className="text-3xl font-semibold mb-4">Are You a Buyer?</h2>
@@ -73,3 +85,4 @@ export default function Home() {
     </main>
   );
 }
+
