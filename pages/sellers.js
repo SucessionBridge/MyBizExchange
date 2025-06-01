@@ -192,6 +192,19 @@ export default function SellerOnboarding() {
           </div>
 
           <div>
+            <label className="block text-sm font-medium mb-2">Brief Description of the Business:</label>
+            <textarea
+              name="businessDescription"
+              value={formData.businessDescription}
+              onChange={handleChange}
+              rows="4"
+              placeholder="What does your business do? Who are the customers?"
+              className="w-full border border-gray-300 p-3 rounded-xl"
+              required
+            />
+          </div>
+
+          <div>
             <label className="block text-sm font-medium mb-2">Upload up to 8 photos:</label>
             <input type="file" name="images" accept="image/*" multiple onChange={handleImageUpload} className="w-full border border-gray-300 p-3 rounded-xl" />
             <div className="mt-4 flex flex-wrap gap-2">
@@ -199,7 +212,7 @@ export default function SellerOnboarding() {
                 <div key={index} className="relative">
                   <img src={preview} alt={`Preview ${index}`} className="h-20 w-20 object-cover rounded-md" />
                   <button onClick={() => removeImage(index)} className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-full">X</button>
-                  {invalidFiles.includes(formData.images[index].name) && (
+                  {invalidFiles.includes(formData.images[index]?.name) && (
                     <span className="absolute top-0 left-0 bg-red-500 text-white text-xs p-1">Invalid</span>
                   )}
                 </div>
@@ -218,5 +231,3 @@ export default function SellerOnboarding() {
     </main>
   );
 }
-
-
