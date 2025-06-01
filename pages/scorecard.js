@@ -6,6 +6,8 @@ export default function ScorecardPage() {
     industry: '',
     description: '',
     askingPrice: '',
+    annualRevenue: '',
+    annualProfit: '',
     ageOfBusiness: '',
     revenue: '',
     profitability: '',
@@ -74,6 +76,30 @@ export default function ScorecardPage() {
             name="askingPrice"
             value={formData.askingPrice}
             onChange={handleChange}
+            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Approximate annual revenue</label>
+          <input
+            type="number"
+            name="annualRevenue"
+            value={formData.annualRevenue}
+            onChange={handleChange}
+            required
+            className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Approximate annual profit or owner earnings (SDE)</label>
+          <input
+            type="number"
+            name="annualProfit"
+            value={formData.annualProfit}
+            onChange={handleChange}
+            required
             className="mt-1 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
           />
         </div>
