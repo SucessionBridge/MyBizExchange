@@ -9,7 +9,6 @@ export default function ScorecardPage() {
     annualRevenue: '',
     annualProfit: '',
     ageOfBusiness: '',
-    revenue: '',
     profitability: '',
     hasSystems: '',
     hasTeam: '',
@@ -19,14 +18,27 @@ export default function ScorecardPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const calculateScore = () => {
-    const fields = ['ageOfBusiness', 'revenue', 'profitability', 'hasSystems', 'hasTeam'];
+    const fields = ['profitability', 'hasSystems', 'hasTeam'];
     const values = fields.map((field) => parseInt(formData[field] || '0'));
-    const total = values.reduce((acc, val) => acc + val, 0);
-    return (total / fields.length).toFixed(1);
+
+    // Age score logic
+    const age = parseInt(formData.ageOfBusiness || '0');
+    let ageScore = 1;
+    if (age >= 3 && age < 5) ageScore = 3;
+    else if (age >= 5) ageScore = 5;
+
+    // Revenue score logic
+    const revenue = parseInt(formData.annualRevenue || '0');
+    let revenueScore = 1;
+    if (revenue >= 100000 && revenue < 300000) revenueScore = 3;
+    else if (revenue >= 300000) revenueScore = 5;
+
+    const total = values.reduce((acc, val) => acc + val, 0) + ageScore + revenueScore;
+    return (total / (values.length + 2)).toFixed(1);
   };
 
   const handleSubmit = async (e) => {
@@ -34,7 +46,7 @@ export default function ScorecardPage() {
     const calculated = calculateScore();
     setScore(calculated);
     alert(`Submitted! Your Sellability Score is ${calculated}/5. It will be emailed to you.`);
-    // Here you'd insert logic to save to Supabase and trigger an email
+    // Save to Supabase + trigger email logic here later
   };
 
   return (
@@ -122,32 +134,41 @@ export default function ScorecardPage() {
           />
         </div>
 
-        {/* Scorecard Section */}
+        {/* Age of Business */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            How many years has your business been running?
+          </label>
+          <small className="text-gray-500">
+            Buyers prefer businesses that are at least 2+ years old.
+          </small>
+          <input
+            type="number"
+            name="ageOfBusiness"
+            value={formData.ageOfBusiness}
+            onChange={handleChange}
+            required
+            min="0"
+            className="mt-2 block w-full rounded-md border border-gray-300 p-2 shadow-sm"
+          />
+        </div>
+
+        {/* Scorecard Radio Questions */}
         {[
-          {
-            label: 'How many years has your business been running?',
-            name: 'ageOfBusiness',
-            help: 'Buyers prefer businesses that are at least 2+ years old.',
-          },
-          {
-            label: 'Is your revenue over $100K/year?',
-            name: 'revenue',
-            help: 'Higher revenue signals proven demand.',
-          },
           {
             label: 'Is your business consistently profitable?',
             name: 'profitability',
-            help: 'Profitability affects financing and buyer confidence.',
+            help: 'Consistent profitability means your business brings in more than it spends — after paying you. This builds buyer trust and affects financing.',
           },
           {
             label: 'Do you have documented systems/processes?',
             name: 'hasSystems',
-            help: 'SOPs make your business easier to transfer and scale.',
+            help: 'Example: step-by-step instructions for tasks like onboarding customers, fulfilling orders, or handling refunds. These can be checklists, Google Docs, SOPs, or training videos.',
           },
           {
             label: 'Do you have a team helping run the business?',
             name: 'hasTeam',
-            help: 'A strong team means less dependency on the owner.',
+            help: 'A team (employees, VAs, or contractors) makes your business less dependent on you and easier for a buyer to take over.',
           },
         ].map(({ label, name, help }) => (
           <div key={name}>
