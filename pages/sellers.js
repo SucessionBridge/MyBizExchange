@@ -8,10 +8,12 @@ export default function SellerOnboarding() {
     businessName: "",
     industry: "",
     location: "",
-    financingType: "seller-financing",
+    annualRevenue: "",
+    annualProfit: "",
     askingPrice: "",
     includesInventory: "",
     includesBuilding: "",
+    financingType: "seller-financing",
     images: [],
     businessDescription: "",
   });
@@ -95,7 +97,12 @@ export default function SellerOnboarding() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const uploadedUrls = await uploadImages(formData.images);
-    const { name, email, businessName, industry, location, financingType, askingPrice, includesInventory, includesBuilding, businessDescription } = formData;
+    const {
+      name, email, businessName, industry, location,
+      annualRevenue, annualProfit, askingPrice,
+      includesInventory, includesBuilding, financingType,
+      businessDescription
+    } = formData;
 
     const { error } = await supabase.from('sellers').insert([
       {
@@ -104,10 +111,12 @@ export default function SellerOnboarding() {
         business_name: businessName,
         industry,
         location,
-        financing_type: financingType,
+        annual_revenue: parseFloat(annualRevenue),
+        annual_profit: parseFloat(annualProfit),
         asking_price: parseFloat(askingPrice),
         includes_inventory: includesInventory,
         includes_building: includesBuilding,
+        financing_type: financingType,
         images: uploadedUrls,
         business_description: businessDescription,
       },
@@ -124,10 +133,12 @@ export default function SellerOnboarding() {
         businessName: "",
         industry: "",
         location: "",
-        financingType: "seller-financing",
+        annualRevenue: "",
+        annualProfit: "",
         askingPrice: "",
         includesInventory: "",
         includesBuilding: "",
+        financingType: "seller-financing",
         images: [],
         businessDescription: "",
       });
@@ -149,11 +160,13 @@ export default function SellerOnboarding() {
           <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
           <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
           <input name="location" placeholder="Location" value={formData.location} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
-          <input name="askingPrice" type="number" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
+          <input name="annualRevenue" type="number" placeholder="Annual Revenue (e.g., 200000)" value={formData.annualRevenue} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
+          <input name="annualProfit" type="number" placeholder="Annual Profit / SDE (e.g., 75000)" value={formData.annualProfit} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
+          <input name="askingPrice" type="number" placeholder="Asking Price (e.g., 150000)" value={formData.askingPrice} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
 
           <div>
-            <label className="block text-sm font-medium mb-2">Does the asking price include inventory?</label>
-            <select name="includesInventory" value={formData.includesInventory} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required>
+            <label className="block text-sm font-medium mb-2">Does the price include inventory?</label>
+            <select name="includesInventory" value={formData.includesInventory} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl">
               <option value="">Select</option>
               <option value="Yes">Yes</option>
               <option value="No">No</option>
@@ -161,15 +174,13 @@ export default function SellerOnboarding() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Does the asking price include a building?</label>
-            <select name="includesBuilding" value={formData.includesBuilding} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required>
+            <label className="block text-sm font-medium mb-2">Does the price include a building?</label>
+            <select name="includesBuilding" value={formData.includesBuilding} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl">
               <option value="">Select</option>
               <option value="Yes">Yes</option>
               <option value="No">No</option>
             </select>
           </div>
-
-          <textarea name="businessDescription" placeholder="Brief description of the business" value={formData.businessDescription} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" rows="4" required />
 
           <div>
             <label className="block text-sm font-medium mb-2">Preferred Financing Option:</label>
@@ -197,14 +208,15 @@ export default function SellerOnboarding() {
             {errorMessage && <div className="text-red-500 text-sm">{errorMessage}</div>}
           </div>
 
+          {uploadStatus && (
+            <div className="text-center text-blue-600 font-semibold mt-4">{uploadStatus}</div>
+          )}
+
           <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">Submit Listing</button>
         </form>
       </div>
     </main>
   );
 }
-
-
-
 
 
