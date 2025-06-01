@@ -70,8 +70,11 @@ export default function BuyerOnboarding() {
     } = formData;
 
     let videoUrl = null;
+
     if (video) {
-      const videoName = `buyer-video-${Date.now()}-${video.name}`;
+      const safeFileName = video.name.replace(/\s+/g, '_'); // sanitize file name
+      const videoName = `public/buyer-video-${Date.now()}-${safeFileName}`;
+
       const { error: uploadError } = await supabase.storage
         .from('buyer-videos')
         .upload(videoName, video);
@@ -166,26 +169,3 @@ export default function BuyerOnboarding() {
             <option value="No">Willing to Relocate? No</option>
             <option value="Yes">Yes</option>
           </select>
-
-          <input name="city" placeholder="City" value={formData.city} onChange={handleChange} className="w-full border p-3 rounded text-black" />
-          <input name="stateOrProvince" placeholder="State/Province" value={formData.stateOrProvince} onChange={handleChange} className="w-full border p-3 rounded text-black" />
-
-          <label>Upload a short intro video (.mp4/.mov/.webm)</label>
-          <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={handleVideoUpload} className="w-full border p-3 rounded" />
-          {videoPreview && (
-            <video width="200" controls className="mt-4">
-              <source src={videoPreview} type="video/mp4" />
-            </video>
-          )}
-
-          <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold">
-            Submit Buyer Profile
-          </button>
-        </form>
-      </div>
-    </main>
-  );
-}
-
-
-
