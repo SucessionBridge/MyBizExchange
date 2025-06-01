@@ -20,7 +20,7 @@ export default function Home() {
               Get an instant, free valuation using our AI-powered tool. Understand your business value and plan your exit with confidence.
             </p>
             <Link href="/business-valuation">
-              <button className="bg-orange-500 hover:bg-orange-600 text-white py-3 px-6 rounded-lg text-lg font-semibold">
+              <button className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 py-3 px-6 rounded-lg text-lg font-semibold">
                 See How Much Your Business Is Worth
               </button>
             </Link>
