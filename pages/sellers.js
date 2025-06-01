@@ -9,15 +9,15 @@ export default function SellerOnboarding() {
     industry: "",
     location: "",
     financingType: "rent-to-own",
-    images: [],  // To store valid image files
-    businessDescription: "", // New business description field
+    images: [],
+    businessDescription: "",
   });
 
-  const [imagePreviews, setImagePreviews] = useState([]);  // For storing preview images
-  const [errorMessage, setErrorMessage] = useState("");  // To display validation errors
-  const [invalidFiles, setInvalidFiles] = useState([]);  // To store invalid files based on size
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [invalidFiles, setInvalidFiles] = useState([]);
+  const [uploadStatus, setUploadStatus] = useState("");
 
-  // Handle changes to form fields
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -26,63 +26,49 @@ export default function SellerOnboarding() {
     }));
   };
 
-  // Handle image selection
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
-    const maxSize = 5 * 1024 * 1024; // 5MB limit
-
+    const maxSize = 5 * 1024 * 1024;
     const validFiles = files.filter(file => file.size <= maxSize);
-    const invalidFiles = files.filter(file => file.size > maxSize);
+    const invalid = files.filter(file => file.size > maxSize);
 
-    // Handle invalid files and set error message
-    if (invalidFiles.length > 0) {
+    if (invalid.length > 0) {
       setErrorMessage(`Some files exceed the 5MB size limit and will not be uploaded.`);
-      setInvalidFiles(invalidFiles.map(file => file.name));  // Track invalid files by name or unique identifier
+      setInvalidFiles(invalid.map(file => file.name));
     } else {
-      setErrorMessage("");  // Clear the error message if all files are valid
-      setInvalidFiles([]);  // Clear invalid files
+      setErrorMessage("");
+      setInvalidFiles([]);
     }
 
     if (validFiles.length + formData.images.length <= 8) {
       const previews = validFiles.map((file) => URL.createObjectURL(file));
-
       setFormData((prev) => ({
         ...prev,
         images: [...prev.images, ...validFiles],
       }));
-
       setImagePreviews((prev) => [...prev, ...previews]);
     } else {
       alert('You can only upload up to 8 images.');
     }
   };
 
-  // Remove image from selection
   const removeImage = (index) => {
     const updatedImages = formData.images.filter((_, i) => i !== index);
     const updatedPreviews = imagePreviews.filter((_, i) => i !== index);
-
     setFormData({ ...formData, images: updatedImages });
     setImagePreviews(updatedPreviews);
-
-    // Reset error message if removing an invalid file
     setErrorMessage("");
   };
 
-  // Upload images to Supabase and return their URLs
   const uploadImages = async (files) => {
     const uploadedUrls = [];
     const errors = [];
+    setUploadStatus("Uploading images, please keep browser open...");
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const fileName = `business-${Date.now()}-${file.name}`;
-
-      console.log(`Uploading file: ${fileName}`);
-
-      const { data, error } = await supabase.storage
-        .from('new-business-photos') // Use the new bucket name here
-        .upload(fileName, file);
+      const { error } = await supabase.storage.from('new-business-photos').upload(fileName, file);
 
       if (error) {
         console.error('Error uploading image:', error.message);
@@ -91,10 +77,10 @@ export default function SellerOnboarding() {
       }
 
       const url = supabase.storage.from('new-business-photos').getPublicUrl(fileName).publicURL;
-
-      console.log(`Image uploaded: ${url}`);
       uploadedUrls.push(url);
     }
+
+    setUploadStatus("");
 
     if (errors.length > 0) {
       alert(`Some images failed to upload: ${errors.join(', ')}`);
@@ -103,17 +89,12 @@ export default function SellerOnboarding() {
     return uploadedUrls;
   };
 
-  // Handle form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // Upload images and get URLs
     const uploadedUrls = await uploadImages(formData.images);
-
-    // Submit form data including business description
     const { name, email, businessName, industry, location, financingType, businessDescription } = formData;
 
-    const { data, error } = await supabase.from('sellers').insert([
+    const { error } = await supabase.from('sellers').insert([
       {
         name,
         email,
@@ -122,7 +103,7 @@ export default function SellerOnboarding() {
         location,
         financing_type: financingType,
         images: uploadedUrls,
-        business_description: businessDescription, // Include the business description
+        business_description: businessDescription,
       },
     ]);
 
@@ -130,10 +111,7 @@ export default function SellerOnboarding() {
       console.error("❌ Error submitting form:", error);
       alert("There was a problem submitting your form.");
     } else {
-      console.log("✅ Submitted:", data);
       alert("Your listing was submitted successfully!");
-
-      // Reset form data
       setFormData({
         name: "",
         email: "",
@@ -141,11 +119,11 @@ export default function SellerOnboarding() {
         industry: "",
         location: "",
         financingType: "rent-to-own",
-        images: [],  // Clear images
-        businessDescription: "", // Clear business description field
+        images: [],
+        businessDescription: "",
       });
-      setImagePreviews([]);  // Clear previews
-      setErrorMessage("");  // Clear any error messages
+      setImagePreviews([]);
+      setErrorMessage("");
     }
   };
 
@@ -153,123 +131,50 @@ export default function SellerOnboarding() {
     <main className="min-h-screen bg-white p-8">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Seller Onboarding</h1>
+        {uploadStatus && (
+          <div className="text-center text-blue-600 font-semibold mb-4">{uploadStatus}</div>
+        )}
         <form onSubmit={handleSubmit} className="space-y-6">
-          <input
-            name="name"
-            placeholder="Your Name"
-            value={formData.name}
-            onChange={handleChange}
-            className="w-full border border-gray-300 p-3 rounded-xl"
-            required
-          />
-          <input
-            name="email"
-            type="email"
-            placeholder="Email Address"
-            value={formData.email}
-            onChange={handleChange}
-            className="w-full border border-gray-300 p-3 rounded-xl"
-            required
-          />
-          <input
-            name="businessName"
-            placeholder="Business Name"
-            value={formData.businessName}
-            onChange={handleChange}
-            className="w-full border border-gray-300 p-3 rounded-xl"
-            required
-          />
-          <input
-            name="industry"
-            placeholder="Industry"
-            value={formData.industry}
-            onChange={handleChange}
-            className="w-full border border-gray-300 p-3 rounded-xl"
-            required
-          />
-          <input
-            name="location"
-            placeholder="Location"
-            value={formData.location}
-            onChange={handleChange}
-            className="w-full border border-gray-300 p-3 rounded-xl"
-            required
-          />
-
-          {/* Business Description Field */}
-          <textarea
-            name="businessDescription"
-            placeholder="Brief description of the business"
-            value={formData.businessDescription}
-            onChange={handleChange}
-            className="w-full border border-gray-300 p-3 rounded-xl"
-            rows="4"
-            required
-          />
-
-          {/* Financing Type */}
+          <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
+          <input name="email" type="email" placeholder="Email Address" value={formData.email} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
+          <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
+          <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
+          <input name="location" placeholder="Location" value={formData.location} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" required />
+          <textarea name="businessDescription" placeholder="Brief description of the business" value={formData.businessDescription} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl" rows="4" required />
           <div>
             <label className="block text-sm font-medium mb-2">Preferred Financing Option:</label>
-            <select
-              name="financingType"
-              value={formData.financingType}
-              onChange={handleChange}
-              className="w-full border border-gray-300 p-3 rounded-xl"
-            >
+            <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border border-gray-300 p-3 rounded-xl">
               <option value="rent-to-own">Rent-to-Own</option>
               <option value="seller-financing">Seller Financing</option>
               <option value="third-party">3rd-Party Financing</option>
             </select>
           </div>
-
-          {/* Image Upload */}
           <div>
             <label className="block text-sm font-medium mb-2">Upload up to 8 photos:</label>
-            <input
-              type="file"
-              name="images"
-              accept="image/*"
-              multiple
-              onChange={handleImageUpload}
-              className="w-full border border-gray-300 p-3 rounded-xl"
-            />
+            <input type="file" name="images" accept="image/*" multiple onChange={handleImageUpload} className="w-full border border-gray-300 p-3 rounded-xl" />
             <div className="mt-4 flex flex-wrap gap-2">
               {imagePreviews.map((preview, index) => (
                 <div key={index} className="relative">
-                  <img
-                    src={preview}
-                    alt={`Preview ${index}`}
-                    className="h-20 w-20 object-cover rounded-md"
-                  />
-                  <button
-                    onClick={() => removeImage(index)}
-                    className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-full"
-                  >
-                    X
-                  </button>
+                  <img src={preview} alt={`Preview ${index}`} className="h-20 w-20 object-cover rounded-md" />
+                  <button onClick={() => removeImage(index)} className="absolute top-0 right-0 bg-red-500 text-white p-1 rounded-full">X</button>
                   {invalidFiles.includes(formData.images[index].name) && (
-                    <span className="absolute top-0 left-0 bg-red-500 text-white text-xs p-1">
-                      Invalid
-                    </span>
+                    <span className="absolute top-0 left-0 bg-red-500 text-white text-xs p-1">Invalid</span>
                   )}
                 </div>
               ))}
             </div>
             {errorMessage && <div className="text-red-500 text-sm">{errorMessage}</div>}
           </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold"
-          >
-            Submit Listing
-          </button>
+          {uploadStatus && (
+            <div className="text-center text-blue-600 font-semibold mt-4">{uploadStatus}</div>
+          )}
+          <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">Submit Listing</button>
         </form>
       </div>
     </main>
   );
 }
+
 
 
 
