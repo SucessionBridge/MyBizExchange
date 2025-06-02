@@ -5,7 +5,7 @@ export default function BuyerOnboarding() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    financingType: "rent-to-own",
+    financingType: "self-financing", // ✅ Default set to Self Financing
     experience: 3,
     industryPreference: "",
     capitalInvestment: "",
@@ -120,7 +120,7 @@ export default function BuyerOnboarding() {
       setFormData({
         name: "",
         email: "",
-        financingType: "rent-to-own",
+        financingType: "self-financing", // ✅ Reset to default
         experience: 3,
         industryPreference: "",
         capitalInvestment: "",
@@ -155,8 +155,9 @@ export default function BuyerOnboarding() {
 
           <label>Preferred Financing Option:</label>
           <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded text-black">
-            <option value="rent-to-own">Rent-to-Own</option>
+            <option value="self-financing">Self Financing</option>
             <option value="seller-financing">Seller Financing</option>
+            <option value="rent-to-own">Rent-to-Own</option>
             <option value="third-party">3rd-Party Financing</option>
           </select>
 
