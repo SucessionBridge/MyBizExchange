@@ -11,9 +11,11 @@ export default function Header() {
           <Link href="/business-valuation" className="hover:text-blue-600">Valuation</Link>
           <Link href="/sellers" className="hover:text-blue-600">Sell</Link>
           <Link href="/buyers" className="hover:text-blue-600">Buy</Link>
-          <Link href="/scorecard" className="hover:text-blue-600">Scorecard</Link>
+          <Link href="/listings" className="hover:text-blue-600">Marketplace</Link> {/* ✅ Added */}
+          <Link href="/scorecard" className="hover:text-blue-600">Prepare to Sell</Link>
         </nav>
       </div>
     </header>
   );
 }
+
