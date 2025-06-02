@@ -4,11 +4,13 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-white text-gray-900 px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        {/* Header Section */}
+        {/* Hero Section (Updated wording only) */}
         <div className="text-center mb-16">
-          <h1 className="text-5xl font-extrabold text-blue-800 mb-4">SuccessionBridge</h1>
+          <h1 className="text-5xl font-extrabold text-blue-800 mb-4">
+            Helping Business Owners Exit on Their Terms
+          </h1>
           <p className="text-lg font-normal text-gray-700 max-w-2xl mx-auto">
-            Helping business owners transition smoothly — and buyers step confidently into ownership.
+            SuccessionBridge supports entrepreneurs planning for retirement or transition — by connecting them with qualified buyers who value their legacy.
           </p>
         </div>
 
@@ -42,7 +44,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Sellability Scorecard Section (Updated Color) */}
+        {/* Sellability Scorecard Section */}
         <section className="bg-blue-50 rounded-xl p-8 mb-12 border border-blue-100">
           <div className="text-center">
             <h2 className="text-2xl font-semibold text-blue-800 mb-4">
@@ -85,4 +87,5 @@ export default function Home() {
     </main>
   );
 }
+
 
