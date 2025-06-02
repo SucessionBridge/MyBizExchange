@@ -83,7 +83,7 @@ export default function SellerOnboarding() {
         continue;
       }
 
-      const { data: publicUrlData, error: urlError } = supabase.storage
+      const { data, error: urlError } = supabase.storage
         .from('new-business-photos')
         .getPublicUrl(fileName);
 
@@ -93,7 +93,7 @@ export default function SellerOnboarding() {
         continue;
       }
 
-      uploadedUrls.push(publicUrlData.publicUrl);
+      uploadedUrls.push(data.publicUrl);
     }
 
     setUploadStatus("");
