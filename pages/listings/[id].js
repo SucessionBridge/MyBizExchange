@@ -1,5 +1,3 @@
-// pages/listings/[id].js
-
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
@@ -32,45 +30,35 @@ export default function ListingDetails() {
     fetchListing();
   }, [id]);
 
-  if (loading) {
-    return <div className="text-center p-8">Loading...</div>;
-  }
-
-  if (!listing) {
-    return <div className="text-center p-8 text-red-600">Listing not found.</div>;
-  }
+  if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (!listing) return <div className="p-8 text-center text-red-600">Listing not found.</div>;
 
   return (
-    <main className="max-w-4xl mx-auto px-4 py-10">
-      <h1 className="text-3xl font-bold text-blue-800 mb-4">{listing.business_name}</h1>
-      <p className="text-gray-700 mb-2">{listing.location} • {listing.industry}</p>
+    <div className="max-w-4xl mx-auto p-6 bg-white shadow-md rounded-xl mt-8">
+      <h1 className="text-3xl font-bold text-blue-900 mb-4">{listing.business_name}</h1>
+      <p className="text-gray-600 mb-2">{listing.location} • {listing.industry}</p>
 
       {listing.images?.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 my-6">
-          {listing.images.map((url, idx) => (
-            <img
-              key={idx}
-              src={url}
-              alt={`Image ${idx + 1}`}
-              className="rounded-xl w-full object-cover h-48"
-            />
-          ))}
-        </div>
+        <img
+          src={listing.images[0]}
+          alt="Business Image"
+          className="w-full max-h-[400px] object-cover rounded-lg mb-4"
+        />
       )}
 
-      <div className="space-y-2 text-gray-800">
-        <p><strong>Revenue:</strong> ${listing.annual_revenue?.toLocaleString()}</p>
-        <p><strong>Profit / SDE:</strong> ${listing.annual_profit?.toLocaleString()}</p>
+      <div className="space-y-2 text-gray-800 text-sm">
+        <p><strong>Annual Revenue:</strong> ${listing.annual_revenue?.toLocaleString()}</p>
+        <p><strong>Annual Profit (SDE):</strong> ${listing.annual_profit?.toLocaleString()}</p>
         <p><strong>Asking Price:</strong> ${listing.asking_price?.toLocaleString()}</p>
-        <p><strong>Includes Inventory:</strong> {listing.includes_inventory}</p>
-        <p><strong>Includes Building:</strong> {listing.includes_building}</p>
-        <p><strong>Preferred Financing:</strong> {listing.financing_type}</p>
+        <p><strong>Includes Inventory:</strong> {listing.includes_inventory || 'No'}</p>
+        <p><strong>Includes Building:</strong> {listing.includes_building || 'No'}</p>
+        <p><strong>Financing Option:</strong> {listing.financing_type}</p>
       </div>
 
       <div className="mt-6">
-        <h2 className="text-xl font-semibold mb-2">Business Description</h2>
-        <p className="text-gray-700 whitespace-pre-line">{listing.business_description}</p>
+        <h2 className="text-xl font-semibold text-blue-800 mb-2">Business Description</h2>
+        <p className="text-gray-700">{listing.business_description}</p>
       </div>
-    </main>
+    </div>
   );
 }
