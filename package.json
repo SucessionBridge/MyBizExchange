@@ -6,11 +6,14 @@
     "build": "next build",
     "start": "next start"
   },
-  "dependencies": {
-    "next": "13.4.12",
-    "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "@supabase/supabase-js": "^2.38.3"
+"dependencies": {
+  "next": "13.4.12",
+  "react": "18.2.0",
+  "react-dom": "18.2.0",
+  "@supabase/supabase-js": "^2.38.3",
+  "lucide-react": "^0.264.0"
+}
+
   },
   "devDependencies": {
     "tailwindcss": "^3.4.1",
