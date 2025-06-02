@@ -18,11 +18,21 @@ export default function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex space-x-6 text-sm font-medium">
-          <Link href="/business-valuation" className="hover:text-blue-600">Valuation</Link>
-          <Link href="/sellers" className="hover:text-blue-600">Sell</Link>
-          <Link href="/buyers" className="hover:text-blue-600">Buy</Link>
-          <Link href="/scorecard" className="hover:text-blue-600">Prepare to Sell</Link>
-          <Link href="/listings" className="hover:text-blue-600">Marketplace</Link>
+          <Link href="/business-valuation">
+            <span className="hover:text-blue-600 cursor-pointer">Valuation</span>
+          </Link>
+          <Link href="/sellers">
+            <span className="hover:text-blue-600 cursor-pointer">Sell</span>
+          </Link>
+          <Link href="/buyers">
+            <span className="hover:text-blue-600 cursor-pointer">Buy</span>
+          </Link>
+          <Link href="/scorecard">
+            <span className="hover:text-blue-600 cursor-pointer">Prepare to Sell</span>
+          </Link>
+          <Link href="/listings">
+            <span className="hover:text-blue-600 cursor-pointer">Marketplace</span>
+          </Link>
         </nav>
 
         {/* Mobile Hamburger Button */}
@@ -37,11 +47,21 @@ export default function Header() {
       {isOpen && (
         <div className="md:hidden bg-white border-t">
           <nav className="flex flex-col px-4 py-2 space-y-2 text-sm font-medium">
-            <Link href="/business-valuation" onClick={() => setIsOpen(false)} className="hover:text-blue-600">Valuation</Link>
-            <Link href="/sellers" onClick={() => setIsOpen(false)} className="hover:text-blue-600">Sell</Link>
-            <Link href="/buyers" onClick={() => setIsOpen(false)} className="hover:text-blue-600">Buy</Link>
-            <Link href="/scorecard" onClick={() => setIsOpen(false)} className="hover:text-blue-600">Prepare to Sell</Link>
-            <Link href="/listings" onClick={() => setIsOpen(false)} className="hover:text-blue-600">Marketplace</Link>
+            <Link href="/business-valuation">
+              <span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Valuation</span>
+            </Link>
+            <Link href="/sellers">
+              <span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Sell</span>
+            </Link>
+            <Link href="/buyers">
+              <span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Buy</span>
+            </Link>
+            <Link href="/scorecard">
+              <span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Prepare to Sell</span>
+            </Link>
+            <Link href="/listings">
+              <span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Marketplace</span>
+            </Link>
           </nav>
         </div>
       )}
