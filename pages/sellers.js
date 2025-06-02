@@ -83,17 +83,17 @@ export default function SellerOnboarding() {
         continue;
       }
 
-      const { data, error: urlError } = await supabase.storage
+      const { data: publicUrlData, error: urlError } = supabase.storage
         .from('new-business-photos')
-        .createSignedUrl(fileName, 60 * 60 * 24 * 7); // 7-day URL
+        .getPublicUrl(fileName);
 
       if (urlError) {
-        console.error('Error creating signed URL:', urlError.message);
+        console.error('Error getting public URL:', urlError.message);
         errors.push(urlError.message);
         continue;
       }
 
-      uploadedUrls.push(data.signedUrl);
+      uploadedUrls.push(publicUrlData.publicUrl);
     }
 
     setUploadStatus("");
