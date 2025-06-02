@@ -38,7 +38,11 @@ export default function Listings() {
           {listings.map((listing) => (
             <div key={listing.id} className="bg-white border border-gray-200 rounded-2xl shadow hover:shadow-md transition">
               {listing.images?.[0] && (
-                <img src={listing.images[0]} alt="Business" className="w-full h-48 object-cover rounded-t-2xl" />
+                <img
+                  src={listing.images[0]}
+                  alt={`${listing.business_name} image`}
+                  className="w-full h-48 object-cover rounded-t-2xl"
+                />
               )}
               <div className="p-4 space-y-2">
                 <h2 className="text-xl font-semibold text-blue-800">{listing.business_name}</h2>
@@ -51,7 +55,7 @@ export default function Listings() {
                 </div>
               </div>
               <div className="px-4 pb-4">
-                <Link href="#">
+                <Link href={`/listings/${listing.id}`}>
                   <a className="inline-block mt-2 text-blue-600 hover:underline text-sm font-medium">View Details →</a>
                 </Link>
               </div>
@@ -62,4 +66,3 @@ export default function Listings() {
     </div>
   );
 }
-
