@@ -39,11 +39,16 @@ export default function ListingDetails() {
       <p className="text-gray-600 mb-2">{listing.location} • {listing.industry}</p>
 
       {listing.images?.length > 0 && (
-        <img
-          src={listing.images[0]}
-          alt="Business Image"
-          className="w-full max-h-[400px] object-cover rounded-lg mb-4"
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          {listing.images.map((url, index) => (
+            <img
+              key={index}
+              src={url}
+              alt={`Business Image ${index + 1}`}
+              className="w-full h-64 object-cover rounded-lg"
+            />
+          ))}
+        </div>
       )}
 
       <div className="space-y-2 text-gray-800 text-sm">
@@ -62,3 +67,4 @@ export default function ListingDetails() {
     </div>
   );
 }
+
