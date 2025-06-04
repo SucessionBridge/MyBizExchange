@@ -1,10 +1,9 @@
-// components/DealBuilderForm.jsx
 "use client";
 
 import { useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
+import { Input } from "./ui/input";
+import { Textarea } from "./ui/textarea";
+import { Button } from "./ui/button";
 
 export default function DealBuilderForm({ buyerId }) {
   const [valuation, setValuation] = useState(400000);
@@ -60,4 +59,3 @@ export default function DealBuilderForm({ buyerId }) {
     </div>
   );
 }
-
