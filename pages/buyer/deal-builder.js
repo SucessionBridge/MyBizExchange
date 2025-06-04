@@ -1,4 +1,4 @@
-import DealBuilderForm from "@/components/DealBuilderForm";
+import DealBuilderForm from "../../components/DealBuilderForm";
 
 export default function DealBuilderPage() {
   return (
