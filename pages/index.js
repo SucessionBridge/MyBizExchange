@@ -6,14 +6,14 @@ export default function Home() {
       <div className="max-w-6xl mx-auto">
 
         {/* Hero Section */}
-        <h1 className="text-5xl font-serif font-bold text-[#2E3A59] mb-4">
-  Helping Business Owners Exit on Their Terms
-</h1>
-<p className="text-lg text-[#1F2937] max-w-2xl mx-auto">
-  SuccessionBridge supports entrepreneurs planning for retirement or transition — by connecting them with qualified buyers who value their legacy.
-</p>
+        <section className="text-center mb-20">
+          <h1 className="text-5xl font-serif font-bold text-[#2E3A59] mb-4">
+            Helping Business Owners Exit on Their Terms
+          </h1>
+          <p className="text-lg text-[#1F2937] max-w-2xl mx-auto">
+            SuccessionBridge supports entrepreneurs planning for retirement or transition — by connecting them with qualified buyers who value their legacy.
+          </p>
 
-          
           <div className="mt-6 space-x-4">
             <Link href="/buyers">
               <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
