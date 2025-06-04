@@ -14,7 +14,8 @@ export default function Home() {
             SuccessionBridge supports entrepreneurs planning for retirement or transition — by connecting them with qualified buyers who value their legacy.
           </p>
 
-          <div className="mt-6 space-x-4">
+        <div className="mt-6 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0 items-center justify-center">
+
             <Link href="/buyers">
               <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
                 Browse Businesses
