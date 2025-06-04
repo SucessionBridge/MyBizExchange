@@ -1,9 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Input } from "./ui/input";
-import { Textarea } from "./ui/textarea";
-import { Button } from "./ui/button";
 
 export default function DealBuilderForm({ buyerId }) {
   const [valuation, setValuation] = useState(400000);
@@ -26,35 +23,51 @@ export default function DealBuilderForm({ buyerId }) {
     <div className="max-w-xl mx-auto p-4 rounded-xl shadow">
       <h2 className="text-xl font-bold mb-4">Deal Builder: Subcontractor-Style</h2>
 
-      <div className="space-y-3">
-        <Input
+      <div className="space-y-4">
+        <input
           type="number"
           value={valuation}
           onChange={(e) => setValuation(Number(e.target.value))}
           placeholder="Business Valuation ($)"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg"
         />
-        <Input
+        <input
           type="number"
           value={jobRevenue}
           onChange={(e) => setJobRevenue(Number(e.target.value))}
           placeholder="Example Job Revenue ($)"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg"
         />
-        <Input
+        <input
           type="number"
           value={jobCost}
           onChange={(e) => setJobCost(Number(e.target.value))}
           placeholder="Example Job Cost ($)"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg"
         />
-        <Input
+        <input
           type="number"
           value={buyerSplit}
           onChange={(e) => setBuyerSplit(Number(e.target.value))}
           placeholder="Buyer Profit Split (%)"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg"
         />
 
-        <Button onClick={generateSummary}>Generate Deal Summary</Button>
+        <button
+          onClick={generateSummary}
+          className="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2 rounded-lg"
+        >
+          Generate Deal Summary
+        </button>
 
-        {summary && <Textarea readOnly className="mt-4" value={summary} rows={8} />}
+        {summary && (
+          <textarea
+            readOnly
+            value={summary}
+            rows={8}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+          />
+        )}
       </div>
     </div>
   );
