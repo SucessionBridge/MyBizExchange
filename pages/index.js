@@ -15,14 +15,14 @@ export default function Home() {
           </p>
           <div className="mt-6 space-x-4">
             <Link href="/buyers">
-              <button className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg">
+              <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
                 Browse Businesses
-              </button>
+              </a>
             </Link>
             <Link href="/sellers">
-              <button className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-6 py-3 rounded-xl font-semibold text-lg">
+              <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
                 List Your Business
-              </button>
+              </a>
             </Link>
           </div>
         </section>
@@ -35,9 +35,9 @@ export default function Home() {
               Use our AI-powered tool to get a free valuation instantly. Know your numbers before you negotiate.
             </p>
             <Link href="/business-valuation">
-              <button className="bg-[#14B8A6] hover:bg-[#0D9488] text-white py-3 px-6 rounded-lg text-lg font-semibold">
+              <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white py-3 px-6 rounded-lg text-lg font-semibold inline-block">
                 See How Much Your Business Is Worth
-              </button>
+              </a>
             </Link>
           </div>
         </section>
@@ -50,9 +50,9 @@ export default function Home() {
               Maximize your legacy. Find a trusted buyer who’ll carry on what you’ve built — on your terms.
             </p>
             <Link href="/sellers">
-              <button className="bg-[#F59E0B] hover:bg-[#D97706] text-white py-3 px-6 rounded-lg text-lg font-semibold">
+              <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white py-3 px-6 rounded-lg text-lg font-semibold inline-block">
                 List Your Business
-              </button>
+              </a>
             </Link>
           </div>
         </section>
@@ -79,9 +79,9 @@ export default function Home() {
               Discover stable businesses ready for transition. Get in with creative financing and zero bank stress.
             </p>
             <Link href="/buyers">
-              <button className="bg-[#14B8A6] hover:bg-[#0D9488] text-white py-3 px-6 rounded-lg text-lg font-semibold">
+              <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white py-3 px-6 rounded-lg text-lg font-semibold inline-block">
                 Browse Businesses
-              </button>
+              </a>
             </Link>
           </div>
         </section>
@@ -95,6 +95,7 @@ export default function Home() {
             </p>
           </div>
         </section>
+
       </div>
     </main>
   );
