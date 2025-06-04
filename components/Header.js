@@ -12,17 +12,32 @@ export default function Header() {
   return (
     <header className="bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-        <Link href="/" className="text-2xl font-bold text-blue-700 cursor-pointer">
-          SuccessionBridge
+
+        {/* Stylized Brand Name */}
+        <Link href="/">
+          <a className="text-2xl font-serif font-bold">
+            <span className="text-[#2E3A59]">Succession</span>
+            <span className="text-[#F59E0B]">Bridge</span>
+          </a>
         </Link>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex space-x-6 text-sm font-medium">
-          <Link href="/business-valuation" className="hover:text-blue-600">Valuation</Link>
-          <Link href="/sellers" className="hover:text-blue-600">Sell</Link>
-          <Link href="/buyers" className="hover:text-blue-600">Buy</Link>
-          <Link href="/scorecard" className="hover:text-blue-600">Prepare to Sell</Link>
-          <Link href="/listings" className="hover:text-blue-600">Marketplace</Link>
+          <Link href="/business-valuation">
+            <a className="hover:text-blue-600">Valuation</a>
+          </Link>
+          <Link href="/sellers">
+            <a className="hover:text-blue-600">Sell</a>
+          </Link>
+          <Link href="/buyers">
+            <a className="hover:text-blue-600">Buy</a>
+          </Link>
+          <Link href="/scorecard">
+            <a className="hover:text-blue-600">Prepare to Sell</a>
+          </Link>
+          <Link href="/listings">
+            <a className="hover:text-blue-600">Marketplace</a>
+          </Link>
         </nav>
 
         {/* Mobile Hamburger Button */}
@@ -37,17 +52,25 @@ export default function Header() {
       {isOpen && (
         <div className="md:hidden bg-white border-t">
           <nav className="flex flex-col px-4 py-2 space-y-2 text-sm font-medium">
-            <Link href="/business-valuation" onClick={() => setIsOpen(false)} className="hover:text-blue-600">Valuation</Link>
-            <Link href="/sellers" onClick={() => setIsOpen(false)} className="hover:text-blue-600">Sell</Link>
-            <Link href="/buyers" onClick={() => setIsOpen(false)} className="hover:text-blue-600">Buy</Link>
-            <Link href="/scorecard" onClick={() => setIsOpen(false)} className="hover:text-blue-600">Prepare to Sell</Link>
-            <Link href="/listings" onClick={() => setIsOpen(false)} className="hover:text-blue-600">Marketplace</Link>
+            <Link href="/business-valuation">
+              <a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Valuation</a>
+            </Link>
+            <Link href="/sellers">
+              <a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Sell</a>
+            </Link>
+            <Link href="/buyers">
+              <a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Buy</a>
+            </Link>
+            <Link href="/scorecard">
+              <a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Prepare to Sell</a>
+            </Link>
+            <Link href="/listings">
+              <a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Marketplace</a>
+            </Link>
           </nav>
         </div>
       )}
     </header>
   );
 }
-
-
 
