@@ -1,34 +1,34 @@
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
-import React, { useState } from "react";
+import React, { useState } from 'react';
 
 export default function BuyerOnboarding() {
   const router = useRouter();
   const redirectPath = router.query.redirect || null;
 
   const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    financingType: "self-financing",
+    name: '',
+    email: '',
+    financingType: 'self-financing',
     experience: 3,
-    industryPreference: "",
-    capitalInvestment: "",
-    shortIntroduction: "",
-    priorIndustryExperience: "No",
-    willingToRelocate: "No",
-    city: "",
-    stateOrProvince: "",
+    industryPreference: '',
+    capitalInvestment: '',
+    shortIntroduction: '',
+    priorIndustryExperience: 'No',
+    willingToRelocate: 'No',
+    city: '',
+    stateOrProvince: '',
     video: null,
-    budgetForPurchase: "",
+    budgetForPurchase: '',
   });
 
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState('');
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value ?? "" }));
+    setFormData((prev) => ({ ...prev, [name]: value ?? '' }));
   };
 
   const handleVideoUpload = (e) => {
@@ -41,14 +41,14 @@ export default function BuyerOnboarding() {
   };
 
   const validateForm = () => {
-    const requiredFields = ["name", "email", "city", "stateOrProvince"];
+    const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
     for (let field of requiredFields) {
       if (!formData[field]) {
-        setErrorMessage("Please fill in all the required fields.");
+        setErrorMessage('Please fill in all the required fields.');
         return false;
       }
     }
-    setErrorMessage("");
+    setErrorMessage('');
     return true;
   };
 
@@ -83,8 +83,8 @@ export default function BuyerOnboarding() {
       setIsUploading(false);
 
       if (uploadError) {
-        console.error("❌ Error uploading video:", uploadError);
-        alert("There was a problem uploading your video.");
+        console.error('❌ Error uploading video:', uploadError);
+        alert('There was a problem uploading your video.');
         return;
       }
 
@@ -114,32 +114,14 @@ export default function BuyerOnboarding() {
     ]);
 
     if (insertError) {
-      console.error("❌ Error submitting form:", insertError);
-      alert("There was a problem submitting your form.");
+      console.error('❌ Error submitting form:', insertError);
+      alert('There was a problem submitting your form.');
     } else {
-      alert("Your buyer profile was submitted successfully!");
-
-      // If redirect path exists, go there
+      alert('Your buyer profile was submitted successfully!');
       if (redirectPath) {
         router.push(redirectPath);
       } else {
-        // Reset form and stay on page
-        setFormData({
-          name: "",
-          email: "",
-          financingType: "self-financing",
-          experience: 3,
-          industryPreference: "",
-          capitalInvestment: "",
-          shortIntroduction: "",
-          priorIndustryExperience: "No",
-          willingToRelocate: "No",
-          city: "",
-          stateOrProvince: "",
-          video: null,
-          budgetForPurchase: "",
-        });
-        setVideoPreview(null);
+        router.push('/buyer-dashboard');
       }
     }
   };
@@ -158,8 +140,46 @@ export default function BuyerOnboarding() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {errorMessage && <p className="text-red-500 font-semibold">{errorMessage}</p>}
 
-          {/* Form fields remain unchanged */}
-          {/* ... */}
+          <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded text-black" />
+          <input name="email" type="email" placeholder="Email Address" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded text-black" />
+
+          <label className="block font-medium">Preferred Financing Option</label>
+          <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded text-black">
+            <option value="self-financing">Self Financing</option>
+            <option value="seller-financing">Seller Financing</option>
+            <option value="rent-to-own">Rent-to-Own</option>
+            <option value="third-party">3rd-Party Financing</option>
+          </select>
+
+          <label>Experience (1–5)</label>
+          <input type="number" name="experience" min="1" max="5" value={formData.experience} onChange={handleChange} className="w-full border p-3 rounded text-black" />
+
+          <input name="industryPreference" placeholder="Industry Preference" value={formData.industryPreference} onChange={handleChange} className="w-full border p-3 rounded text-black" />
+          <input type="number" name="capitalInvestment" placeholder="Available Capital" value={formData.capitalInvestment} onChange={handleChange} className="w-full border p-3 rounded text-black" />
+          <input type="number" name="budgetForPurchase" placeholder="Budget for Purchase" value={formData.budgetForPurchase} onChange={handleChange} className="w-full border p-3 rounded text-black" />
+
+          <textarea name="shortIntroduction" value={formData.shortIntroduction} onChange={handleChange} placeholder="Short Introduction" rows="4" className="w-full border p-3 rounded text-black" />
+
+          <select name="priorIndustryExperience" value={formData.priorIndustryExperience} onChange={handleChange} className="w-full border p-3 rounded text-black">
+            <option value="No">Prior Industry Experience? No</option>
+            <option value="Yes">Yes</option>
+          </select>
+
+          <select name="willingToRelocate" value={formData.willingToRelocate} onChange={handleChange} className="w-full border p-3 rounded text-black">
+            <option value="No">Willing to Relocate? No</option>
+            <option value="Yes">Yes</option>
+          </select>
+
+          <input name="city" placeholder="City" value={formData.city} onChange={handleChange} className="w-full border p-3 rounded text-black" />
+          <input name="stateOrProvince" placeholder="State/Province" value={formData.stateOrProvince} onChange={handleChange} className="w-full border p-3 rounded text-black" />
+
+          <label>Upload a short intro video (.mp4/.mov/.webm)</label>
+          <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={handleVideoUpload} className="w-full border p-3 rounded" />
+          {videoPreview && (
+            <video width="200" controls className="mt-4">
+              <source src={videoPreview} type="video/mp4" />
+            </video>
+          )}
 
           <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold">
             Submit Buyer Profile
