@@ -1,62 +1,93 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import { supabase } from "../lib/supabaseClient";
 
 export default function BuyerDashboard() {
-  const [buyer, setBuyer] = useState(null);
+  const router = useRouter();
+  const [buyerProfile, setBuyerProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
 
+  // Fetch current logged-in user
   useEffect(() => {
-    const fetchBuyer = async () => {
-      const { data, error } = await supabase
-        .from('buyers')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
+    async function fetchUser() {
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser();
 
-      if (error) {
-        console.error('Error fetching buyer:', error.message);
+      if (error || !user) {
+        router.push("/login"); // Redirect to login if not authenticated
       } else {
-        setBuyer(data);
+        setUser(user);
+        fetchBuyerProfile(user.email);
       }
+    }
 
-      setLoading(false);
-    };
-
-    fetchBuyer();
+    fetchUser();
   }, []);
 
-  if (loading) return <div className="p-8 text-center">Loading dashboard...</div>;
-  if (!buyer) return <div className="p-8 text-center text-red-500">No buyer profile found.</div>;
+  // Fetch buyer profile from Supabase
+  async function fetchBuyerProfile(email) {
+    const { data, error } = await supabase
+      .from("buyers")
+      .select("*")
+      .eq("email", email)
+      .single();
+
+    if (error) {
+      console.warn("No buyer profile found.");
+      setBuyerProfile(null);
+    } else {
+      setBuyerProfile(data);
+    }
+
+    setLoading(false);
+  }
+
+  if (loading) {
+    return <div className="p-8 text-center text-gray-600">Loading dashboard...</div>;
+  }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-3xl font-bold text-blue-800 mb-6">Buyer Dashboard</h1>
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-6 text-blue-900 text-center">Buyer Dashboard</h1>
 
-      <section className="mb-8 bg-white p-6 rounded shadow">
-        <h2 className="text-xl font-semibold mb-4">Your Profile</h2>
-        <p><strong>Email:</strong> {buyer.email}</p>
-        <p><strong>Capital:</strong> ${buyer.capital?.toLocaleString()}</p>
-        <p><strong>Industry Interests:</strong> {buyer.preferred_industries}</p>
-        <p><strong>Experience:</strong> {buyer.experience}</p>
-        <p><strong>Financing Preference:</strong> {buyer.financing_preference}</p>
-      </section>
+      {!buyerProfile ? (
+        <div className="text-center">
+          <p className="text-gray-700 mb-4">
+            You haven't completed your buyer profile yet.
+          </p>
+          <button
+            onClick={() => router.push("/buyers")}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-lg font-semibold"
+          >
+            Complete Buyer Profile
+          </button>
+        </div>
+      ) : (
+        <div className="bg-white p-6 rounded-xl shadow space-y-4">
+          <h2 className="text-xl font-semibold text-blue-800">Your Profile</h2>
+          <p><strong>Name:</strong> {buyerProfile.name}</p>
+          <p><strong>Email:</strong> {buyerProfile.email}</p>
+          <p><strong>Financing Type:</strong> {buyerProfile.financing_type}</p>
+          <p><strong>Experience (1-5):</strong> {buyerProfile.experience}</p>
+          <p><strong>Industry Preference:</strong> {buyerProfile.industry_preference}</p>
+          <p><strong>Capital Investment:</strong> ${buyerProfile.capital_investment}</p>
+          <p><strong>Budget for Purchase:</strong> ${buyerProfile.budget_for_purchase}</p>
+          <p><strong>Relocation:</strong> {buyerProfile.willing_to_relocate}</p>
+          <p><strong>City/State:</strong> {buyerProfile.city}, {buyerProfile.state_or_province}</p>
+          <p><strong>Short Introduction:</strong> {buyerProfile.short_introduction}</p>
 
-      {buyer.video_url && (
-        <section className="mb-8 bg-white p-6 rounded shadow">
-          <h2 className="text-xl font-semibold mb-4">Your Video Pitch</h2>
-          <video controls className="w-full max-w-md">
-            <source src={buyer.video_url} type="video/mp4" />
-            Your browser does not support the video tag.
-          </video>
-        </section>
+          {buyerProfile.video_introduction && (
+            <div>
+              <p className="font-semibold mt-4 mb-2">Intro Video:</p>
+              <video src={buyerProfile.video_introduction} controls className="w-full max-w-md rounded-lg" />
+            </div>
+          )}
+        </div>
       )}
-
-      <section className="bg-white p-6 rounded shadow">
-        <h2 className="text-xl font-semibold mb-4">Matching Businesses</h2>
-        <p>This section will show businesses that match your preferences.</p>
-        {/* Matching logic goes here next */}
-      </section>
     </div>
   );
 }
+
