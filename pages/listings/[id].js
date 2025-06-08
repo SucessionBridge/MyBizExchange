@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import Link from 'next/link';
 
 export default function ListingDetails() {
   const router = useRouter();
@@ -8,61 +9,46 @@ export default function ListingDetails() {
 
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [buyer, setBuyer] = useState(null);
+  const [buyerProfile, setBuyerProfile] = useState(null);
 
-  // Fetch listing
   useEffect(() => {
-    if (!id) return;
+    async function fetchData() {
+      if (!id) return;
 
-    async function fetchListing() {
-      const { data, error } = await supabase
+      // 1. Fetch the listing
+      const { data: listingData, error: listingError } = await supabase
         .from('sellers')
         .select('*')
         .eq('id', id)
         .single();
 
-      if (error) console.error('Error fetching listing:', error);
-      else setListing(data);
+      if (listingError) {
+        console.error('Error fetching listing:', listingError);
+      } else {
+        setListing(listingData);
+      }
+
+      // 2. Check if the current user has a buyer profile
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const userEmail = sessionData?.session?.user?.email;
+
+      if (userEmail) {
+        const { data: buyer, error: buyerError } = await supabase
+          .from('buyers')
+          .select('*')
+          .eq('email', userEmail)
+          .single();
+
+        if (buyer && !buyerError) {
+          setBuyerProfile(buyer);
+        }
+      }
 
       setLoading(false);
     }
 
-    fetchListing();
+    fetchData();
   }, [id]);
-
-  // Check if a buyer profile exists
-  useEffect(() => {
-    async function fetchBuyer() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('buyers')
-        .select('*')
-        .eq('email', user.email)
-        .single();
-
-      if (error) {
-        console.log('No buyer profile found');
-      } else {
-        setBuyer(data);
-      }
-    }
-
-    fetchBuyer();
-  }, []);
-
-  const handleRequestInfo = () => {
-    if (!buyer) {
-      // Redirect to onboarding with a return path
-      router.push(`/buyers?redirect=/listings/${id}`);
-    } else {
-      alert('✅ Info request sent to seller! (Feature under construction)');
-    }
-  };
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
   if (!listing) return <div className="p-8 text-center text-red-600">Listing not found.</div>;
@@ -100,14 +86,20 @@ export default function ListingDetails() {
       </div>
 
       <div className="mt-8 text-center">
-        <button
-          onClick={handleRequestInfo}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-lg font-semibold shadow-md"
-        >
-          Request More Info
-        </button>
+        {buyerProfile ? (
+          <button className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700">
+            ✅ Message Seller
+          </button>
+        ) : (
+          <Link href={`/buyer-onboarding?redirect=/listings/${id}`}>
+            <a className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700">
+              Request More Info
+            </a>
+          </Link>
+        )}
       </div>
     </div>
   );
 }
+
 
