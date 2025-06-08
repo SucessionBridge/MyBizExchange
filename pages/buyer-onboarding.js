@@ -118,10 +118,26 @@ export default function BuyerOnboarding() {
       alert('There was a problem submitting your form.');
     } else {
       alert('Your buyer profile was submitted successfully!');
+
       if (redirectPath) {
-        router.push(redirectPath);
+        router.push(redirectPath); // 🔁 Send user back to the listing
       } else {
-        router.push('/buyer-dashboard');
+        setFormData({
+          name: '',
+          email: '',
+          financingType: 'self-financing',
+          experience: 3,
+          industryPreference: '',
+          capitalInvestment: '',
+          shortIntroduction: '',
+          priorIndustryExperience: 'No',
+          willingToRelocate: 'No',
+          city: '',
+          stateOrProvince: '',
+          video: null,
+          budgetForPurchase: '',
+        });
+        setVideoPreview(null);
       }
     }
   };
@@ -142,34 +158,25 @@ export default function BuyerOnboarding() {
 
           <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded text-black" />
           <input name="email" type="email" placeholder="Email Address" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded text-black" />
-
-          <label className="block font-medium">Preferred Financing Option</label>
           <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded text-black">
             <option value="self-financing">Self Financing</option>
             <option value="seller-financing">Seller Financing</option>
             <option value="rent-to-own">Rent-to-Own</option>
             <option value="third-party">3rd-Party Financing</option>
           </select>
-
-          <label>Experience (1–5)</label>
           <input type="number" name="experience" min="1" max="5" value={formData.experience} onChange={handleChange} className="w-full border p-3 rounded text-black" />
-
           <input name="industryPreference" placeholder="Industry Preference" value={formData.industryPreference} onChange={handleChange} className="w-full border p-3 rounded text-black" />
           <input type="number" name="capitalInvestment" placeholder="Available Capital" value={formData.capitalInvestment} onChange={handleChange} className="w-full border p-3 rounded text-black" />
           <input type="number" name="budgetForPurchase" placeholder="Budget for Purchase" value={formData.budgetForPurchase} onChange={handleChange} className="w-full border p-3 rounded text-black" />
-
           <textarea name="shortIntroduction" value={formData.shortIntroduction} onChange={handleChange} placeholder="Short Introduction" rows="4" className="w-full border p-3 rounded text-black" />
-
           <select name="priorIndustryExperience" value={formData.priorIndustryExperience} onChange={handleChange} className="w-full border p-3 rounded text-black">
             <option value="No">Prior Industry Experience? No</option>
             <option value="Yes">Yes</option>
           </select>
-
           <select name="willingToRelocate" value={formData.willingToRelocate} onChange={handleChange} className="w-full border p-3 rounded text-black">
             <option value="No">Willing to Relocate? No</option>
             <option value="Yes">Yes</option>
           </select>
-
           <input name="city" placeholder="City" value={formData.city} onChange={handleChange} className="w-full border p-3 rounded text-black" />
           <input name="stateOrProvince" placeholder="State/Province" value={formData.stateOrProvince} onChange={handleChange} className="w-full border p-3 rounded text-black" />
 
@@ -189,3 +196,4 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
+
