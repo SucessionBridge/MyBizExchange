@@ -13,10 +13,9 @@ export default function ListingDetail() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (id) {
-      fetchListing();
-      fetchBuyerProfile();
-    }
+    if (!id) return;
+    fetchListing();
+    fetchBuyerProfile();
   }, [id]);
 
   async function fetchListing() {
@@ -26,11 +25,9 @@ export default function ListingDetail() {
       .eq('id', id)
       .single();
 
-    if (error || !data) {
+    if (error) {
       console.error('Error loading listing:', error);
-      setListing(null);
     } else {
-      console.log('Fetched listing data:', data);
       setListing(data);
     }
   }
@@ -38,9 +35,13 @@ export default function ListingDetail() {
   async function fetchBuyerProfile() {
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser();
 
-    if (!user) return setLoading(false);
+    if (authError || !user) {
+      setLoading(false);
+      return;
+    }
 
     const { data, error } = await supabase
       .from('buyers')
@@ -48,10 +49,7 @@ export default function ListingDetail() {
       .eq('email', user.email)
       .single();
 
-    if (!error && data) {
-      setBuyer(data);
-    }
-
+    if (!error) setBuyer(data);
     setLoading(false);
   }
 
@@ -69,28 +67,23 @@ export default function ListingDetail() {
     ]);
 
     if (error) {
-      console.error('Message send failed', error);
+      console.error('Message send failed:', error);
     } else {
       setSuccess(true);
     }
   }
 
-  if (!listing) {
-    return <div className="p-6">Loading listing...</div>;
-  }
+  if (!id || loading) return <div className="p-6">Loading...</div>;
+  if (!listing) return <div className="p-6">Listing not found.</div>;
 
   return (
     <main className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2">
-        {listing.business_name ?? 'Untitled Business'}
-      </h1>
+      <h1 className="text-3xl font-bold mb-2">{listing.business_name}</h1>
       <p className="text-gray-700 mb-4">
-        {listing.description ?? 'No description available.'}
+        {listing.description || 'No description available.'}
       </p>
 
-      {loading ? (
-        <p>Loading your profile...</p>
-      ) : buyer ? (
+      {buyer ? (
         <div className="mt-6 border-t pt-6">
           <h2 className="text-xl font-semibold mb-2">Send a message to the seller</h2>
           {success ? (
@@ -131,6 +124,4 @@ export default function ListingDetail() {
     </main>
   );
 }
-
-
 
