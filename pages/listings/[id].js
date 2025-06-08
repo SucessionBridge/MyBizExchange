@@ -1,6 +1,6 @@
 import { useRouter } from 'next/router';
-import { supabase } from '../../lib/supabaseClient';
 import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabaseClient';
 
 export default function ListingDetail() {
   const router = useRouter();
@@ -8,56 +8,50 @@ export default function ListingDetail() {
 
   const [listing, setListing] = useState(null);
   const [buyer, setBuyer] = useState(null);
-  const [user, setUser] = useState(null);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-
-    const fetchData = async () => {
-      const { data: listingData, error: listingError } = await supabase
-        .from('sellers')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (listingError) {
-        console.error('Listing fetch error:', listingError);
-        return;
-      }
-      setListing(listingData);
-
-      const { data: userResponse, error: userError } = await supabase.auth.getUser();
-      if (userError || !userResponse?.user) {
-        setUser(null);
-        setBuyer(null);
-        setLoading(false);
-        return;
-      }
-
-      setUser(userResponse.user);
-
-      const { data: buyerData, error: buyerError } = await supabase
-        .from('buyers')
-        .select('*')
-        .eq('email', userResponse.user.email)
-        .single();
-
-      if (!buyerError && buyerData) {
-        setBuyer(buyerData);
-      }
-
-      setLoading(false);
-    };
-
-    fetchData();
+    fetchListing();
+    fetchBuyerProfile();
   }, [id]);
 
-  const handleSubmit = async (e) => {
+  async function fetchListing() {
+    const { data, error } = await supabase
+      .from('sellers')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error) console.error('Error loading listing:', error);
+    else setListing(data);
+  }
+
+  async function fetchBuyerProfile() {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('buyers')
+      .select('*')
+      .eq('email', user.email)
+      .single();
+
+    if (!error) setBuyer(data);
+    setLoading(false);
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
-    if (!buyer || !message) return;
+    if (!message || !buyer) return;
 
     const { error } = await supabase.from('messages').insert([
       {
@@ -69,36 +63,36 @@ export default function ListingDetail() {
     ]);
 
     if (error) {
-      console.error('Error sending message:', error);
+      console.error('Message send failed', error);
     } else {
       setSuccess(true);
     }
-  };
-
-  if (!router.isReady || loading || !listing) {
-    return <div className="p-6">Loading...</div>;
   }
+
+  if (!listing) return <div className="p-6">Loading listing...</div>;
 
   return (
     <main className="p-6 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold mb-2">{listing.business_name}</h1>
       <p className="text-gray-700 mb-4">{listing.description}</p>
 
-      {user && buyer ? (
+      {loading ? (
+        <p>Loading your profile...</p>
+      ) : buyer ? (
         <div className="mt-6 border-t pt-6">
           <h2 className="text-xl font-semibold mb-2">Send a message to the seller</h2>
           {success ? (
-            <p className="text-green-600">✅ Message sent successfully!</p>
+            <p className="text-green-600">✅ Your message was sent!</p>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
               <textarea
+                className="w-full p-3 border rounded"
                 rows="5"
-                placeholder="Write your message here..."
-                className="w-full border p-3 rounded"
+                placeholder="Write your message to the seller..."
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 required
-              />
+              ></textarea>
               <button
                 type="submit"
                 className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
@@ -108,30 +102,21 @@ export default function ListingDetail() {
             </form>
           )}
         </div>
-      ) : user ? (
+      ) : (
         <div className="mt-6 border-t pt-6">
-          <p className="text-red-500">
+          <p className="text-red-600">
             You must{' '}
             <a
               href={`/buyer-onboarding?redirect=/listings/${id}`}
-              className="underline font-medium text-blue-600"
+              className="underline font-semibold"
             >
               complete your buyer profile
             </a>{' '}
-            to contact the seller.
-          </p>
-        </div>
-      ) : (
-        <div className="mt-6 border-t pt-6">
-          <p className="text-red-500">
-            You must{' '}
-            <a href="/login" className="underline font-medium text-blue-600">
-              log in
-            </a>{' '}
-            to request more information.
+            before contacting the seller.
           </p>
         </div>
       )}
     </main>
   );
 }
+
