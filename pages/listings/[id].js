@@ -1,14 +1,16 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
-import Link from 'next/link';
 
 export default function ListingDetails() {
   const router = useRouter();
   const { id } = router.query;
+
   const [listing, setListing] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [buyer, setBuyer] = useState(null);
 
+  // Fetch listing
   useEffect(() => {
     if (!id) return;
 
@@ -19,17 +21,48 @@ export default function ListingDetails() {
         .eq('id', id)
         .single();
 
-      if (error) {
-        console.error('Error fetching listing:', error);
-      } else {
-        setListing(data);
-      }
+      if (error) console.error('Error fetching listing:', error);
+      else setListing(data);
 
       setLoading(false);
     }
 
     fetchListing();
   }, [id]);
+
+  // Check if a buyer profile exists
+  useEffect(() => {
+    async function fetchBuyer() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('buyers')
+        .select('*')
+        .eq('email', user.email)
+        .single();
+
+      if (error) {
+        console.log('No buyer profile found');
+      } else {
+        setBuyer(data);
+      }
+    }
+
+    fetchBuyer();
+  }, []);
+
+  const handleRequestInfo = () => {
+    if (!buyer) {
+      // Redirect to onboarding with a return path
+      router.push(`/buyers?redirect=/listings/${id}`);
+    } else {
+      alert('✅ Info request sent to seller! (Feature under construction)');
+    }
+  };
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
   if (!listing) return <div className="p-8 text-center text-red-600">Listing not found.</div>;
@@ -67,15 +100,14 @@ export default function ListingDetails() {
       </div>
 
       <div className="mt-8 text-center">
-        <Link href={`/buyers?redirect=/listings/${listing.id}`}>
-          <a className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-lg font-semibold inline-block">
-            Request More Info
-          </a>
-        </Link>
-        <p className="text-sm text-gray-500 mt-2">
-          You must complete your buyer profile before contacting sellers.
-        </p>
+        <button
+          onClick={handleRequestInfo}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-lg font-semibold shadow-md"
+        >
+          Request More Info
+        </button>
       </div>
     </div>
   );
 }
+
