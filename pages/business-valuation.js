@@ -1,92 +1,142 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
+import jsPDF from 'jspdf';
 
 export default function BusinessValuation() {
-  const [form, setForm] = useState({
+  const [formData, setFormData] = useState({
     businessName: '',
     yearsInBusiness: '',
     email: '',
-    annualSales: '',
-    expenses: '',
+    industry: '',
+    annualRevenue: '',
+    annualExpenses: '',
     ownerSalary: '',
-    addBacks: '',
-    equipmentList: '',
-    equipmentValue: '',
+    personalAddBacks: '',
+    hasEmployees: 'yes',
+    equipment: [{ name: '', value: '' }],
     realEstateValue: '',
-    ownerOperated: 'yes',
-    hasTeam: 'no',
   });
-  const [valuation, setValuation] = useState(null);
+
+  const industries = [
+    'Landscaping', 'Construction', 'Cleaning', 'Retail', 'E-commerce', 'Consulting',
+    'Accounting', 'Legal', 'Restaurant', 'Health & Wellness', 'Transportation',
+    'Technology', 'Education', 'Manufacturing', 'Automotive', 'Real Estate',
+    'Hospitality', 'Home Services', 'Fitness', 'Event Planning', 'Photography'
+  ];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleEquipmentChange = (index, field, value) => {
+    const updated = [...formData.equipment];
+    updated[index][field] = value;
+    setFormData((prev) => ({ ...prev, equipment: updated }));
+  };
+
+  const addEquipment = () => {
+    setFormData((prev) => ({
+      ...prev,
+      equipment: [...prev.equipment, { name: '', value: '' }],
+    }));
   };
 
   const calculateValuation = () => {
-    const sales = parseFloat(form.annualSales) || 0;
-    const expenses = parseFloat(form.expenses) || 0;
-    const ownerSalary = parseFloat(form.ownerSalary) || 0;
-    const addBacks = parseFloat(form.addBacks) || 0;
-    const equipment = parseFloat(form.equipmentValue) || 0;
-    const realEstate = parseFloat(form.realEstateValue) || 0;
+    const revenue = parseFloat(formData.annualRevenue) || 0;
+    const expenses = parseFloat(formData.annualExpenses) || 0;
+    const salary = parseFloat(formData.ownerSalary) || 0;
+    const addBacks = parseFloat(formData.personalAddBacks) || 0;
+    const realEstate = parseFloat(formData.realEstateValue) || 0;
 
-    const sde = sales - expenses + ownerSalary + addBacks;
+    const sde = revenue - expenses + salary + addBacks;
+    const multiplier = formData.hasEmployees === 'yes' ? 2.5 : 2.0;
+    const sdeValue = sde * multiplier;
 
-    let multiple = 2.0;
-    if (form.ownerOperated === 'yes' && form.hasTeam === 'no') multiple = 1.5;
-    else if (form.hasTeam === 'yes') multiple = 2.5;
+    const equipmentValue = formData.equipment.reduce((sum, eq) => {
+      return sum + (parseFloat(eq.value) || 0);
+    }, 0);
 
-    const valuationEstimate = sde * multiple + equipment + realEstate;
-    setValuation(valuationEstimate);
+    return sdeValue + realEstate + equipmentValue;
+  };
+
+  const generatePDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text('Business Valuation Report', 20, 20);
+    doc.setFontSize(12);
+
+    Object.entries(formData).forEach(([key, value], i) => {
+      if (key === 'equipment') {
+        doc.text(`Equipment:`, 20, 40 + i * 10);
+        value.forEach((eq, idx) => {
+          doc.text(`- ${eq.name}: $${eq.value}`, 30, 45 + idx * 10);
+        });
+      } else {
+        doc.text(`${key}: ${value}`, 20, 40 + i * 10);
+      }
+    });
+
+    doc.text(`Estimated Valuation: $${calculateValuation().toFixed(2)}`, 20, 180);
+    doc.save('valuation-report.pdf');
   };
 
   return (
-    <main className="p-8 bg-blue-50 min-h-screen text-black">
-      <div className="max-w-3xl mx-auto space-y-6">
-        <h1 className="text-3xl font-bold text-center">Landscaping Business Valuation</h1>
+    <main className="min-h-screen p-6 bg-gray-50">
+      <div className="max-w-3xl mx-auto bg-white shadow-md p-6 rounded-lg">
+        <h1 className="text-3xl font-bold mb-6">Business Valuation</h1>
 
-        <input name="businessName" placeholder="Business Name" onChange={handleChange} className="w-full border p-3 rounded" />
-        <input name="yearsInBusiness" placeholder="Years in Business" onChange={handleChange} className="w-full border p-3 rounded" />
-        <input name="email" placeholder="Email Address (for report)" onChange={handleChange} className="w-full border p-3 rounded" />
+        <div className="space-y-4">
+          <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="yearsInBusiness" placeholder="Years in Business" value={formData.yearsInBusiness} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="email" placeholder="Email Address" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" />
 
-        <input name="annualSales" placeholder="Annual Sales ($)" onChange={handleChange} className="w-full border p-3 rounded" />
-        <input name="expenses" placeholder="Annual Expenses ($)" onChange={handleChange} className="w-full border p-3 rounded" />
-        <input name="ownerSalary" placeholder="Owner Salary ($)" onChange={handleChange} className="w-full border p-3 rounded" />
-        <input name="addBacks" placeholder="Discretionary Add-Backs ($)" onChange={handleChange} className="w-full border p-3 rounded" />
+          <select name="industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded">
+            <option value="">Select Industry</option>
+            {industries.map((ind) => (
+              <option key={ind} value={ind}>{ind}</option>
+            ))}
+          </select>
 
-        <textarea name="equipmentList" placeholder="List of Equipment (e.g. Excavator, F-550 Dump Truck)" onChange={handleChange} className="w-full border p-3 rounded" rows="3" />
-        <input name="equipmentValue" placeholder="Estimated Equipment Value ($)" onChange={handleChange} className="w-full border p-3 rounded" />
-        <input name="realEstateValue" placeholder="Real Estate Value (if selling property) ($)" onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="annualRevenue" placeholder="Annual Revenue ($)" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="annualExpenses" placeholder="Annual Expenses ($)" value={formData.annualExpenses} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="ownerSalary" placeholder="Owner Salary ($)" value={formData.ownerSalary} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="personalAddBacks" placeholder="Add-backs (personal expenses, etc.)" value={formData.personalAddBacks} onChange={handleChange} className="w-full border p-3 rounded" />
 
-        <div className="flex gap-4">
-          <label className="flex-1">
-            Is the business owner-operated?
-            <select name="ownerOperated" onChange={handleChange} className="w-full border p-2 rounded">
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
-            </select>
-          </label>
-          <label className="flex-1">
-            Do you have a team in place?
-            <select name="hasTeam" onChange={handleChange} className="w-full border p-2 rounded">
-              <option value="no">No</option>
-              <option value="yes">Yes</option>
-            </select>
-          </label>
-        </div>
+          <label className="block font-medium">Is this business owner-operated or has employees?</label>
+          <select name="hasEmployees" value={formData.hasEmployees} onChange={handleChange} className="w-full border p-3 rounded">
+            <option value="yes">Has Employees</option>
+            <option value="no">Owner-Operated Only</option>
+          </select>
 
-        <button onClick={calculateValuation} className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 font-semibold">
-          Calculate Valuation
-        </button>
+          <label className="block font-medium">List Equipment</label>
+          {formData.equipment.map((eq, idx) => (
+            <div key={idx} className="flex space-x-2 mb-2">
+              <input
+                placeholder="Equipment Name"
+                value={eq.name}
+                onChange={(e) => handleEquipmentChange(idx, 'name', e.target.value)}
+                className="flex-1 border p-2 rounded"
+              />
+              <input
+                placeholder="Value ($)"
+                value={eq.value}
+                onChange={(e) => handleEquipmentChange(idx, 'value', e.target.value)}
+                className="w-32 border p-2 rounded"
+              />
+            </div>
+          ))}
+          <button onClick={addEquipment} className="text-blue-600 hover:underline">+ Add Equipment</button>
 
-        {valuation !== null && (
-          <div className="bg-white p-6 rounded shadow text-center">
-            <h2 className="text-xl font-semibold mb-2">Estimated Business Value</h2>
-            <p className="text-2xl font-bold text-green-700">${valuation.toLocaleString()}</p>
+          <input name="realEstateValue" placeholder="Real Estate Value ($)" value={formData.realEstateValue} onChange={handleChange} className="w-full border p-3 rounded" />
+
+          <div className="mt-6">
+            <p className="text-xl font-semibold mb-2">Estimated Valuation: ${calculateValuation().toFixed(2)}</p>
+            <button onClick={generatePDF} className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
+              Download PDF Report
+            </button>
           </div>
-        )}
+        </div>
       </div>
     </main>
   );
 }
-
