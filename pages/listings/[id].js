@@ -25,8 +25,12 @@ export default function ListingDetail() {
       .eq('id', id)
       .single();
 
-    if (error) console.error('Error loading listing:', error);
-    else setListing(data);
+    if (error) {
+      console.error('Error loading listing:', error);
+    } else {
+      console.log('Fetched listing data:', data);
+      setListing(data);
+    }
   }
 
   async function fetchBuyerProfile() {
@@ -69,12 +73,17 @@ export default function ListingDetail() {
     }
   }
 
-  if (!listing) return <div className="p-6">Loading listing...</div>;
+  const isLoadingListing =
+    !listing || typeof listing !== 'object' || Object.keys(listing).length === 0;
+
+  if (isLoadingListing) {
+    return <div className="p-6">Loading listing...</div>;
+  }
 
   return (
     <main className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2">{listing.business_name}</h1>
-      <p className="text-gray-700 mb-4">{listing.description}</p>
+      <h1 className="text-3xl font-bold mb-2">{listing?.business_name || 'Unnamed Business'}</h1>
+      <p className="text-gray-700 mb-4">{listing?.description || 'No description provided.'}</p>
 
       {loading ? (
         <p>Loading your profile...</p>
@@ -119,4 +128,5 @@ export default function ListingDetail() {
     </main>
   );
 }
+
 
