@@ -15,48 +15,47 @@ export default function ListingDetail() {
 
   useEffect(() => {
     if (!id) return;
-    fetchListing();
-    fetchBuyerAndUser();
+
+    const fetchData = async () => {
+      const { data: listingData, error: listingError } = await supabase
+        .from('sellers')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (listingError) {
+        console.error('Listing fetch error:', listingError);
+        return;
+      }
+      setListing(listingData);
+
+      const { data: userResponse, error: userError } = await supabase.auth.getUser();
+      if (userError || !userResponse?.user) {
+        setUser(null);
+        setBuyer(null);
+        setLoading(false);
+        return;
+      }
+
+      setUser(userResponse.user);
+
+      const { data: buyerData, error: buyerError } = await supabase
+        .from('buyers')
+        .select('*')
+        .eq('email', userResponse.user.email)
+        .single();
+
+      if (!buyerError && buyerData) {
+        setBuyer(buyerData);
+      }
+
+      setLoading(false);
+    };
+
+    fetchData();
   }, [id]);
 
-  async function fetchListing() {
-    const { data, error } = await supabase
-      .from('sellers')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      console.error('Error loading listing', error);
-    } else {
-      setListing(data);
-    }
-  }
-
-  async function fetchBuyerAndUser() {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data?.user) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-
-    setUser(data.user);
-
-    const { data: buyerData, error: buyerError } = await supabase
-      .from('buyers')
-      .select('*')
-      .eq('email', data.user.email)
-      .single();
-
-    if (!buyerError) {
-      setBuyer(buyerData);
-    }
-
-    setLoading(false);
-  }
-
-  async function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!buyer || !message) return;
 
@@ -69,11 +68,14 @@ export default function ListingDetail() {
       },
     ]);
 
-    if (error) console.error('Error sending message:', error);
-    else setSuccess(true);
-  }
+    if (error) {
+      console.error('Error sending message:', error);
+    } else {
+      setSuccess(true);
+    }
+  };
 
-  if (!id || loading || !listing) {
+  if (!router.isReady || loading || !listing) {
     return <div className="p-6">Loading...</div>;
   }
 
@@ -96,7 +98,7 @@ export default function ListingDetail() {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 required
-              ></textarea>
+              />
               <button
                 type="submit"
                 className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
