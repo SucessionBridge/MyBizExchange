@@ -8,16 +8,15 @@ export default function ListingDetail() {
 
   const [listing, setListing] = useState(null);
   const [buyer, setBuyer] = useState(null);
+  const [user, setUser] = useState(null);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
-  const [user, setUser] = useState(null);
 
   useEffect(() => {
     if (!id) return;
-
     fetchListing();
-    checkUserAndBuyerProfile();
+    fetchBuyerAndUser();
   }, [id]);
 
   async function fetchListing() {
@@ -27,29 +26,32 @@ export default function ListingDetail() {
       .eq('id', id)
       .single();
 
-    if (error) console.error('Error loading listing', error);
-    else setListing(data);
+    if (error) {
+      console.error('Error loading listing', error);
+    } else {
+      setListing(data);
+    }
   }
 
-  async function checkUserAndBuyerProfile() {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    setUser(user); // Save for later checks
-
-    if (!user) {
+  async function fetchBuyerAndUser() {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data?.user) {
+      setUser(null);
       setLoading(false);
       return;
     }
 
-    const { data, error } = await supabase
+    setUser(data.user);
+
+    const { data: buyerData, error: buyerError } = await supabase
       .from('buyers')
       .select('*')
-      .eq('email', user.email)
+      .eq('email', data.user.email)
       .single();
 
-    if (!error && data) setBuyer(data);
+    if (!buyerError) {
+      setBuyer(buyerData);
+    }
 
     setLoading(false);
   }
@@ -67,20 +69,20 @@ export default function ListingDetail() {
       },
     ]);
 
-    if (error) console.error('Message send error', error);
+    if (error) console.error('Error sending message:', error);
     else setSuccess(true);
   }
 
-  if (!listing) return <div className="p-6">Loading listing...</div>;
+  if (!id || loading || !listing) {
+    return <div className="p-6">Loading...</div>;
+  }
 
   return (
     <main className="p-6 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold mb-2">{listing.business_name}</h1>
       <p className="text-gray-700 mb-4">{listing.description}</p>
 
-      {loading ? (
-        <p>Loading buyer profile...</p>
-      ) : user && buyer ? (
+      {user && buyer ? (
         <div className="mt-6 border-t pt-6">
           <h2 className="text-xl font-semibold mb-2">Send a message to the seller</h2>
           {success ? (
@@ -120,9 +122,9 @@ export default function ListingDetail() {
       ) : (
         <div className="mt-6 border-t pt-6">
           <p className="text-red-500">
-            You must be{' '}
+            You must{' '}
             <a href="/login" className="underline font-medium text-blue-600">
-              logged in
+              log in
             </a>{' '}
             to request more information.
           </p>
