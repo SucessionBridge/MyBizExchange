@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
+import Link from 'next/link';
 
 export default function ListingDetails() {
   const router = useRouter();
@@ -65,22 +66,12 @@ export default function ListingDetails() {
         <p className="text-gray-700">{listing.business_description}</p>
       </div>
 
-      {/* Request More Info Button */}
       <div className="mt-8 text-center">
-        <button
-          onClick={() => {
-            const isBuyerProfileComplete = false; // 🔧 Replace with real logic later
-
-            if (isBuyerProfileComplete) {
-              alert("You're eligible to contact the seller. (Contact form coming soon)");
-            } else {
-              router.push('/buyers');
-            }
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-lg font-semibold"
-        >
-          Request More Info
-        </button>
+        <Link href={`/buyers?redirect=/listings/${listing.id}`}>
+          <a className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-lg font-semibold inline-block">
+            Request More Info
+          </a>
+        </Link>
         <p className="text-sm text-gray-500 mt-2">
           You must complete your buyer profile before contacting sellers.
         </p>
@@ -88,4 +79,3 @@ export default function ListingDetails() {
     </div>
   );
 }
-
