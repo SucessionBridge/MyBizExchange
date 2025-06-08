@@ -1,105 +1,92 @@
 import { useState } from 'react';
 
-export default function LandscapingValuation() {
-  const [formData, setFormData] = useState({
+export default function BusinessValuation() {
+  const [form, setForm] = useState({
     businessName: '',
-    annualRevenue: '',
-    sde: '',
+    yearsInBusiness: '',
+    email: '',
+    annualSales: '',
+    expenses: '',
+    ownerSalary: '',
+    addBacks: '',
+    equipmentList: '',
+    equipmentValue: '',
     realEstateValue: '',
-    equipment: [{ name: '', value: '' }],
+    ownerOperated: 'yes',
+    hasTeam: 'no',
   });
+  const [valuation, setValuation] = useState(null);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleEquipmentChange = (index, field, value) => {
-    const updatedEquipment = [...formData.equipment];
-    updatedEquipment[index][field] = value;
-    setFormData((prev) => ({ ...prev, equipment: updatedEquipment }));
-  };
+  const calculateValuation = () => {
+    const sales = parseFloat(form.annualSales) || 0;
+    const expenses = parseFloat(form.expenses) || 0;
+    const ownerSalary = parseFloat(form.ownerSalary) || 0;
+    const addBacks = parseFloat(form.addBacks) || 0;
+    const equipment = parseFloat(form.equipmentValue) || 0;
+    const realEstate = parseFloat(form.realEstateValue) || 0;
 
-  const addEquipment = () => {
-    setFormData((prev) => ({ ...prev, equipment: [...prev.equipment, { name: '', value: '' }] }));
-  };
+    const sde = sales - expenses + ownerSalary + addBacks;
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log('Form Submitted:', formData);
-    // TODO: Send data to Supabase or run valuation logic
+    let multiple = 2.0;
+    if (form.ownerOperated === 'yes' && form.hasTeam === 'no') multiple = 1.5;
+    else if (form.hasTeam === 'yes') multiple = 2.5;
+
+    const valuationEstimate = sde * multiple + equipment + realEstate;
+    setValuation(valuationEstimate);
   };
 
   return (
-    <main className="max-w-3xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6 text-center">Landscaping Business Valuation</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <input
-          name="businessName"
-          value={formData.businessName}
-          onChange={handleChange}
-          placeholder="Business Name"
-          className="w-full p-3 border rounded text-black"
-        />
+    <main className="p-8 bg-blue-50 min-h-screen text-black">
+      <div className="max-w-3xl mx-auto space-y-6">
+        <h1 className="text-3xl font-bold text-center">Landscaping Business Valuation</h1>
 
-        <input
-          name="annualRevenue"
-          value={formData.annualRevenue}
-          onChange={handleChange}
-          placeholder="Annual Revenue"
-          type="number"
-          className="w-full p-3 border rounded text-black"
-        />
+        <input name="businessName" placeholder="Business Name" onChange={handleChange} className="w-full border p-3 rounded" />
+        <input name="yearsInBusiness" placeholder="Years in Business" onChange={handleChange} className="w-full border p-3 rounded" />
+        <input name="email" placeholder="Email Address (for report)" onChange={handleChange} className="w-full border p-3 rounded" />
 
-        <input
-          name="sde"
-          value={formData.sde}
-          onChange={handleChange}
-          placeholder="Seller's Discretionary Earnings (SDE)"
-          type="number"
-          className="w-full p-3 border rounded text-black"
-        />
+        <input name="annualSales" placeholder="Annual Sales ($)" onChange={handleChange} className="w-full border p-3 rounded" />
+        <input name="expenses" placeholder="Annual Expenses ($)" onChange={handleChange} className="w-full border p-3 rounded" />
+        <input name="ownerSalary" placeholder="Owner Salary ($)" onChange={handleChange} className="w-full border p-3 rounded" />
+        <input name="addBacks" placeholder="Discretionary Add-Backs ($)" onChange={handleChange} className="w-full border p-3 rounded" />
 
-        <input
-          name="realEstateValue"
-          value={formData.realEstateValue}
-          onChange={handleChange}
-          placeholder="Real Estate Value (if selling)"
-          type="number"
-          className="w-full p-3 border rounded text-black"
-        />
+        <textarea name="equipmentList" placeholder="List of Equipment (e.g. Excavator, F-550 Dump Truck)" onChange={handleChange} className="w-full border p-3 rounded" rows="3" />
+        <input name="equipmentValue" placeholder="Estimated Equipment Value ($)" onChange={handleChange} className="w-full border p-3 rounded" />
+        <input name="realEstateValue" placeholder="Real Estate Value (if selling property) ($)" onChange={handleChange} className="w-full border p-3 rounded" />
 
-        <div className="border-t pt-4">
-          <h2 className="text-lg font-semibold mb-2">Equipment</h2>
-          {formData.equipment.map((item, index) => (
-            <div key={index} className="flex gap-2 mb-2">
-              <input
-                placeholder="Equipment Name"
-                value={item.name}
-                onChange={(e) => handleEquipmentChange(index, 'name', e.target.value)}
-                className="flex-1 p-2 border rounded text-black"
-              />
-              <input
-                placeholder="Value"
-                value={item.value}
-                onChange={(e) => handleEquipmentChange(index, 'value', e.target.value)}
-                type="number"
-                className="w-32 p-2 border rounded text-black"
-              />
-            </div>
-          ))}
-          <button type="button" onClick={addEquipment} className="text-blue-600 font-semibold underline">
-            + Add Another Equipment
-          </button>
+        <div className="flex gap-4">
+          <label className="flex-1">
+            Is the business owner-operated?
+            <select name="ownerOperated" onChange={handleChange} className="w-full border p-2 rounded">
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+          </label>
+          <label className="flex-1">
+            Do you have a team in place?
+            <select name="hasTeam" onChange={handleChange} className="w-full border p-2 rounded">
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </label>
         </div>
 
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold"
-        >
-          Generate Valuation
+        <button onClick={calculateValuation} className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 font-semibold">
+          Calculate Valuation
         </button>
-      </form>
+
+        {valuation !== null && (
+          <div className="bg-white p-6 rounded shadow text-center">
+            <h2 className="text-xl font-semibold mb-2">Estimated Business Value</h2>
+            <p className="text-2xl font-bold text-green-700">${valuation.toLocaleString()}</p>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
+
