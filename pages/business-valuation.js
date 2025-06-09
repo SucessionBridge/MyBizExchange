@@ -61,7 +61,6 @@ export default function BusinessValuation() {
 
     const sdeValue = sde * multiplier;
 
-    // If equipment is already reflected in the multiplier, do NOT add it again
     return sdeValue + realEstate + (equipmentValue > 0 ? 0 : equipmentValue);
   };
 
@@ -107,13 +106,8 @@ export default function BusinessValuation() {
     doc.text(`Estimated Valuation: $${calculateValuation().toFixed(2)}`, 20, y);
     y += 10;
 
-    if (formData.equipment.length > 0 && formData.equipment.some(eq => parseFloat(eq.value) > 0)) {
-      doc.text(
-        'Note: We’ve assumed your business cannot operate without this equipment. Because you’re including it in the sale, we’re reflecting its value through a higher multiplier. Don’t worry — you’re not missing out. It’s built in.',
-        20,
-        y,
-        { maxWidth: 170 }
-      );
+    if (formData.equipment.every(eq => !eq.value || parseFloat(eq.value) === 0)) {
+      doc.text('Note: We’ve assumed your business cannot operate without this equipment. Because you’re including it in the sale, we’re reflecting its value through a higher multiplier. Don’t worry — you’re not missing out. It’s built in.', 20, y, { maxWidth: 170 });
     }
 
     doc.save('valuation-report.pdf');
@@ -154,6 +148,11 @@ export default function BusinessValuation() {
           </select>
 
           <label className="block font-medium">List Equipment</label>
+          <p className="text-sm text-gray-600">
+            💡 Only include equipment here if it is <strong>not essential</strong> to running the business (like extra tools or backup vehicles). 
+            If the equipment is required for daily operations (e.g. oven for a bakery, dump truck for landscaping), leave this blank — its value is already reflected in the valuation multiplier.
+          </p>
+
           {formData.equipment.map((eq, idx) => (
             <div key={idx} className="flex space-x-2 mb-2">
               <input
@@ -176,6 +175,13 @@ export default function BusinessValuation() {
 
           <div className="mt-6">
             <p className="text-xl font-semibold mb-2">Estimated Valuation: ${calculateValuation().toFixed(2)}</p>
+
+            {formData.equipment.every(eq => !eq.value || parseFloat(eq.value) === 0) && (
+              <p className="text-sm text-gray-600 mt-2">
+                Because we assumed your business cannot operate without core equipment, its value has been reflected using a higher multiplier. 💡 You’re not missing out — it’s already built into your valuation.
+              </p>
+            )}
+
             <button onClick={generatePDF} className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
               Download PDF Report
             </button>
@@ -185,4 +191,3 @@ export default function BusinessValuation() {
     </main>
   );
 }
-
