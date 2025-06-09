@@ -12,7 +12,7 @@ export default function BusinessValuation() {
     ownerSalary: '',
     personalAddBacks: '',
     hasEmployees: 'yes',
-    equipmentIncluded: 'yes',
+    includesEquipmentInPrice: 'yes',
     equipment: [{ name: '', value: '' }],
     realEstateValue: '',
   });
@@ -50,20 +50,15 @@ export default function BusinessValuation() {
     const realEstate = parseFloat(formData.realEstateValue) || 0;
 
     const sde = revenue - expenses + salary + addBacks;
-    const multiplier = formData.equipmentIncluded === 'yes'
-      ? (formData.hasEmployees === 'yes' ? 2.5 : 2.2)
-      : (formData.hasEmployees === 'yes' ? 2.2 : 2.0);
-    let valuation = sde * multiplier;
+    let multiplier = formData.hasEmployees === 'yes' ? 2.5 : 2.0;
+    if (formData.includesEquipmentInPrice === 'yes') multiplier += 0.25;
+    const sdeValue = sde * multiplier;
 
-    const equipmentValue = formData.equipment.reduce((sum, eq) => {
-      return sum + (parseFloat(eq.value) || 0);
-    }, 0);
+    const equipmentValue = formData.includesEquipmentInPrice === 'no'
+      ? formData.equipment.reduce((sum, eq) => sum + (parseFloat(eq.value) || 0), 0)
+      : 0;
 
-    if (formData.equipmentIncluded === 'no') {
-      valuation += equipmentValue;
-    }
-
-    return valuation + realEstate;
+    return sdeValue + realEstate + equipmentValue;
   };
 
   const generatePDF = () => {
@@ -84,7 +79,6 @@ export default function BusinessValuation() {
     });
 
     doc.text(`Estimated Valuation: $${calculateValuation().toFixed(2)}`, 20, 180);
-    doc.text('Disclaimer: This valuation is a basic estimate based on limited inputs and should not be used as financial or legal advice.', 20, 190, { maxWidth: 170 });
     doc.save('valuation-report.pdf');
   };
 
@@ -93,14 +87,14 @@ export default function BusinessValuation() {
       <div className="max-w-3xl mx-auto bg-white shadow-md p-6 rounded-lg">
         <h1 className="text-3xl font-bold mb-6">Valuation Wizard</h1>
 
-        <p className="mb-4 text-gray-600 text-sm">
-          Please provide accurate information. This tool offers a basic estimate to help business owners understand potential value. This is not a certified appraisal.
+        <p className="text-sm text-gray-600 mb-4">
+          This is a simplified valuation tool for informational purposes only. It should not be used as a substitute for professional financial advice.
         </p>
 
         <div className="space-y-4">
-          <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" required />
           <input name="yearsInBusiness" placeholder="Years in Business" value={formData.yearsInBusiness} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="email" placeholder="Email Address (used to send you the PDF report)" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" required />
+          <input name="email" placeholder="Email Address (we’ll email your PDF)" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" required />
 
           <select name="industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded">
             <option value="">Select Industry</option>
@@ -112,22 +106,26 @@ export default function BusinessValuation() {
           <input name="annualRevenue" placeholder="Annual Revenue ($)" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
           <input name="annualExpenses" placeholder="Annual Expenses ($)" value={formData.annualExpenses} onChange={handleChange} className="w-full border p-3 rounded" />
 
-          <label className="block text-sm text-gray-600">If your salary is already included in expenses, leave this as $0.</label>
           <input name="ownerSalary" placeholder="Owner Salary ($)" value={formData.ownerSalary} onChange={handleChange} className="w-full border p-3 rounded" />
+          <p className="text-sm text-gray-500">Include only if your salary is not already included in the annual expenses above.</p>
 
           <input name="personalAddBacks" placeholder="Add-backs (personal expenses, etc.)" value={formData.personalAddBacks} onChange={handleChange} className="w-full border p-3 rounded" />
 
-          <label className="block font-medium">Is this business owner-operated or has employees?</label>
+          <label className="block font-medium">Is this business owner-operated or does it have employees?</label>
           <select name="hasEmployees" value={formData.hasEmployees} onChange={handleChange} className="w-full border p-3 rounded">
             <option value="yes">Has Employees</option>
             <option value="no">Owner-Operated Only</option>
           </select>
 
-          <label className="block font-medium">Will required equipment be included in the sale?</label>
-          <select name="equipmentIncluded" value={formData.equipmentIncluded} onChange={handleChange} className="w-full border p-3 rounded">
-            <option value="yes">Yes, equipment is included</option>
-            <option value="no">No, buyer will need to purchase</option>
+          <label className="block font-medium">Will the equipment be included in the sale price?</label>
+          <select name="includesEquipmentInPrice" value={formData.includesEquipmentInPrice} onChange={handleChange} className="w-full border p-3 rounded">
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
           </select>
+
+          <p className="text-sm text-gray-500">
+            We’ve assumed your business cannot operate without this equipment. Because you’re including it in the sale, we’re reflecting its value through a higher multiplier. Don’t worry — you’re not missing out — it’s built in.
+          </p>
 
           <label className="block font-medium">List Equipment</label>
           {formData.equipment.map((eq, idx) => (
