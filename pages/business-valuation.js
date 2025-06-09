@@ -9,10 +9,10 @@ export default function BusinessValuation() {
     industry: '',
     annualRevenue: '',
     annualExpenses: '',
-    ownerSalary: '',
+    totalSalariesPaid: '',
+    ownerSalaryAddBack: '',
     personalAddBacks: '',
     hasEmployees: 'yes',
-    includesEquipmentInPrice: 'yes',
     equipment: [{ name: '', value: '' }],
     realEstateValue: '',
   });
@@ -45,20 +45,19 @@ export default function BusinessValuation() {
   const calculateValuation = () => {
     const revenue = parseFloat(formData.annualRevenue) || 0;
     const expenses = parseFloat(formData.annualExpenses) || 0;
-    const salary = parseFloat(formData.ownerSalary) || 0;
+    const ownerSalaryAddBack = parseFloat(formData.ownerSalaryAddBack) || 0;
     const addBacks = parseFloat(formData.personalAddBacks) || 0;
     const realEstate = parseFloat(formData.realEstateValue) || 0;
 
-    const sde = revenue - expenses + salary + addBacks;
-    let multiplier = formData.hasEmployees === 'yes' ? 2.5 : 2.0;
-    if (formData.includesEquipmentInPrice === 'yes') multiplier += 0.25;
+    const equipmentValue = formData.equipment.reduce((sum, eq) => {
+      return sum + (parseFloat(eq.value) || 0);
+    }, 0);
+
+    const sde = revenue - expenses + ownerSalaryAddBack + addBacks;
+    const multiplier = equipmentValue > 0 ? (formData.hasEmployees === 'yes' ? 2.5 : 2.0) : (formData.hasEmployees === 'yes' ? 2.2 : 1.8);
     const sdeValue = sde * multiplier;
 
-    const equipmentValue = formData.includesEquipmentInPrice === 'no'
-      ? formData.equipment.reduce((sum, eq) => sum + (parseFloat(eq.value) || 0), 0)
-      : 0;
-
-    return sdeValue + realEstate + equipmentValue;
+    return sdeValue + realEstate + (equipmentValue > 0 ? 0 : equipmentValue);
   };
 
   const generatePDF = () => {
@@ -67,14 +66,16 @@ export default function BusinessValuation() {
     doc.text('Business Valuation Report', 20, 20);
     doc.setFontSize(12);
 
+    doc.text(`Disclaimer: This is a simple estimated valuation meant for guidance only. It is not intended for official financial or lending decisions.`, 20, 30, { maxWidth: 170 });
+
     Object.entries(formData).forEach(([key, value], i) => {
       if (key === 'equipment') {
-        doc.text(`Equipment:`, 20, 40 + i * 10);
+        doc.text(`Equipment:`, 20, 50 + i * 10);
         value.forEach((eq, idx) => {
-          doc.text(`- ${eq.name}: $${eq.value}`, 30, 45 + idx * 10);
+          doc.text(`- ${eq.name}: $${eq.value}`, 30, 55 + idx * 10);
         });
       } else {
-        doc.text(`${key}: ${value}`, 20, 40 + i * 10);
+        doc.text(`${key}: ${value}`, 20, 50 + i * 10);
       }
     });
 
@@ -87,14 +88,14 @@ export default function BusinessValuation() {
       <div className="max-w-3xl mx-auto bg-white shadow-md p-6 rounded-lg">
         <h1 className="text-3xl font-bold mb-6">Valuation Wizard</h1>
 
-        <p className="text-sm text-gray-600 mb-4">
-          This is a simplified valuation tool for informational purposes only. It should not be used as a substitute for professional financial advice.
+        <p className="mb-4 text-sm text-gray-600">
+          📌 This valuation is a simple tool to help business owners get a general sense of what their business may be worth. It should not be used for investment, loan, or legal decisions.
         </p>
 
         <div className="space-y-4">
-          <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" required />
+          <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" />
           <input name="yearsInBusiness" placeholder="Years in Business" value={formData.yearsInBusiness} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="email" placeholder="Email Address (we’ll email your PDF)" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" required />
+          <input name="email" placeholder="Email Address (we’ll send your report)" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" required />
 
           <select name="industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded">
             <option value="">Select Industry</option>
@@ -106,26 +107,19 @@ export default function BusinessValuation() {
           <input name="annualRevenue" placeholder="Annual Revenue ($)" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
           <input name="annualExpenses" placeholder="Annual Expenses ($)" value={formData.annualExpenses} onChange={handleChange} className="w-full border p-3 rounded" />
 
-          <input name="ownerSalary" placeholder="Owner Salary ($)" value={formData.ownerSalary} onChange={handleChange} className="w-full border p-3 rounded" />
-          <p className="text-sm text-gray-500">Include only if your salary is not already included in the annual expenses above.</p>
+          <input name="totalSalariesPaid" placeholder="Total Salaries Paid (including owner, if applicable)" value={formData.totalSalariesPaid} onChange={handleChange} className="w-full border p-3 rounded" />
+
+          <input name="ownerSalaryAddBack" placeholder="Owner’s Salary (only if included above and should be added back)" value={formData.ownerSalaryAddBack} onChange={handleChange} className="w-full border p-3 rounded" />
+
+          <p className="text-sm text-gray-600">💡 Only include your salary here if it’s already included in the total expenses — we’ll add it back for SDE.</p>
 
           <input name="personalAddBacks" placeholder="Add-backs (personal expenses, etc.)" value={formData.personalAddBacks} onChange={handleChange} className="w-full border p-3 rounded" />
 
-          <label className="block font-medium">Is this business owner-operated or does it have employees?</label>
+          <label className="block font-medium">Does your business have employees?</label>
           <select name="hasEmployees" value={formData.hasEmployees} onChange={handleChange} className="w-full border p-3 rounded">
-            <option value="yes">Has Employees</option>
-            <option value="no">Owner-Operated Only</option>
-          </select>
-
-          <label className="block font-medium">Will the equipment be included in the sale price?</label>
-          <select name="includesEquipmentInPrice" value={formData.includesEquipmentInPrice} onChange={handleChange} className="w-full border p-3 rounded">
             <option value="yes">Yes</option>
-            <option value="no">No</option>
+            <option value="no">No, I operate it alone</option>
           </select>
-
-          <p className="text-sm text-gray-500">
-            We’ve assumed your business cannot operate without this equipment. Because you’re including it in the sale, we’re reflecting its value through a higher multiplier. Don’t worry — you’re not missing out — it’s built in.
-          </p>
 
           <label className="block font-medium">List Equipment</label>
           {formData.equipment.map((eq, idx) => (
