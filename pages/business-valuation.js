@@ -14,7 +14,6 @@ export default function BusinessValuation() {
     hasEmployees: 'yes',
     equipment: [{ name: '', value: '' }],
     realEstateValue: '',
-    agreeDisclaimer: false,
   });
 
   const industries = [
@@ -25,8 +24,8 @@ export default function BusinessValuation() {
   ];
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleEquipmentChange = (index, field, value) => {
@@ -72,7 +71,7 @@ export default function BusinessValuation() {
         value.forEach((eq, idx) => {
           doc.text(`- ${eq.name}: $${eq.value}`, 30, 45 + idx * 10);
         });
-      } else if (key !== 'agreeDisclaimer') {
+      } else {
         doc.text(`${key}: ${value}`, 20, 40 + i * 10);
       }
     });
@@ -85,44 +84,32 @@ export default function BusinessValuation() {
     <main className="min-h-screen p-6 bg-gray-50">
       <div className="max-w-3xl mx-auto bg-white shadow-md p-6 rounded-lg">
         <h1 className="text-3xl font-bold mb-6">Valuation Wizard</h1>
+        <p className="mb-4 text-sm text-gray-600">This tool offers a basic business valuation to help you understand potential value. This is for informational purposes only and should not be used as a substitute for professional valuation or financial advice.</p>
 
         <div className="space-y-4">
-          <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" required />
-          <input name="yearsInBusiness" placeholder="Years in Business" value={formData.yearsInBusiness} onChange={handleChange} className="w-full border p-3 rounded" required />
+          <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="yearsInBusiness" placeholder="Years in Business" value={formData.yearsInBusiness} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="email" placeholder="Email Address (required to receive PDF report)" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" required />
 
-          <label className="block font-medium">Email Address</label>
-          <input
-            name="email"
-            type="email"
-            required
-            placeholder="Enter your email to receive the report"
-            value={formData.email}
-            onChange={handleChange}
-            className="w-full border p-3 rounded"
-          />
-          <p className="text-sm text-gray-500 mt-1">
-            We'll send your valuation report to this email.
-          </p>
-
-          <select name="industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded" required>
+          <select name="industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded">
             <option value="">Select Industry</option>
             {industries.map((ind) => (
               <option key={ind} value={ind}>{ind}</option>
             ))}
           </select>
 
-          <input name="annualRevenue" placeholder="Annual Revenue ($)" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" required />
-          <input name="annualExpenses" placeholder="Annual Expenses ($)" value={formData.annualExpenses} onChange={handleChange} className="w-full border p-3 rounded" required />
-          <input name="ownerSalary" placeholder="Owner Salary ($)" value={formData.ownerSalary} onChange={handleChange} className="w-full border p-3 rounded" required />
-          <input name="personalAddBacks" placeholder="Add-backs (personal expenses, etc.)" value={formData.personalAddBacks} onChange={handleChange} className="w-full border p-3 rounded" required />
+          <input name="annualRevenue" placeholder="Annual Revenue ($)" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="annualExpenses" placeholder="Annual Expenses ($) — Exclude owner salary or personal expenses" value={formData.annualExpenses} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="ownerSalary" placeholder="Owner Salary ($) — If already in expenses, leave blank" value={formData.ownerSalary} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="personalAddBacks" placeholder="Add-backs (e.g. personal vehicle, phone, etc.)" value={formData.personalAddBacks} onChange={handleChange} className="w-full border p-3 rounded" />
 
-          <label className="block font-medium">Is this business owner-operated or has employees?</label>
+          <label className="block font-medium">Is this business owner-operated or does it have employees?</label>
           <select name="hasEmployees" value={formData.hasEmployees} onChange={handleChange} className="w-full border p-3 rounded">
             <option value="yes">Has Employees</option>
             <option value="no">Owner-Operated Only</option>
           </select>
 
-          <label className="block font-medium">List Equipment</label>
+          <label className="block font-medium">List Equipment (optional)</label>
           {formData.equipment.map((eq, idx) => (
             <div key={idx} className="flex space-x-2 mb-2">
               <input
@@ -141,16 +128,7 @@ export default function BusinessValuation() {
           ))}
           <button onClick={addEquipment} className="text-blue-600 hover:underline">+ Add Equipment</button>
 
-          <input name="realEstateValue" placeholder="Real Estate Value ($)" value={formData.realEstateValue} onChange={handleChange} className="w-full border p-3 rounded" />
-
-          <div className="mt-4">
-            <label className="flex items-center space-x-2">
-              <input type="checkbox" name="agreeDisclaimer" checked={formData.agreeDisclaimer} onChange={handleChange} required />
-              <span className="text-sm">
-                I understand this is a simple estimate only and not a formal appraisal. It should not be used for lending or legal purposes.
-              </span>
-            </label>
-          </div>
+          <input name="realEstateValue" placeholder="Real Estate Value ($) (if applicable)" value={formData.realEstateValue} onChange={handleChange} className="w-full border p-3 rounded" />
 
           <div className="mt-6">
             <p className="text-xl font-semibold mb-2">Estimated Valuation: ${calculateValuation().toFixed(2)}</p>
@@ -163,4 +141,5 @@ export default function BusinessValuation() {
     </main>
   );
 }
+
 
