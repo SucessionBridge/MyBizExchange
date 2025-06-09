@@ -83,7 +83,7 @@ export default function BusinessValuation() {
   return (
     <main className="min-h-screen p-6 bg-gray-50">
       <div className="max-w-3xl mx-auto bg-white shadow-md p-6 rounded-lg">
-        <h1 className="text-3xl font-bold mb-6">Business Valuation</h1>
+        <h1 className="text-3xl font-bold mb-6">Valuation Wizard</h1>
 
         <div className="space-y-4">
           <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" />
