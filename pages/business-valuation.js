@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+""import React, { useState } from 'react';
 import jsPDF from 'jspdf';
 
 export default function BusinessValuation() {
@@ -67,15 +67,16 @@ export default function BusinessValuation() {
     doc.setFontSize(12);
 
     doc.text(`Disclaimer: This is a simple estimated valuation meant for guidance only. It is not intended for official financial or lending decisions.`, 20, 30, { maxWidth: 170 });
+    doc.text(`We’ve assumed your business cannot operate without this equipment. Because you're including it in the sale, we’ve reflected its value through a higher earnings multiple rather than adding the equipment price separately. Don’t worry — you’re not missing out. It’s built in.`, 20, 40, { maxWidth: 170 });
 
     Object.entries(formData).forEach(([key, value], i) => {
       if (key === 'equipment') {
-        doc.text(`Equipment:`, 20, 50 + i * 10);
+        doc.text(`Equipment:`, 20, 60 + i * 10);
         value.forEach((eq, idx) => {
-          doc.text(`- ${eq.name}: $${eq.value}`, 30, 55 + idx * 10);
+          doc.text(`- ${eq.name}: $${eq.value}`, 30, 65 + idx * 10);
         });
       } else {
-        doc.text(`${key}: ${value}`, 20, 50 + i * 10);
+        doc.text(`${key}: ${value}`, 20, 60 + i * 10);
       }
     });
 
@@ -139,6 +140,8 @@ export default function BusinessValuation() {
             </div>
           ))}
           <button onClick={addEquipment} className="text-blue-600 hover:underline">+ Add Equipment</button>
+
+          <p className="text-sm text-gray-600 mt-2">💡 We’ve assumed your business cannot operate without this equipment. Because you're including it in the sale, we’ve reflected its value through a higher earnings multiple rather than adding the equipment price separately. Don’t worry — you’re not missing out. It’s built in.</p>
 
           <input name="realEstateValue" placeholder="Real Estate Value ($)" value={formData.realEstateValue} onChange={handleChange} className="w-full border p-3 rounded" />
 
