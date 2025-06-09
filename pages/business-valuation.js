@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import jsPDF from 'jspdf';
 
-export default function ValuationWizard() {
+export default function BusinessValuation() {
   const [formData, setFormData] = useState({
     businessName: '',
     yearsInBusiness: '',
     email: '',
     industry: '',
-    location: '',
     annualRevenue: '',
     annualExpenses: '',
     ownerSalary: '',
@@ -15,7 +14,7 @@ export default function ValuationWizard() {
     hasEmployees: 'yes',
     equipment: [{ name: '', value: '' }],
     realEstateValue: '',
-    confidenceRating: '3'
+    agreeDisclaimer: false,
   });
 
   const industries = [
@@ -26,8 +25,8 @@ export default function ValuationWizard() {
   ];
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleEquipmentChange = (index, field, value) => {
@@ -49,10 +48,15 @@ export default function ValuationWizard() {
     const salary = parseFloat(formData.ownerSalary) || 0;
     const addBacks = parseFloat(formData.personalAddBacks) || 0;
     const realEstate = parseFloat(formData.realEstateValue) || 0;
+
     const sde = revenue - expenses + salary + addBacks;
     const multiplier = formData.hasEmployees === 'yes' ? 2.5 : 2.0;
     const sdeValue = sde * multiplier;
-    const equipmentValue = formData.equipment.reduce((sum, eq) => sum + (parseFloat(eq.value) || 0), 0);
+
+    const equipmentValue = formData.equipment.reduce((sum, eq) => {
+      return sum + (parseFloat(eq.value) || 0);
+    }, 0);
+
     return sdeValue + realEstate + equipmentValue;
   };
 
@@ -62,62 +66,61 @@ export default function ValuationWizard() {
     doc.text('Business Valuation Report', 20, 20);
     doc.setFontSize(12);
 
-    let y = 30;
-    doc.text(`Business Name: ${formData.businessName}`, 20, y += 10);
-    doc.text(`Industry: ${formData.industry}`, 20, y += 10);
-    doc.text(`Location: ${formData.location}`, 20, y += 10);
-    doc.text(`Years in Business: ${formData.yearsInBusiness}`, 20, y += 10);
-    doc.text(`Revenue: $${formData.annualRevenue}`, 20, y += 10);
-    doc.text(`Expenses: $${formData.annualExpenses}`, 20, y += 10);
-    doc.text(`Owner Salary: $${formData.ownerSalary}`, 20, y += 10);
-    doc.text(`Add-backs: $${formData.personalAddBacks}`, 20, y += 10);
-    doc.text(`Employees: ${formData.hasEmployees === 'yes' ? 'Yes' : 'Owner-operated'}`, 20, y += 10);
-    doc.text(`Confidence Level: ${formData.confidenceRating}/5`, 20, y += 10);
+    Object.entries(formData).forEach(([key, value], i) => {
+      if (key === 'equipment') {
+        doc.text(`Equipment:`, 20, 40 + i * 10);
+        value.forEach((eq, idx) => {
+          doc.text(`- ${eq.name}: $${eq.value}`, 30, 45 + idx * 10);
+        });
+      } else if (key !== 'agreeDisclaimer') {
+        doc.text(`${key}: ${value}`, 20, 40 + i * 10);
+      }
+    });
 
-    if (formData.equipment.length > 0) {
-      doc.text('Equipment:', 20, y += 10);
-      formData.equipment.forEach(eq => {
-        doc.text(`- ${eq.name}: $${eq.value}`, 30, y += 10);
-      });
-    }
-
-    doc.text(`Real Estate Value: $${formData.realEstateValue}`, 20, y += 10);
-    doc.setFontSize(14);
-    doc.text(`\nEstimated Valuation: $${calculateValuation().toFixed(2)}`, 20, y += 20);
-
+    doc.text(`Estimated Valuation: $${calculateValuation().toFixed(2)}`, 20, 180);
     doc.save('valuation-report.pdf');
   };
 
   return (
-    <main className="min-h-screen p-6 bg-blue-50">
+    <main className="min-h-screen p-6 bg-gray-50">
       <div className="max-w-3xl mx-auto bg-white shadow-md p-6 rounded-lg">
-        <h1 className="text-4xl font-bold mb-6 text-center">Valuation Wizard</h1>
+        <h1 className="text-3xl font-bold mb-6">Valuation Wizard</h1>
 
         <div className="space-y-4">
-          <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="yearsInBusiness" placeholder="Years in Business" value={formData.yearsInBusiness} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="email" placeholder="Email (for report)" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="location" placeholder="City/Province" value={formData.location} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" required />
+          <input name="yearsInBusiness" placeholder="Years in Business" value={formData.yearsInBusiness} onChange={handleChange} className="w-full border p-3 rounded" required />
 
-          <select name="industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded">
+          <label className="block font-medium">Email Address</label>
+          <input
+            name="email"
+            type="email"
+            required
+            placeholder="Enter your email to receive the report"
+            value={formData.email}
+            onChange={handleChange}
+            className="w-full border p-3 rounded"
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            We'll send your valuation report to this email.
+          </p>
+
+          <select name="industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded" required>
             <option value="">Select Industry</option>
             {industries.map((ind) => (
               <option key={ind} value={ind}>{ind}</option>
             ))}
           </select>
 
-          <input name="annualRevenue" placeholder="Annual Revenue ($)" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="annualExpenses" placeholder="Annual Expenses ($)" value={formData.annualExpenses} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="ownerSalary" placeholder="Owner Salary ($)" value={formData.ownerSalary} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="personalAddBacks" placeholder="Add-backs (personal items, etc.)" value={formData.personalAddBacks} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="annualRevenue" placeholder="Annual Revenue ($)" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" required />
+          <input name="annualExpenses" placeholder="Annual Expenses ($)" value={formData.annualExpenses} onChange={handleChange} className="w-full border p-3 rounded" required />
+          <input name="ownerSalary" placeholder="Owner Salary ($)" value={formData.ownerSalary} onChange={handleChange} className="w-full border p-3 rounded" required />
+          <input name="personalAddBacks" placeholder="Add-backs (personal expenses, etc.)" value={formData.personalAddBacks} onChange={handleChange} className="w-full border p-3 rounded" required />
 
+          <label className="block font-medium">Is this business owner-operated or has employees?</label>
           <select name="hasEmployees" value={formData.hasEmployees} onChange={handleChange} className="w-full border p-3 rounded">
             <option value="yes">Has Employees</option>
-            <option value="no">Owner-Operated</option>
+            <option value="no">Owner-Operated Only</option>
           </select>
-
-          <label className="block font-semibold">Confidence rating (1 = unsure, 5 = very confident):</label>
-          <input type="range" min="1" max="5" name="confidenceRating" value={formData.confidenceRating} onChange={handleChange} className="w-full" />
 
           <label className="block font-medium">List Equipment</label>
           {formData.equipment.map((eq, idx) => (
@@ -140,6 +143,15 @@ export default function ValuationWizard() {
 
           <input name="realEstateValue" placeholder="Real Estate Value ($)" value={formData.realEstateValue} onChange={handleChange} className="w-full border p-3 rounded" />
 
+          <div className="mt-4">
+            <label className="flex items-center space-x-2">
+              <input type="checkbox" name="agreeDisclaimer" checked={formData.agreeDisclaimer} onChange={handleChange} required />
+              <span className="text-sm">
+                I understand this is a simple estimate only and not a formal appraisal. It should not be used for lending or legal purposes.
+              </span>
+            </label>
+          </div>
+
           <div className="mt-6">
             <p className="text-xl font-semibold mb-2">Estimated Valuation: ${calculateValuation().toFixed(2)}</p>
             <button onClick={generatePDF} className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
@@ -151,5 +163,4 @@ export default function ValuationWizard() {
     </main>
   );
 }
-
 
