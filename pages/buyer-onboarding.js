@@ -1,6 +1,6 @@
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function BuyerOnboarding() {
   const router = useRouter();
@@ -25,6 +25,11 @@ export default function BuyerOnboarding() {
   const [errorMessage, setErrorMessage] = useState('');
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isClient, setIsClient] = useState(false); // NEW: controls hydration-safe rendering
+
+  useEffect(() => {
+    setIsClient(true); // ✅ Only set true after client mounts
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -118,9 +123,8 @@ export default function BuyerOnboarding() {
       alert('There was a problem submitting your form.');
     } else {
       alert('Your buyer profile was submitted successfully!');
-
       if (redirectPath) {
-        router.push(redirectPath); // 🔁 Send user back to the listing
+        router.push(redirectPath);
       } else {
         setFormData({
           name: '',
@@ -182,9 +186,10 @@ export default function BuyerOnboarding() {
 
           <label>Upload a short intro video (.mp4/.mov/.webm)</label>
           <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={handleVideoUpload} className="w-full border p-3 rounded" />
-          {videoPreview && (
+
+          {isClient && videoPreview && (
             <video width="200" controls className="mt-4">
-              <source src={videoPreview} type="video/mp4" />
+              <source src={videoPreview} type={formData.video?.type || 'video/mp4'} />
             </video>
           )}
 
@@ -196,4 +201,3 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
-
