@@ -12,7 +12,6 @@ export default function Header() {
   return (
     <header className="bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-
         {/* Stylized Brand Name */}
         <Link href="/">
           <a className="text-2xl font-serif font-bold">
@@ -29,7 +28,7 @@ export default function Header() {
           <Link href="/sellers">
             <a className="hover:text-blue-600">Sell</a>
           </Link>
-          <Link href="/buyers">
+          <Link href="/buyer-onboarding">
             <a className="hover:text-blue-600">Buy</a>
           </Link>
           <Link href="/scorecard">
@@ -58,7 +57,7 @@ export default function Header() {
             <Link href="/sellers">
               <a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Sell</a>
             </Link>
-            <Link href="/buyers">
+            <Link href="/buyer-onboarding">
               <a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Buy</a>
             </Link>
             <Link href="/scorecard">
@@ -73,4 +72,3 @@ export default function Header() {
     </header>
   );
 }
-
