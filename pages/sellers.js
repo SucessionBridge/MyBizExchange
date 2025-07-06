@@ -1,3 +1,5 @@
+// pages/sellers.js
+
 import { supabase } from '../lib/supabaseClient';
 import React, { useState } from "react";
 import SellerListingPreview from '../components/SellerListingPreview';
@@ -260,8 +262,10 @@ export default function SellerOnboarding() {
             onBack={() => { setShowAI(false); setShowForm(true); }}
             onComplete={(desc) => {
               setFormData((prev) => ({ ...prev, aiGeneratedDescription: desc }));
-              setShowAI(false);
-              setShowPreview(true);
+              setTimeout(() => {
+                setShowAI(false);
+                setShowPreview(true);
+              }, 100);
             }}
           />
         )}
