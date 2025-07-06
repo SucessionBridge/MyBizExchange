@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 
-export default function SellerListingPreview({ formData, imagePreviews, onBack, onSubmit }) {
+export default function SellerListingPreview({
+  formData,
+  imagePreviews,
+  onBack,
+  onSubmit
+}) {
   const {
     name,
     email,
@@ -14,42 +19,52 @@ export default function SellerListingPreview({ formData, imagePreviews, onBack, 
     includesBuilding,
     financingType,
     businessDescription,
-    aiGeneratedDescription, // NEW: assuming this is passed from parent if generated
+    aiGeneratedDescription
   } = formData;
 
-  const [selectedDescription, setSelectedDescription] = useState(businessDescription);
+  const [selectedDescription, setSelectedDescription] = useState(
+    aiGeneratedDescription || businessDescription
+  );
+  const [selectedVersion, setSelectedVersion] = useState(
+    aiGeneratedDescription ? 'ai' : 'original'
+  );
 
-  const handleSelectDescription = (desc) => {
+  const handleSelectDescription = (desc, version) => {
     setSelectedDescription(desc);
+    setSelectedVersion(version);
   };
 
   const handleSubmit = () => {
-    onSubmit({ ...formData, businessDescription: selectedDescription });
+    const submissionData = {
+      ...formData,
+      businessDescription: selectedDescription
+    };
+    onSubmit(submissionData);
   };
 
   return (
     <div className="max-w-4xl mx-auto bg-white rounded-xl shadow p-6 mt-8">
       <h1 className="text-2xl font-bold mb-4">{businessName}</h1>
-      <p className="text-sm text-gray-600 mb-2">{industry} • {location}</p>
+      <p className="text-sm text-gray-600 mb-4">{industry} • {location}</p>
 
-      <div className="mt-4 space-y-1">
+      <div className="space-y-2">
         <p><strong>Owner Name:</strong> {name}</p>
         <p><strong>Email:</strong> {email}</p>
-        <p><strong>Revenue:</strong> ${annualRevenue}</p>
-        <p><strong>Profit:</strong> ${annualProfit}</p>
+        <p><strong>Annual Revenue:</strong> ${annualRevenue}</p>
+        <p><strong>Annual Profit:</strong> ${annualProfit}</p>
         <p><strong>Asking Price:</strong> ${askingPrice}</p>
         <p><strong>Includes Inventory:</strong> {includesInventory}</p>
         <p><strong>Includes Building:</strong> {includesBuilding}</p>
-        <p><strong>Financing Option:</strong> {financingType}</p>
+        <p><strong>Financing Type:</strong> {financingType}</p>
       </div>
 
       <div className="mt-6">
         <h2 className="font-semibold mb-2">Business Description</h2>
 
-        <div className="border rounded-xl p-4 mb-4 bg-gray-50">
+        <div className={`border rounded-xl p-4 mb-4 ${selectedVersion === 'original' ? 'border-blue-500 bg-blue-50' : 'bg-gray-50'}`}>
           <p className="text-gray-700 whitespace-pre-line">{businessDescription}</p>
           <button
-            onClick={() => handleSelectDescription(businessDescription)}
+            onClick={() => handleSelectDescription(businessDescription, 'original')}
             className="mt-2 text-sm text-blue-600 underline"
           >
             Use this version
@@ -57,16 +72,20 @@ export default function SellerListingPreview({ formData, imagePreviews, onBack, 
         </div>
 
         {aiGeneratedDescription && (
-          <div className="border rounded-xl p-4 bg-green-50">
+          <div className={`border rounded-xl p-4 ${selectedVersion === 'ai' ? 'border-blue-500 bg-blue-50' : 'bg-green-50'}`}>
             <p className="text-gray-800 whitespace-pre-line italic">{aiGeneratedDescription}</p>
             <button
-              onClick={() => handleSelectDescription(aiGeneratedDescription)}
+              onClick={() => handleSelectDescription(aiGeneratedDescription, 'ai')}
               className="mt-2 text-sm text-blue-600 underline"
             >
               Use this version
             </button>
           </div>
         )}
+
+        <p className="mt-4 text-sm text-gray-500">
+          <strong>Selected:</strong> {selectedVersion === 'ai' ? 'AI-Generated Description' : 'Original Description'}
+        </p>
       </div>
 
       <div className="mt-6">
