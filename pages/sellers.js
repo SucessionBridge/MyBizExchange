@@ -17,6 +17,7 @@ export default function SellerOnboarding() {
     financingType: "seller-financing",
     images: [],
     businessDescription: "",
+    aiGeneratedDescription: "", // New field for AI version
   });
 
   const [imagePreviews, setImagePreviews] = useState([]);
@@ -156,6 +157,7 @@ export default function SellerOnboarding() {
           financingType: "seller-financing",
           images: [],
           businessDescription: "",
+          aiGeneratedDescription: "",
         });
         setImagePreviews([]);
         setErrorMessage("");
@@ -175,7 +177,7 @@ export default function SellerOnboarding() {
 
         {!showPreview ? (
           <form onSubmit={(e) => { e.preventDefault(); setShowPreview(true); }} className="space-y-6">
-            {/* Form fields stay the same */}
+            {/* All input fields and upload UI stay the same */}
             {/* ... */}
 
             <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">Preview Listing</button>
@@ -187,11 +189,11 @@ export default function SellerOnboarding() {
             onBack={() => setShowPreview(false)}
             onSubmit={handleFinalSubmit}
             onUpdateDescription={(desc) => setFormData((prev) => ({ ...prev, businessDescription: desc }))}
+            onUpdateAI={(aiDesc) => setFormData((prev) => ({ ...prev, aiGeneratedDescription: aiDesc }))}
           />
         )}
       </div>
     </main>
   );
 }
-
 
