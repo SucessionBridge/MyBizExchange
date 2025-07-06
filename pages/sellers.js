@@ -30,6 +30,7 @@ export default function SellerOnboarding() {
   const [showForm, setShowForm] = useState(true);
   const [showAI, setShowAI] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [descriptionMode, setDescriptionMode] = useState("ai");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -192,8 +193,17 @@ export default function SellerOnboarding() {
                 alert("Please fill out: " + missing.join(', '));
                 return;
               }
-              setShowForm(false);
-              setShowAI(true);
+              if (descriptionMode === "manual") {
+                if (!formData.businessDescription) {
+                  alert("Please provide your business description.");
+                  return;
+                }
+                setShowForm(false);
+                setShowPreview(true);
+              } else {
+                setShowForm(false);
+                setShowAI(true);
+              }
             }}
             className="space-y-4"
           >
@@ -222,14 +232,23 @@ export default function SellerOnboarding() {
               <option value="rent-to-own">Rent to Own</option>
             </select>
 
-            <textarea
-              name="businessDescription"
-              placeholder="Example: Wine store on Main St. operating for 30+ years, employs 2 people and serves local townspeople."
-              value={formData.businessDescription}
-              onChange={handleChange}
-              className="w-full p-2 border rounded"
-              rows={5}
-            />
+            <div className="space-y-2">
+              <label className="block font-medium">How would you like to provide your business description?</label>
+              <div className="flex gap-4">
+                <button type="button" onClick={() => setDescriptionMode("ai")} className={`px-4 py-2 rounded ${descriptionMode === "ai" ? "bg-blue-600 text-white" : "bg-gray-200"}`}>Use AI</button>
+                <button type="button" onClick={() => setDescriptionMode("manual")} className={`px-4 py-2 rounded ${descriptionMode === "manual" ? "bg-blue-600 text-white" : "bg-gray-200"}`}>Write My Own</button>
+              </div>
+              {descriptionMode === "manual" && (
+                <textarea
+                  name="businessDescription"
+                  placeholder="Example: Wine store on Main St. operating for 30+ years..."
+                  value={formData.businessDescription}
+                  onChange={handleChange}
+                  className="w-full p-2 border rounded"
+                  rows={5}
+                />
+              )}
+            </div>
 
             <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full" />
 
@@ -251,7 +270,7 @@ export default function SellerOnboarding() {
             )}
 
             <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">
-              Next: Improve with AI
+              Next Step
             </button>
           </form>
         )}
@@ -259,14 +278,6 @@ export default function SellerOnboarding() {
         {showAI && (
           <AIDescriptionWizard
             uploadedImages={imagePreviews}
-            sellerInfo={{
-              businessName: formData.businessName,
-              industry: formData.industry,
-              location: formData.location,
-              annualRevenue: formData.annualRevenue,
-              annualProfit: formData.annualProfit,
-              askingPrice: formData.askingPrice
-            }}
             onBack={() => { setShowAI(false); setShowForm(true); }}
             onComplete={(desc) => {
               setFormData((prev) => ({ ...prev, aiGeneratedDescription: desc }));
@@ -282,7 +293,15 @@ export default function SellerOnboarding() {
           <SellerListingPreview
             formData={formData}
             imagePreviews={imagePreviews}
-            onBack={() => { setShowPreview(false); setShowAI(true); }}
+            onBack={() => {
+              if (descriptionMode === "manual") {
+                setShowPreview(false);
+                setShowForm(true);
+              } else {
+                setShowPreview(false);
+                setShowAI(true);
+              }
+            }}
             onSubmit={handleFinalSubmit}
           />
         )}
