@@ -25,8 +25,15 @@ export default async function handler(req, res) {
     includesBuilding
   } = req.body;
 
-  if (!sentenceSummary || !customers || !opportunity || !industry) {
-    return res.status(400).json({ error: 'Missing required fields for AI generation.' });
+  // Better error messaging
+  const requiredFields = { sentenceSummary, customers, opportunity, industry };
+  const missing = Object.entries(requiredFields).filter(([_, v]) => !v);
+  if (missing.length > 0) {
+    return res.status(400).json({ error: `Missing required fields: ${missing.map(([k]) => k).join(', ')}` });
+  }
+
+  if (!process.env.OPENAI_API_KEY) {
+    return res.status(500).json({ error: 'Missing OpenAI API key in environment.' });
   }
 
   const prompt = `
