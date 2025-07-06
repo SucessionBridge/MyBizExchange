@@ -21,45 +21,37 @@ export default function SellerListingPreview({ formData, imagePreviews, onBack, 
       <h1 className="text-2xl font-bold mb-4">{businessName}</h1>
       <p className="text-sm text-gray-600 mb-2">{industry} • {location}</p>
 
-      <div className="mt-4">
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
         <p><strong>Owner Name:</strong> {name}</p>
         <p><strong>Email:</strong> {email}</p>
-        <p><strong>Revenue:</strong> ${annualRevenue}</p>
-        <p><strong>Profit:</strong> ${annualProfit}</p>
+        <p><strong>Annual Revenue:</strong> ${annualRevenue}</p>
+        <p><strong>Annual Profit (SDE):</strong> ${annualProfit}</p>
         <p><strong>Asking Price:</strong> ${askingPrice}</p>
         <p><strong>Includes Inventory:</strong> {includesInventory}</p>
         <p><strong>Includes Building:</strong> {includesBuilding}</p>
         <p><strong>Financing Option:</strong> {financingType}</p>
       </div>
 
-      <div className="mt-4">
-        <h2 className="font-semibold">Business Description</h2>
-        <p className="text-gray-700 mt-2 whitespace-pre-line">{businessDescription}</p>
-      </div>
-
-      {/* New AI Enhancement Link */}
-      <div className="mt-4 text-center">
-        <a
-          href="/seller-wizard"
-          className="inline-block text-sm bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-        >
-          ✨ Enhance this listing with AI
-        </a>
-      </div>
-
       <div className="mt-6">
-        <h2 className="font-semibold mb-2">Uploaded Photos</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {imagePreviews.map((url, i) => (
-            <img
-              key={i}
-              src={url}
-              alt={`Image ${i + 1}`}
-              className="rounded-md border h-40 w-full object-cover"
-            />
-          ))}
-        </div>
+        <h2 className="font-semibold mb-2">Business Description</h2>
+        <p className="text-gray-800 whitespace-pre-line">{businessDescription}</p>
       </div>
+
+      {imagePreviews?.length > 0 && (
+        <div className="mt-6">
+          <h2 className="font-semibold mb-2">Uploaded Photos</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {imagePreviews.map((url, i) => (
+              <img
+                key={i}
+                src={url}
+                alt={`Image ${i + 1}`}
+                className="rounded-md border h-40 w-full object-cover"
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="flex justify-between mt-8">
         <button
@@ -78,4 +70,5 @@ export default function SellerListingPreview({ formData, imagePreviews, onBack, 
     </div>
   );
 }
+
 
