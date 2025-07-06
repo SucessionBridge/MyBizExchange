@@ -1,4 +1,3 @@
-// pages/sellers.js
 import { supabase } from '../lib/supabaseClient';
 import React, { useState } from "react";
 import SellerListingPreview from '../components/SellerListingPreview';
@@ -81,7 +80,7 @@ export default function SellerOnboarding() {
         .upload(fileName, file);
 
       if (uploadError) {
-        console.error('Error uploading image:', uploadError.message);
+        console.error('❌ Error uploading image:', uploadError.message);
         errors.push(uploadError.message);
         continue;
       }
@@ -91,7 +90,7 @@ export default function SellerOnboarding() {
         .getPublicUrl(fileName);
 
       if (urlError) {
-        console.error('Error getting public URL:', urlError.message);
+        console.error('❌ Error getting public URL:', urlError.message);
         errors.push(urlError.message);
         continue;
       }
@@ -109,53 +108,62 @@ export default function SellerOnboarding() {
   };
 
   const handleFinalSubmit = async () => {
-    const uploadedUrls = await uploadImages(formData.images);
-    const {
-      name, email, businessName, industry, location,
-      annualRevenue, annualProfit, askingPrice,
-      includesInventory, includesBuilding, financingType,
-      businessDescription
-    } = formData;
+    try {
+      const uploadedUrls = await uploadImages(formData.images);
+      const {
+        name, email, businessName, industry, location,
+        annualRevenue, annualProfit, askingPrice,
+        includesInventory, includesBuilding, financingType,
+        businessDescription
+      } = formData;
 
-    const { error } = await supabase.from('sellers').insert([{
-      name,
-      email,
-      business_name: businessName,
-      industry,
-      location,
-      annual_revenue: parseFloat(annualRevenue),
-      annual_profit: parseFloat(annualProfit),
-      asking_price: parseFloat(askingPrice),
-      includes_inventory: includesInventory,
-      includes_building: includesBuilding,
-      financing_type: financingType,
-      images: uploadedUrls,
-      business_description: businessDescription,
-    }]);
+      const payload = {
+        name,
+        email,
+        business_name: businessName,
+        industry,
+        location,
+        annual_revenue: parseFloat(annualRevenue),
+        annual_profit: parseFloat(annualProfit),
+        asking_price: parseFloat(askingPrice),
+        includes_inventory: includesInventory,
+        includes_building: includesBuilding,
+        financing_type: financingType,
+        images: uploadedUrls,
+        business_description: businessDescription,
+      };
 
-    if (error) {
-      console.error("❌ Error submitting form:", error);
-      alert("There was a problem submitting your form.");
-    } else {
-      alert("Your listing was submitted successfully!");
-      setFormData({
-        name: "",
-        email: "",
-        businessName: "",
-        industry: "",
-        location: "",
-        annualRevenue: "",
-        annualProfit: "",
-        askingPrice: "",
-        includesInventory: "",
-        includesBuilding: "",
-        financingType: "seller-financing",
-        images: [],
-        businessDescription: "",
-      });
-      setImagePreviews([]);
-      setErrorMessage("");
-      setShowPreview(false);
+      console.log("📦 Submitting to Supabase:", payload);
+
+      const { error } = await supabase.from('sellers').insert([payload]);
+
+      if (error) {
+        console.error("❌ Supabase insert error:", error.message, error.details, error.hint);
+        alert("There was a problem submitting your form. Check console for details.");
+      } else {
+        alert("✅ Your listing was submitted successfully!");
+        setFormData({
+          name: "",
+          email: "",
+          businessName: "",
+          industry: "",
+          location: "",
+          annualRevenue: "",
+          annualProfit: "",
+          askingPrice: "",
+          includesInventory: "",
+          includesBuilding: "",
+          financingType: "seller-financing",
+          images: [],
+          businessDescription: "",
+        });
+        setImagePreviews([]);
+        setErrorMessage("");
+        setShowPreview(false);
+      }
+    } catch (e) {
+      console.error("🔥 Unexpected error in handleFinalSubmit:", e);
+      alert("Unexpected error occurred. See console.");
     }
   };
 
@@ -247,3 +255,4 @@ export default function SellerOnboarding() {
     </main>
   );
 }
+
