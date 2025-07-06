@@ -259,6 +259,14 @@ export default function SellerOnboarding() {
         {showAI && (
           <AIDescriptionWizard
             uploadedImages={imagePreviews}
+            sellerInfo={{
+              businessName: formData.businessName,
+              industry: formData.industry,
+              location: formData.location,
+              annualRevenue: formData.annualRevenue,
+              annualProfit: formData.annualProfit,
+              askingPrice: formData.askingPrice
+            }}
             onBack={() => { setShowAI(false); setShowForm(true); }}
             onComplete={(desc) => {
               setFormData((prev) => ({ ...prev, aiGeneratedDescription: desc }));
