@@ -1,4 +1,4 @@
-// pages/seller-dashboard.js
+""// pages/seller-dashboard.js
 import { useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
@@ -30,10 +30,33 @@ export default function SellerDashboard() {
     setLoading(false);
   };
 
+  const handleDelete = async (id) => {
+    const confirm = window.confirm("Are you sure you want to delete this listing?");
+    if (!confirm) return;
+
+    const { error } = await supabase
+      .from('sellers')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      alert('Error deleting listing');
+    } else {
+      setListings((prev) => prev.filter(listing => listing.id !== id));
+      alert('Listing deleted.');
+    }
+  };
+
+  const formatCurrency = (value) => {
+    return value ? `$${parseFloat(value).toLocaleString()}` : 'N/A';
+  };
+
+  const getPublicListingUrl = (id) => `${window.location.origin}/listings/${id}`;
+
   return (
     <main className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-center">My Listings</h1>
+        <h1 className="text-3xl font-bold mb-6 text-center">Seller Dashboard</h1>
 
         <div className="bg-white p-6 rounded-xl shadow mb-6">
           <input
@@ -54,15 +77,58 @@ export default function SellerDashboard() {
         </div>
 
         {listings.length > 0 && (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {listings.map((listing) => (
-              <div key={listing.id} className="bg-white p-4 rounded-xl shadow">
-                <h2 className="text-xl font-semibold">{listing.business_name}</h2>
+              <div key={listing.id} className="bg-white p-6 rounded-xl shadow relative">
+                <h2 className="text-xl font-semibold mb-1">{listing.business_name}</h2>
                 <p className="text-gray-700 mb-2">{listing.industry} • {listing.location}</p>
-                <p><strong>Asking Price:</strong> ${listing.asking_price}</p>
-                <p><strong>Annual Revenue:</strong> ${listing.annual_revenue}</p>
-                <p><strong>Annual Profit:</strong> ${listing.annual_profit}</p>
-                <p className="mt-2 text-sm text-gray-500">Submitted on: {new Date(listing.created_at).toLocaleDateString()}</p>
+
+                <p><strong>Asking Price:</strong> {formatCurrency(listing.asking_price)}</p>
+                <p><strong>Annual Revenue:</strong> {formatCurrency(listing.annual_revenue)}</p>
+                <p><strong>Annual Profit:</strong> {formatCurrency(listing.annual_profit)}</p>
+                <p><strong>Financing:</strong> {listing.financing_type}</p>
+                <p className="mt-2"><strong>Description:</strong><br />{listing.business_description}</p>
+
+                {listing.images?.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="font-medium mb-2">Uploaded Photos</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {listing.images.map((url, i) => (
+                        <img
+                          key={i}
+                          src={url}
+                          alt={`Image ${i + 1}`}
+                          className="rounded-md border h-32 w-full object-cover"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <p className="mt-4 text-sm text-gray-500">
+                  Submitted: {new Date(listing.created_at).toLocaleDateString()}
+                </p>
+
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    onClick={() => navigator.clipboard.writeText(getPublicListingUrl(listing.id))}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                  >
+                    📋 Copy Listing Link
+                  </button>
+                  <button
+                    onClick={() => alert('Edit feature coming soon.')}
+                    className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                  >
+                    ✏️ Edit Listing
+                  </button>
+                  <button
+                    onClick={() => handleDelete(listing.id)}
+                    className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                  >
+                    🗑️ Delete Listing
+                  </button>
+                </div>
               </div>
             ))}
           </div>
