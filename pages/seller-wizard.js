@@ -1,3 +1,4 @@
+// pages/seller-wizard.js
 import React, { useState } from "react";
 
 export default function SellerWizard() {
@@ -16,16 +17,12 @@ export default function SellerWizard() {
     profitDriver: ""
   });
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [generatedDescription, setGeneratedDescription] = useState("");
-  const [error, setError] = useState("");
-
   const handleChange = (field, value) => {
     setAnswers((prev) => ({ ...prev, [field]: value }));
   };
 
-  const next = () => setStep(step + 1);
-  const back = () => setStep(step - 1);
+  const next = () => setStep((prev) => Math.min(prev + 1, questions.length + 1));
+  const back = () => setStep((prev) => Math.max(prev - 1, 1));
 
   const questions = [
     {
@@ -88,97 +85,60 @@ export default function SellerWizard() {
   const isFinalStep = step > questions.length;
   const current = questions[step - 1];
 
-  const generateDescription = async () => {
-    setIsLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/generate-description", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          industry: answers.businessType,
-          customers: answers.customerType,
-          whatItDoes: answers.profitDriver,
-          whySelling: answers.reasonForSelling,
-          uniqueEdge: answers.growthOpportunities
-        })
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) throw new Error(data.error || "API Error");
-
-      setGeneratedDescription(data.description);
-    } catch (err) {
-      setError(err.message || "Something went wrong.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
-    <div className="max-w-2xl mx-auto p-8">
-      <h1 className="text-3xl font-bold mb-6">Seller Wizard</h1>
+    <div className="max-w-2xl mx-auto px-6 py-10">
+      <h1 className="text-3xl font-bold mb-6 text-center">Seller Wizard</h1>
 
       {!isFinalStep ? (
-        <div>
-          <label className="block mb-2 font-semibold">{current.label}</label>
+        <div className="bg-white shadow-md rounded-xl p-6">
+          <div className="text-gray-600 text-sm mb-2">Step {step} of {questions.length}</div>
+          <label className="block mb-2 font-semibold text-lg">{current.label}</label>
           <input
-            className="border p-3 rounded w-full mb-6"
+            className="border border-gray-300 p-3 rounded w-full mb-6"
             value={answers[current.field]}
             onChange={(e) => handleChange(current.field, e.target.value)}
             placeholder={current.placeholder}
           />
 
           <div className="flex justify-between">
-            {step > 1 ? (
-              <button
-                onClick={back}
-                className="bg-gray-300 px-4 py-2 rounded"
-              >
-                Back
-              </button>
-            ) : <span></span>}
-
+            <button
+              onClick={back}
+              disabled={step === 1}
+              className="bg-gray-300 px-4 py-2 rounded disabled:opacity-50"
+            >
+              Back
+            </button>
             <button
               onClick={next}
-              className="bg-blue-600 text-white px-4 py-2 rounded"
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
             >
               Next
             </button>
           </div>
         </div>
       ) : (
-        <div className="bg-white p-6 rounded shadow">
+        <div className="bg-white shadow-md rounded-xl p-6">
           <h2 className="text-xl font-semibold mb-4">Review Your Answers</h2>
-          <ul className="space-y-2">
+          <ul className="space-y-2 text-sm">
             {Object.entries(answers).map(([key, value]) => (
-              <li key={key}><strong>{key}:</strong> {value}</li>
+              <li key={key}><strong className="capitalize">{key.replace(/([A-Z])/g, ' $1')}:</strong> {value}</li>
             ))}
           </ul>
 
           <div className="mt-6">
             <button
-              onClick={generateDescription}
-              disabled={isLoading}
-              className="bg-green-600 text-white px-6 py-2 rounded"
+              onClick={() => alert("AI listing generation will happen here")}
+              className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700"
             >
-              {isLoading ? "Generating..." : "Generate Listing with AI"}
+              Generate AI Listing
+            </button>
+            <button
+              onClick={() => setStep(1)}
+              className="ml-4 text-sm text-blue-600 underline"
+            >
+              Start Over
             </button>
           </div>
-
-          {error && (
-            <p className="text-red-600 mt-4">{error}</p>
-          )}
-
-          {generatedDescription && (
-            <div className="mt-6 bg-gray-50 p-4 rounded">
-              <h3 className="font-semibold mb-2">AI-Generated Description</h3>
-              <p>{generatedDescription}</p>
-            </div>
-          )}
         </div>
       )}
     </div>
