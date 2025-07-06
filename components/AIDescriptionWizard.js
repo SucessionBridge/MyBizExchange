@@ -34,29 +34,32 @@ export default function AIDescriptionWizard({
       setLoading(true);
       setError("");
 
+      const payload = {
+        industry: sellerInfo.industry,
+        customers: answers.customers,
+        whatItDoes: answers.sentenceSummary,
+        whySelling: answers.adviceToBuyer,
+        uniqueEdge: answers.bestSellers,
+        yearsInBusiness: "N/A", // Optional, or pull from sellerInfo if available
+        employeeCount: "N/A",
+        website: "N/A",
+        annualRevenue: sellerInfo.annualRevenue || "N/A",
+        annualProfit: sellerInfo.annualProfit || "N/A",
+        includesEquipment: sellerInfo.includesInventory || "No",
+        includesProperty: sellerInfo.includesBuilding || "No"
+      };
+
       try {
-        const response = await fetch("/api/generate-description", {
+        const res = await fetch("/api/generate-description", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...sellerInfo,
-            whatItDoes: answers.sentenceSummary,
-            customers: answers.customers,
-            uniqueEdge: answers.bestSellers,
-            whySelling: answers.adviceToBuyer,
-            repeatCustomers: answers.repeatCustomers,
-            customerLove: answers.customerLove,
-            keepsThemComing: answers.keepsThemComing,
-            ownerInvolvement: answers.ownerInvolvement,
-            opportunity: answers.opportunity,
-            proudOf: answers.proudOf
-          })
+          body: JSON.stringify(payload)
         });
 
-        const data = await response.json();
+        const data = await res.json();
 
-        if (!response.ok || !data.description) {
-          throw new Error(data.error || "Failed to generate description");
+        if (!res.ok || !data.description) {
+          throw new Error(data.error || "Missing required fields for AI generation.");
         }
 
         onComplete(data.description);
@@ -125,3 +128,4 @@ export default function AIDescriptionWizard({
     </div>
   );
 }
+
