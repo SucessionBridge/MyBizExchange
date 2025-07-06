@@ -31,7 +31,6 @@ export default function AIDescriptionWizard({
     if (step < questions.length - 1) {
       setStep(step + 1);
     } else {
-      // Final step: Call API with full payload
       setLoading(true);
       setError("");
 
@@ -39,12 +38,24 @@ export default function AIDescriptionWizard({
         const response = await fetch("/api/generate-description", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...answers, ...sellerInfo })
+          body: JSON.stringify({
+            ...sellerInfo,
+            whatItDoes: answers.sentenceSummary,
+            customers: answers.customers,
+            uniqueEdge: answers.bestSellers,
+            whySelling: answers.adviceToBuyer,
+            repeatCustomers: answers.repeatCustomers,
+            customerLove: answers.customerLove,
+            keepsThemComing: answers.keepsThemComing,
+            ownerInvolvement: answers.ownerInvolvement,
+            opportunity: answers.opportunity,
+            proudOf: answers.proudOf
+          })
         });
 
         const data = await response.json();
 
-        if (!response.ok) {
+        if (!response.ok || !data.description) {
           throw new Error(data.error || "Failed to generate description");
         }
 
@@ -114,4 +125,3 @@ export default function AIDescriptionWizard({
     </div>
   );
 }
-
