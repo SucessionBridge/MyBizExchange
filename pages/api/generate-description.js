@@ -4,13 +4,42 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  const { industry, customers, whatItDoes, whySelling, uniqueEdge } = req.body;
+  const {
+    industry,
+    customers,
+    whatItDoes,
+    whySelling,
+    uniqueEdge,
+    yearsInBusiness,
+    employeeCount,
+    website,
+    annualRevenue,
+    annualProfit,
+    includesEquipment,
+    includesProperty,
+  } = req.body;
 
   if (!industry || !customers || !whatItDoes || !whySelling || !uniqueEdge) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  const prompt = `Write a clear, compelling business-for-sale description for a ${industry} business. It primarily serves ${customers}. Here's what it does: ${whatItDoes}. The owner is selling because ${whySelling}. It stands out because: ${uniqueEdge}. Keep it under 150 words, professional, but engaging.`;
+  const prompt = `
+Write a professional, buyer-friendly listing paragraph (max 150 words) for a business in the ${industry} sector.
+
+• Customers: ${customers}
+• Years in Business: ${yearsInBusiness || "N/A"}
+• Employees: ${employeeCount || "N/A"}
+• Annual Revenue: $${annualRevenue || "N/A"}
+• Annual Profit: $${annualProfit || "N/A"}
+• What it does: ${whatItDoes}
+• Unique edge: ${uniqueEdge}
+• Includes Equipment: ${includesEquipment}
+• Includes Property: ${includesProperty}
+• Website: ${website || "N/A"}
+• Reason for selling: ${whySelling}
+
+The tone should be clear, professional, and persuasive. Avoid bullet points. Write as one clean paragraph buyers would see in a business-for-sale marketplace.
+`;
 
   try {
     const completion = await fetch('https://api.openai.com/v1/chat/completions', {
