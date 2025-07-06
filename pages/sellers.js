@@ -25,7 +25,6 @@ export default function SellerOnboarding() {
 
   const [imagePreviews, setImagePreviews] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
-  const [invalidFiles, setInvalidFiles] = useState([]);
   const [uploadStatus, setUploadStatus] = useState("");
   const [showForm, setShowForm] = useState(true);
   const [showAI, setShowAI] = useState(false);
@@ -34,146 +33,96 @@ export default function SellerOnboarding() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
-    const maxSize = 5 * 1024 * 1024;
-    const validFiles = files.filter(file => file.size <= maxSize);
-    const invalid = files.filter(file => file.size > maxSize);
-
-    if (invalid.length > 0) {
-      setErrorMessage(`Some files exceed the 5MB size limit and will not be uploaded.`);
-      setInvalidFiles(invalid.map(file => file.name));
-    } else {
-      setErrorMessage("");
-      setInvalidFiles([]);
-    }
-
-    if (validFiles.length + formData.images.length <= 8) {
-      const previews = validFiles.map((file) => URL.createObjectURL(file));
-      setFormData((prev) => ({
-        ...prev,
-        images: [...prev.images, ...validFiles],
-      }));
-      setImagePreviews((prev) => [...prev, ...previews]);
-    } else {
-      alert('You can only upload up to 8 images.');
-    }
+    const validFiles = files.filter(file => file.size <= 5 * 1024 * 1024);
+    const previews = validFiles.map((file) => URL.createObjectURL(file));
+    setFormData((prev) => ({ ...prev, images: [...prev.images, ...validFiles] }));
+    setImagePreviews((prev) => [...prev, ...previews]);
   };
 
   const removeImage = (index) => {
-    const updatedImages = formData.images.filter((_, i) => i !== index);
-    const updatedPreviews = imagePreviews.filter((_, i) => i !== index);
-    setFormData({ ...formData, images: updatedImages });
-    setImagePreviews(updatedPreviews);
-    setErrorMessage("");
+    setFormData((prev) => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== index),
+    }));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   const uploadImages = async (files) => {
     const uploadedUrls = [];
-    const errors = [];
-    setUploadStatus("Uploading images, please keep browser open...");
+    setUploadStatus("Uploading images...");
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const fileName = `business-${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('new-business-photos')
-        .upload(fileName, file);
+      const { error: uploadError } = await supabase.storage.from('new-business-photos').upload(fileName, file);
 
-      if (uploadError) {
-        console.error('❌ Error uploading image:', uploadError.message);
-        errors.push(uploadError.message);
-        continue;
-      }
+      if (uploadError) continue;
 
-      const { data, error: urlError } = supabase.storage
-        .from('new-business-photos')
-        .getPublicUrl(fileName);
-
-      if (urlError) {
-        console.error('❌ Error getting public URL:', urlError.message);
-        errors.push(urlError.message);
-        continue;
-      }
-
-      uploadedUrls.push(data.publicUrl);
+      const { data, error: urlError } = supabase.storage.from('new-business-photos').getPublicUrl(fileName);
+      if (!urlError) uploadedUrls.push(data.publicUrl);
     }
 
     setUploadStatus("");
-
-    if (errors.length > 0) {
-      alert(`Some images failed to upload: ${errors.join(', ')}`);
-    }
-
     return uploadedUrls;
   };
 
   const handleFinalSubmit = async (finalFormData) => {
-    try {
-      const uploadedUrls = await uploadImages(finalFormData.images);
-      const {
-        name, email, businessName, industry, location,
-        annualRevenue, annualProfit, askingPrice,
-        includesInventory, includesBuilding, financingType,
-        businessDescription, aiGeneratedDescription
-      } = finalFormData;
+    const uploadedUrls = await uploadImages(finalFormData.images);
+    const {
+      name, email, businessName, industry, location,
+      annualRevenue, annualProfit, askingPrice,
+      includesInventory, includesBuilding, financingType,
+      businessDescription, aiGeneratedDescription
+    } = finalFormData;
 
-      const payload = {
-        name,
-        email,
-        business_name: businessName,
-        industry,
-        location,
-        annual_revenue: parseFloat(annualRevenue),
-        annual_profit: parseFloat(annualProfit),
-        asking_price: parseFloat(askingPrice),
-        includes_inventory: includesInventory,
-        includes_building: includesBuilding,
-        financing_type: financingType,
-        images: uploadedUrls,
-        business_description: businessDescription,
-        original_description: businessDescription,
-        ai_description: aiGeneratedDescription,
-      };
+    const payload = {
+      name,
+      email,
+      business_name: businessName,
+      industry,
+      location,
+      annual_revenue: parseFloat(annualRevenue),
+      annual_profit: parseFloat(annualProfit),
+      asking_price: parseFloat(askingPrice),
+      includes_inventory: includesInventory,
+      includes_building: includesBuilding,
+      financing_type: financingType,
+      images: uploadedUrls,
+      business_description: businessDescription,
+      original_description: businessDescription,
+      ai_description: aiGeneratedDescription,
+    };
 
-      const { error } = await supabase.from('sellers').insert([payload]);
-
-      if (error) {
-        console.error("❌ Supabase insert error:", error.message, error.details, error.hint);
-        alert("There was a problem submitting your form. Check console for details.");
-      } else {
-        alert("✅ Your listing was submitted successfully!");
-        setFormData({
-          name: "",
-          email: "",
-          businessName: "",
-          industry: "",
-          location: "",
-          annualRevenue: "",
-          annualProfit: "",
-          askingPrice: "",
-          includesInventory: "No",
-          includesBuilding: "No",
-          financingType: "buyer-financed",
-          images: [],
-          businessDescription: "",
-          aiGeneratedDescription: "",
-        });
-        setImagePreviews([]);
-        setErrorMessage("");
-        setShowForm(true);
-        setShowAI(false);
-        setShowPreview(false);
-      }
-    } catch (e) {
-      console.error("🔥 Unexpected error in handleFinalSubmit:", e);
-      alert("Unexpected error occurred. See console.");
+    const { error } = await supabase.from('sellers').insert([payload]);
+    if (!error) {
+      alert("✅ Listing submitted successfully!");
+      setFormData({
+        name: "",
+        email: "",
+        businessName: "",
+        industry: "",
+        location: "",
+        annualRevenue: "",
+        annualProfit: "",
+        askingPrice: "",
+        includesInventory: "No",
+        includesBuilding: "No",
+        financingType: "buyer-financed",
+        images: [],
+        businessDescription: "",
+        aiGeneratedDescription: "",
+      });
+      setImagePreviews([]);
+      setShowForm(true);
+      setShowAI(false);
+      setShowPreview(false);
+    } else {
+      alert("There was an error submitting your listing.");
     }
   };
 
@@ -181,74 +130,61 @@ export default function SellerOnboarding() {
     <main className="min-h-screen bg-white p-8">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Seller Onboarding</h1>
-        {uploadStatus && <div className="text-center text-blue-600 font-semibold mb-4">{uploadStatus}</div>}
+
+        {uploadStatus && <p className="text-blue-500 text-center mb-4">{uploadStatus}</p>}
 
         {showForm && (
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              const requiredFields = ['name', 'email', 'businessName', 'industry', 'location', 'annualRevenue', 'annualProfit', 'askingPrice'];
-              const missing = requiredFields.filter((f) => !formData[f]);
-              if (missing.length > 0) {
-                alert("Please fill out: " + missing.join(', '));
-                return;
+              const required = ['name', 'email', 'businessName', 'industry', 'location', 'annualRevenue', 'annualProfit', 'askingPrice'];
+              const missing = required.filter(key => !formData[key]);
+              if (missing.length > 0) return alert("Missing: " + missing.join(", "));
+
+              if (descriptionMode === 'manual' && !formData.businessDescription) {
+                return alert("Please write your business description.");
               }
-              if (descriptionMode === "manual") {
-                if (!formData.businessDescription) {
-                  alert("Please provide your business description.");
-                  return;
-                }
-                setShowForm(false);
-                setShowPreview(true);
-              } else {
-                setShowForm(false);
-                setShowAI(true);
-              }
+
+              setShowForm(false);
+              descriptionMode === 'ai' ? setShowAI(true) : setShowPreview(true);
             }}
             className="space-y-4"
           >
-            <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full p-2 border rounded" />
-            <input name="email" placeholder="Email" type="email" value={formData.email} onChange={handleChange} className="w-full p-2 border rounded" />
-            <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full p-2 border rounded" />
-            <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full p-2 border rounded" />
-            <input name="location" placeholder="Location" value={formData.location} onChange={handleChange} className="w-full p-2 border rounded" />
-            <input name="annualRevenue" placeholder="Annual Revenue" value={formData.annualRevenue} onChange={handleChange} className="w-full p-2 border rounded" />
-            <input name="annualProfit" placeholder="Annual Profit" value={formData.annualProfit} onChange={handleChange} className="w-full p-2 border rounded" />
-            <input name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="name" value={formData.name} onChange={handleChange} placeholder="Your Name" className="w-full border p-2 rounded" />
+            <input name="email" value={formData.email} onChange={handleChange} placeholder="Email" className="w-full border p-2 rounded" />
+            <input name="businessName" value={formData.businessName} onChange={handleChange} placeholder="Business Name" className="w-full border p-2 rounded" />
+            <input name="industry" value={formData.industry} onChange={handleChange} placeholder="Industry" className="w-full border p-2 rounded" />
+            <input name="location" value={formData.location} onChange={handleChange} placeholder="Location" className="w-full border p-2 rounded" />
+            <input name="annualRevenue" value={formData.annualRevenue} onChange={handleChange} placeholder="Annual Revenue" className="w-full border p-2 rounded" />
+            <input name="annualProfit" value={formData.annualProfit} onChange={handleChange} placeholder="Annual Profit" className="w-full border p-2 rounded" />
+            <input name="askingPrice" value={formData.askingPrice} onChange={handleChange} placeholder="Asking Price" className="w-full border p-2 rounded" />
 
-            <select name="includesInventory" value={formData.includesInventory} onChange={handleChange} className="w-full p-2 border rounded">
+            <select name="includesInventory" value={formData.includesInventory} onChange={handleChange} className="w-full border p-2 rounded">
               <option value="No">Includes Inventory?</option>
               <option value="Yes">Yes</option>
               <option value="No">No</option>
             </select>
-            <select name="includesBuilding" value={formData.includesBuilding} onChange={handleChange} className="w-full p-2 border rounded">
+
+            <select name="includesBuilding" value={formData.includesBuilding} onChange={handleChange} className="w-full border p-2 rounded">
               <option value="No">Includes Building?</option>
               <option value="Yes">Yes</option>
               <option value="No">No</option>
             </select>
-            <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full p-2 border rounded">
+
+            <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-2 rounded">
               <option value="buyer-financed">Buyer Financed</option>
               <option value="seller-financing">Seller Financing</option>
               <option value="rent-to-own">Rent to Own</option>
             </select>
 
-            <div className="space-y-2">
-              <label className="block font-medium">How would you like to provide your business description?</label>
-              <div className="flex gap-4">
-                <button type="button" onClick={() => setDescriptionMode("ai")} className={`px-4 py-2 rounded ${descriptionMode === "ai" ? "bg-blue-600 text-white" : "bg-gray-200"}`}>Use AI</button>
-                <button type="button" onClick={() => setDescriptionMode("manual")} className={`px-4 py-2 rounded ${descriptionMode === "manual" ? "bg-blue-600 text-white" : "bg-gray-200"}`}>Write My Own</button>
-              </div>
-              {descriptionMode === "manual" && (
-                <textarea
-                  name="businessDescription"
-                  placeholder="Example: Wine store on Main St. operating for 30+ years..."
-                  value={formData.businessDescription}
-                  onChange={handleChange}
-                  className="w-full p-2 border rounded"
-                  rows={5}
-                />
-              )}
+            <label className="block font-medium">Business Description</label>
+            <div className="flex gap-4">
+              <button type="button" onClick={() => setDescriptionMode("ai")} className={`px-4 py-2 rounded ${descriptionMode === "ai" ? "bg-blue-600 text-white" : "bg-gray-200"}`}>Use AI</button>
+              <button type="button" onClick={() => setDescriptionMode("manual")} className={`px-4 py-2 rounded ${descriptionMode === "manual" ? "bg-blue-600 text-white" : "bg-gray-200"}`}>Write My Own</button>
             </div>
+            {descriptionMode === 'manual' && (
+              <textarea name="businessDescription" value={formData.businessDescription} onChange={handleChange} placeholder="Describe your business..." className="w-full border p-2 rounded" rows={4} />
+            )}
 
             <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full" />
 
@@ -257,28 +193,20 @@ export default function SellerOnboarding() {
                 {imagePreviews.map((src, idx) => (
                   <div key={idx} className="relative">
                     <img src={src} className="rounded w-full h-32 object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(idx)}
-                      className="absolute top-1 right-1 bg-white text-red-600 px-2 py-1 rounded"
-                    >
-                      ✕
-                    </button>
+                    <button onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-white text-red-600 px-2 py-1 rounded">✕</button>
                   </div>
                 ))}
               </div>
             )}
 
-            <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">
-              Next Step
-            </button>
+            <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">Next Step</button>
           </form>
         )}
 
-        {showAI && (
+        {showAI && formData.name && (
           <AIDescriptionWizard
             uploadedImages={imagePreviews}
-            onBack={() => { setShowAI(false); setShowForm(true); }}
+            sellerInfo={formData}
             onComplete={(desc) => {
               setFormData((prev) => ({ ...prev, aiGeneratedDescription: desc }));
               setTimeout(() => {
@@ -294,13 +222,8 @@ export default function SellerOnboarding() {
             formData={formData}
             imagePreviews={imagePreviews}
             onBack={() => {
-              if (descriptionMode === "manual") {
-                setShowPreview(false);
-                setShowForm(true);
-              } else {
-                setShowPreview(false);
-                setShowAI(true);
-              }
+              descriptionMode === "manual" ? setShowForm(true) : setShowAI(true);
+              setShowPreview(false);
             }}
             onSubmit={handleFinalSubmit}
           />
