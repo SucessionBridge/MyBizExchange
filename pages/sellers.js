@@ -14,7 +14,7 @@ export default function SellerOnboarding() {
     askingPrice: "",
     includesInventory: "",
     includesBuilding: "",
-    financingType: "seller-financing",
+    financingType: "buyer-financed",
     images: [],
     businessDescription: "",
     aiGeneratedDescription: "",
@@ -155,7 +155,7 @@ export default function SellerOnboarding() {
           askingPrice: "",
           includesInventory: "",
           includesBuilding: "",
-          financingType: "seller-financing",
+          financingType: "buyer-financed",
           images: [],
           businessDescription: "",
           aiGeneratedDescription: "",
@@ -199,17 +199,27 @@ export default function SellerOnboarding() {
             <input name="annualProfit" placeholder="Annual Profit" value={formData.annualProfit} onChange={handleChange} className="w-full p-2 border rounded" />
             <input name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full p-2 border rounded" />
 
-            <input name="includesInventory" placeholder="Includes Inventory?" value={formData.includesInventory} onChange={handleChange} className="w-full p-2 border rounded" />
-            <input name="includesBuilding" placeholder="Includes Building?" value={formData.includesBuilding} onChange={handleChange} className="w-full p-2 border rounded" />
+            <select name="includesInventory" value={formData.includesInventory} onChange={handleChange} className="w-full p-2 border rounded">
+              <option value="">Includes Inventory?</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+
+            <select name="includesBuilding" value={formData.includesBuilding} onChange={handleChange} className="w-full p-2 border rounded">
+              <option value="">Includes Building?</option>
+              <option value="yes">Yes</option>
+              <option value="no">No</option>
+            </select>
+
             <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full p-2 border rounded">
+              <option value="buyer-financed">Buyer Financed</option>
               <option value="seller-financing">Seller Financing</option>
               <option value="rent-to-own">Rent to Own</option>
-              <option value="cash">Cash</option>
             </select>
 
             <textarea
               name="businessDescription"
-              placeholder="Write a short description..."
+              placeholder="Write a short description (e.g., A wine store located on Main Street, operating for over 30 years, employing 2 staff, serving the local community.)"
               value={formData.businessDescription}
               onChange={handleChange}
               className="w-full p-2 border rounded"
@@ -251,4 +261,3 @@ export default function SellerOnboarding() {
     </main>
   );
 }
-
