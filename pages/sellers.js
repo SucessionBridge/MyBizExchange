@@ -17,7 +17,7 @@ export default function SellerOnboarding() {
     financingType: "seller-financing",
     images: [],
     businessDescription: "",
-    aiGeneratedDescription: "", // NEW
+    aiGeneratedDescription: "",
   });
 
   const [imagePreviews, setImagePreviews] = useState([]);
@@ -132,12 +132,10 @@ export default function SellerOnboarding() {
         includes_building: includesBuilding,
         financing_type: financingType,
         images: uploadedUrls,
-        business_description: businessDescription, // selected version
+        business_description: businessDescription,
         original_description: formData.businessDescription,
         ai_description: formData.aiGeneratedDescription,
       };
-
-      console.log("📦 Submitting to Supabase:", payload);
 
       const { error } = await supabase.from('sellers').insert([payload]);
 
@@ -179,11 +177,67 @@ export default function SellerOnboarding() {
         {uploadStatus && <div className="text-center text-blue-600 font-semibold mb-4">{uploadStatus}</div>}
 
         {!showPreview ? (
-          <form onSubmit={(e) => { e.preventDefault(); setShowPreview(true); }} className="space-y-6">
-            {/* Your existing input fields go here */}
-            {/* ... */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const requiredFields = ['name', 'email', 'businessName', 'industry', 'location', 'annualRevenue', 'annualProfit', 'askingPrice'];
+              const missing = requiredFields.filter((f) => !formData[f]);
+              if (missing.length > 0) {
+                alert("Please fill out: " + missing.join(', '));
+                return;
+              }
+              setShowPreview(true);
+            }}
+            className="space-y-4"
+          >
+            <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="email" placeholder="Email" type="email" value={formData.email} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="location" placeholder="Location" value={formData.location} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="annualRevenue" placeholder="Annual Revenue" value={formData.annualRevenue} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="annualProfit" placeholder="Annual Profit" value={formData.annualProfit} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full p-2 border rounded" />
 
-            <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">Preview Listing</button>
+            <input name="includesInventory" placeholder="Includes Inventory?" value={formData.includesInventory} onChange={handleChange} className="w-full p-2 border rounded" />
+            <input name="includesBuilding" placeholder="Includes Building?" value={formData.includesBuilding} onChange={handleChange} className="w-full p-2 border rounded" />
+            <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full p-2 border rounded">
+              <option value="seller-financing">Seller Financing</option>
+              <option value="rent-to-own">Rent to Own</option>
+              <option value="cash">Cash</option>
+            </select>
+
+            <textarea
+              name="businessDescription"
+              placeholder="Write a short description..."
+              value={formData.businessDescription}
+              onChange={handleChange}
+              className="w-full p-2 border rounded"
+              rows={5}
+            />
+
+            <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full" />
+
+            {imagePreviews.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {imagePreviews.map((src, idx) => (
+                  <div key={idx} className="relative">
+                    <img src={src} className="rounded w-full h-32 object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(idx)}
+                      className="absolute top-1 right-1 bg-white text-red-600 px-2 py-1 rounded"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">
+              Preview Listing
+            </button>
           </form>
         ) : (
           <SellerListingPreview
@@ -197,3 +251,4 @@ export default function SellerOnboarding() {
     </main>
   );
 }
+
