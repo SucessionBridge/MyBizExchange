@@ -12,9 +12,9 @@ export default function SellerOnboarding() {
     annualRevenue: "",
     annualProfit: "",
     askingPrice: "",
-    includesInventory: "",
-    includesBuilding: "",
-    financingType: "buyer-financed",
+    includesInventory: "No",
+    includesBuilding: "No",
+    financingType: "cash",
     images: [],
     businessDescription: "",
     aiGeneratedDescription: "",
@@ -111,7 +111,6 @@ export default function SellerOnboarding() {
   const handleFinalSubmit = async (finalFormData) => {
     try {
       const uploadedUrls = await uploadImages(finalFormData.images);
-
       const {
         name, email, businessName, industry, location,
         annualRevenue, annualProfit, askingPrice,
@@ -153,9 +152,9 @@ export default function SellerOnboarding() {
           annualRevenue: "",
           annualProfit: "",
           askingPrice: "",
-          includesInventory: "",
-          includesBuilding: "",
-          financingType: "buyer-financed",
+          includesInventory: "No",
+          includesBuilding: "No",
+          financingType: "cash",
           images: [],
           businessDescription: "",
           aiGeneratedDescription: "",
@@ -170,6 +169,33 @@ export default function SellerOnboarding() {
     }
   };
 
+  const handlePreview = async (e) => {
+    e.preventDefault();
+    const requiredFields = ['name', 'email', 'businessName', 'industry', 'location', 'annualRevenue', 'annualProfit', 'askingPrice'];
+    const missing = requiredFields.filter((f) => !formData[f]);
+    if (missing.length > 0) {
+      alert("Please fill out: " + missing.join(', '));
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      });
+      const data = await response.json();
+      setFormData((prev) => ({
+        ...prev,
+        aiGeneratedDescription: data.description || "",
+      }));
+    } catch (err) {
+      console.error("❌ Error generating AI description", err);
+    }
+
+    setShowPreview(true);
+  };
+
   return (
     <main className="min-h-screen bg-white p-8">
       <div className="max-w-2xl mx-auto">
@@ -177,19 +203,7 @@ export default function SellerOnboarding() {
         {uploadStatus && <div className="text-center text-blue-600 font-semibold mb-4">{uploadStatus}</div>}
 
         {!showPreview ? (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const requiredFields = ['name', 'email', 'businessName', 'industry', 'location', 'annualRevenue', 'annualProfit', 'askingPrice'];
-              const missing = requiredFields.filter((f) => !formData[f]);
-              if (missing.length > 0) {
-                alert("Please fill out: " + missing.join(', '));
-                return;
-              }
-              setShowPreview(true);
-            }}
-            className="space-y-4"
-          >
+          <form onSubmit={handlePreview} className="space-y-4">
             <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full p-2 border rounded" />
             <input name="email" placeholder="Email" type="email" value={formData.email} onChange={handleChange} className="w-full p-2 border rounded" />
             <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full p-2 border rounded" />
@@ -200,26 +214,22 @@ export default function SellerOnboarding() {
             <input name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full p-2 border rounded" />
 
             <select name="includesInventory" value={formData.includesInventory} onChange={handleChange} className="w-full p-2 border rounded">
-              <option value="">Includes Inventory?</option>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
+              <option value="Yes">Includes Inventory? Yes</option>
+              <option value="No">Includes Inventory? No</option>
             </select>
-
             <select name="includesBuilding" value={formData.includesBuilding} onChange={handleChange} className="w-full p-2 border rounded">
-              <option value="">Includes Building?</option>
-              <option value="yes">Yes</option>
-              <option value="no">No</option>
+              <option value="Yes">Includes Building? Yes</option>
+              <option value="No">Includes Building? No</option>
             </select>
-
             <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full p-2 border rounded">
-              <option value="buyer-financed">Buyer Financed</option>
+              <option value="cash">Buyer Financed (Cash)</option>
               <option value="seller-financing">Seller Financing</option>
               <option value="rent-to-own">Rent to Own</option>
             </select>
 
             <textarea
               name="businessDescription"
-              placeholder="Write a short description (e.g., A wine store located on Main Street, operating for over 30 years, employing 2 staff, serving the local community.)"
+              placeholder="Write a short description of your business. E.g., 'This wine store has been operating for over 30 years on Main Street, employs 2 people, and serves the local town community.'"
               value={formData.businessDescription}
               onChange={handleChange}
               className="w-full p-2 border rounded"
@@ -261,3 +271,4 @@ export default function SellerOnboarding() {
     </main>
   );
 }
+
