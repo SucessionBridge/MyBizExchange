@@ -41,6 +41,8 @@ Write a professional, buyer-friendly listing paragraph (max 150 words) for a bus
 The tone should be clear, professional, and persuasive. Avoid bullet points. Write as one clean paragraph buyers would see in a business-for-sale marketplace.
 `;
 
+  console.log("📨 Prompt being sent to OpenAI:", prompt);
+
   try {
     const completion = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -58,13 +60,16 @@ The tone should be clear, professional, and persuasive. Avoid bullet points. Wri
     const json = await completion.json();
 
     if (!json.choices || !json.choices[0]?.message?.content) {
+      console.error("❌ OpenAI returned invalid response:", json);
       throw new Error('Invalid OpenAI response');
     }
 
     const description = json.choices[0].message.content.trim();
     res.status(200).json({ description });
   } catch (error) {
-    console.error('OpenAI error:', error.message);
-    res.status(500).json({ error: 'Failed to generate description' });
+    console.error('❌ OpenAI error:', error.message);
+    console.error('❗ Full error object:', error);
+    res.status(500).json({ error: 'Failed to generate description', detail: error.message });
   }
 }
+
