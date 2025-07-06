@@ -1,4 +1,3 @@
-// pages/seller-wizard.js
 import React, { useState } from "react";
 
 export default function SellerWizard() {
@@ -16,6 +15,10 @@ export default function SellerWizard() {
     keyAssets: "",
     profitDriver: ""
   });
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [generatedDescription, setGeneratedDescription] = useState("");
+  const [error, setError] = useState("");
 
   const handleChange = (field, value) => {
     setAnswers((prev) => ({ ...prev, [field]: value }));
@@ -85,6 +88,36 @@ export default function SellerWizard() {
   const isFinalStep = step > questions.length;
   const current = questions[step - 1];
 
+  const generateDescription = async () => {
+    setIsLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/generate-description", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          industry: answers.businessType,
+          customers: answers.customerType,
+          whatItDoes: answers.profitDriver,
+          whySelling: answers.reasonForSelling,
+          uniqueEdge: answers.growthOpportunities
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "API Error");
+
+      setGeneratedDescription(data.description);
+    } catch (err) {
+      setError(err.message || "Something went wrong.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto p-8">
       <h1 className="text-3xl font-bold mb-6">Seller Wizard</h1>
@@ -125,18 +158,29 @@ export default function SellerWizard() {
               <li key={key}><strong>{key}:</strong> {value}</li>
             ))}
           </ul>
+
           <div className="mt-6">
             <button
-              onClick={() => alert("AI listing generation will happen here")}
+              onClick={generateDescription}
+              disabled={isLoading}
               className="bg-green-600 text-white px-6 py-2 rounded"
             >
-              Generate Listing with AI
+              {isLoading ? "Generating..." : "Generate Listing with AI"}
             </button>
           </div>
+
+          {error && (
+            <p className="text-red-600 mt-4">{error}</p>
+          )}
+
+          {generatedDescription && (
+            <div className="mt-6 bg-gray-50 p-4 rounded">
+              <h3 className="font-semibold mb-2">AI-Generated Description</h3>
+              <p>{generatedDescription}</p>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
-
-
