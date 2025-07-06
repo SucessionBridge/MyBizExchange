@@ -37,7 +37,9 @@ export default function SellerListingPreview({
   const handleSubmit = () => {
     const submissionData = {
       ...formData,
-      businessDescription: selectedDescription
+      businessDescription: selectedDescription,
+      original_description: businessDescription,
+      ai_description: aiGeneratedDescription || ""
     };
     onSubmit(submissionData);
   };
