@@ -5,49 +5,53 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
-  console.log("🔐 OpenAI key exists:", !!process.env.OPENAI_API_KEY);
-  console.log("📥 Incoming request body:", req.body);
-
   const {
-    industry,
+    sentenceSummary,
     customers,
-    whatItDoes,
-    whySelling,
-    uniqueEdge,
-    yearsInBusiness,
-    employeeCount,
-    website,
+    bestSellers,
+    customerLove,
+    repeatCustomers,
+    keepsThemComing,
+    ownerInvolvement,
+    opportunity,
+    proudOf,
+    adviceToBuyer,
+    businessName,
+    industry,
+    location,
     annualRevenue,
     annualProfit,
-    includesEquipment,
-    includesProperty,
+    includesInventory,
+    includesBuilding
   } = req.body;
 
-  // Validate required fields
-  if (!industry || !customers || !whatItDoes || !whySelling || !uniqueEdge) {
-    console.error("⚠️ Missing required fields.");
-    return res.status(400).json({ error: 'Missing required fields' });
+  if (!sentenceSummary || !customers || !opportunity || !industry) {
+    return res.status(400).json({ error: 'Missing required fields for AI generation.' });
   }
 
   const prompt = `
-Write a professional, buyer-friendly listing paragraph (max 150 words) for a business in the ${industry} sector.
+Write a professional, buyer-friendly business-for-sale listing paragraph (max 150 words) using the following info:
 
+• Business Name: ${businessName || "N/A"}
+• Location: ${location || "N/A"}
+• Industry: ${industry}
+• Summary: ${sentenceSummary}
 • Customers: ${customers}
-• Years in Business: ${yearsInBusiness || "N/A"}
-• Employees: ${employeeCount || "N/A"}
+• Best Sellers: ${bestSellers || "N/A"}
+• What customers love: ${customerLove || "N/A"}
+• Repeat Customer Info: ${repeatCustomers || "N/A"}
+• Why they return: ${keepsThemComing || "N/A"}
+• Owner involvement: ${ownerInvolvement || "N/A"}
+• What makes it a good opportunity: ${opportunity}
+• Something the owner is proud of: ${proudOf || "N/A"}
+• Advice for the next owner: ${adviceToBuyer || "N/A"}
 • Annual Revenue: $${annualRevenue || "N/A"}
 • Annual Profit: $${annualProfit || "N/A"}
-• What it does: ${whatItDoes}
-• Unique edge: ${uniqueEdge}
-• Includes Equipment: ${includesEquipment}
-• Includes Property: ${includesProperty}
-• Website: ${website || "N/A"}
-• Reason for selling: ${whySelling}
+• Includes Inventory: ${includesInventory}
+• Includes Building: ${includesBuilding}
 
-The tone should be clear, professional, and persuasive. Avoid bullet points. Write as one clean paragraph buyers would see in a business-for-sale marketplace.
-  `;
-
-  console.log("🧠 Prompt sent to OpenAI:", prompt);
+Tone: Clear, confident, persuasive. Format: One concise paragraph. Avoid bullet points or repetition.
+`;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -66,19 +70,18 @@ The tone should be clear, professional, and persuasive. Avoid bullet points. Wri
     const data = await response.json();
 
     if (!response.ok) {
-      console.error("🛑 OpenAI API error response:", data);
-      return res.status(500).json({ error: 'OpenAI API error', detail: data });
+      console.error("❌ OpenAI API Error:", data);
+      return res.status(500).json({ error: 'OpenAI error', detail: data });
     }
 
     const description = data.choices?.[0]?.message?.content?.trim();
     if (!description) {
-      console.error("🚫 No description returned:", data);
-      return res.status(500).json({ error: 'No description generated', detail: data });
+      return res.status(500).json({ error: 'No description returned by AI.' });
     }
 
     res.status(200).json({ description });
   } catch (error) {
-    console.error('❌ OpenAI fetch error:', error);
-    res.status(500).json({ error: 'Failed to generate description', detail: error.message });
+    console.error("❌ Error reaching OpenAI:", error);
+    res.status(500).json({ error: 'AI generation failed', detail: error.message });
   }
 }
