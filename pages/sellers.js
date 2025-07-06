@@ -17,7 +17,7 @@ export default function SellerOnboarding() {
     financingType: "seller-financing",
     images: [],
     businessDescription: "",
-    aiGeneratedDescription: "", // New field for AI version
+    aiGeneratedDescription: "", // NEW
   });
 
   const [imagePreviews, setImagePreviews] = useState([]);
@@ -108,15 +108,16 @@ export default function SellerOnboarding() {
     return uploadedUrls;
   };
 
-  const handleFinalSubmit = async () => {
+  const handleFinalSubmit = async (finalFormData) => {
     try {
-      const uploadedUrls = await uploadImages(formData.images);
+      const uploadedUrls = await uploadImages(finalFormData.images);
+
       const {
         name, email, businessName, industry, location,
         annualRevenue, annualProfit, askingPrice,
         includesInventory, includesBuilding, financingType,
-        businessDescription
-      } = formData;
+        businessDescription, aiGeneratedDescription
+      } = finalFormData;
 
       const payload = {
         name,
@@ -131,7 +132,9 @@ export default function SellerOnboarding() {
         includes_building: includesBuilding,
         financing_type: financingType,
         images: uploadedUrls,
-        business_description: businessDescription,
+        business_description: businessDescription, // selected version
+        original_description: formData.businessDescription,
+        ai_description: formData.aiGeneratedDescription,
       };
 
       console.log("📦 Submitting to Supabase:", payload);
@@ -177,7 +180,7 @@ export default function SellerOnboarding() {
 
         {!showPreview ? (
           <form onSubmit={(e) => { e.preventDefault(); setShowPreview(true); }} className="space-y-6">
-            {/* All input fields and upload UI stay the same */}
+            {/* Your existing input fields go here */}
             {/* ... */}
 
             <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">Preview Listing</button>
@@ -188,12 +191,9 @@ export default function SellerOnboarding() {
             imagePreviews={imagePreviews}
             onBack={() => setShowPreview(false)}
             onSubmit={handleFinalSubmit}
-            onUpdateDescription={(desc) => setFormData((prev) => ({ ...prev, businessDescription: desc }))}
-            onUpdateAI={(aiDesc) => setFormData((prev) => ({ ...prev, aiGeneratedDescription: aiDesc }))}
           />
         )}
       </div>
     </main>
   );
 }
-
