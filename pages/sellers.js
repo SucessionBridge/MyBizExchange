@@ -24,7 +24,6 @@ export default function SellerOnboarding() {
   });
 
   const [imagePreviews, setImagePreviews] = useState([]);
-  const [errorMessage, setErrorMessage] = useState("");
   const [uploadStatus, setUploadStatus] = useState("");
   const [showForm, setShowForm] = useState(true);
   const [showAI, setShowAI] = useState(false);
@@ -186,7 +185,16 @@ export default function SellerOnboarding() {
               <textarea name="businessDescription" value={formData.businessDescription} onChange={handleChange} placeholder="Describe your business..." className="w-full border p-2 rounded" rows={4} />
             )}
 
-            <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full" />
+            {/* Updated Photo Upload Section */}
+            <div className="space-y-1">
+              <label className="block font-medium text-gray-700">
+                Upload Photos of Your Business
+              </label>
+              <p className="text-sm text-gray-500 mb-1">
+                Add clear photos of your storefront, equipment, team, or anything that helps buyers visualize the opportunity. (Up to 8 images, max 5MB each)
+              </p>
+              <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full border p-2 rounded" />
+            </div>
 
             {imagePreviews.length > 0 && (
               <div className="grid grid-cols-2 gap-2 mt-2">
@@ -232,3 +240,5 @@ export default function SellerOnboarding() {
     </main>
   );
 }
+
+
