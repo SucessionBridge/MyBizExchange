@@ -37,6 +37,16 @@ export default function SellerListingPreview({ formData, imagePreviews, onBack, 
         <p className="text-gray-700 mt-2 whitespace-pre-line">{businessDescription}</p>
       </div>
 
+      {/* New AI Enhancement Link */}
+      <div className="mt-4 text-center">
+        <a
+          href="/seller-wizard"
+          className="inline-block text-sm bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+        >
+          ✨ Enhance this listing with AI
+        </a>
+      </div>
+
       <div className="mt-6">
         <h2 className="font-semibold mb-2">Uploaded Photos</h2>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -68,3 +78,4 @@ export default function SellerListingPreview({ formData, imagePreviews, onBack, 
     </div>
   );
 }
+
