@@ -1,3 +1,24 @@
+// pages/sellers.js
+import { supabase } from '../lib/supabaseClient';
+import React, { useState } from "react";
+import SellerListingPreview from '../components/SellerListingPreview';
+
+export default function SellerOnboarding() {
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    businessName: "",
+    industry: "",
+    location: "",
+    annualRevenue: "",
+    annualProfit: "",
+    askingPrice: "",
+    includesInventory: "",
+    includesBuilding: "",
+    financingType: "seller-financing",
+    images: [],
+    businessDescription: "",
+  });
 
   const [imagePreviews, setImagePreviews] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
@@ -146,10 +167,9 @@
 
         {!showPreview ? (
           <form onSubmit={(e) => { e.preventDefault(); setShowPreview(true); }} className="space-y-6">
-            {/* all your existing inputs here, unchanged */}
-            {/* ... keep your full form exactly as you had it */}
+            {/* Place your existing inputs here. No changes needed to the form content itself. */}
+            {/* You can copy your form inputs from the previous version here */}
 
-            {/* Only show a preview button now */}
             <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold">Preview Listing</button>
           </form>
         ) : (
@@ -164,3 +184,5 @@
     </main>
   );
 }
+
+  
