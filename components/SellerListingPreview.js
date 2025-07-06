@@ -63,6 +63,7 @@ export default function SellerListingPreview({
       <div className="mt-6">
         <h2 className="font-semibold mb-2">Business Description</h2>
 
+        {/* Original Description */}
         <div className={`border rounded-xl p-4 mb-4 ${selectedVersion === 'original' ? 'border-blue-500 bg-blue-50' : 'bg-gray-50'}`}>
           <p className="text-gray-700 whitespace-pre-line">{businessDescription}</p>
           <button
@@ -73,9 +74,12 @@ export default function SellerListingPreview({
           </button>
         </div>
 
-        {aiGeneratedDescription && (
+        {/* AI Description */}
+        {typeof aiGeneratedDescription === 'string' && (
           <div className={`border rounded-xl p-4 ${selectedVersion === 'ai' ? 'border-blue-500 bg-blue-50' : 'bg-green-50'}`}>
-            <p className="text-gray-800 whitespace-pre-line italic">{aiGeneratedDescription}</p>
+            <p className="text-gray-800 whitespace-pre-line italic">
+              {aiGeneratedDescription || 'No AI description was generated.'}
+            </p>
             <button
               onClick={() => handleSelectDescription(aiGeneratedDescription, 'ai')}
               className="mt-2 text-sm text-blue-600 underline"
@@ -92,16 +96,20 @@ export default function SellerListingPreview({
 
       <div className="mt-6">
         <h2 className="font-semibold mb-2">Uploaded Photos</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-          {imagePreviews.map((url, i) => (
-            <img
-              key={i}
-              src={url}
-              alt={`Image ${i + 1}`}
-              className="rounded-md border h-40 w-full object-cover"
-            />
-          ))}
-        </div>
+        {imagePreviews.length > 0 ? (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {imagePreviews.map((url, i) => (
+              <img
+                key={i}
+                src={url}
+                alt={`Image ${i + 1}`}
+                className="rounded-md border h-40 w-full object-cover"
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-500 italic">No images uploaded.</p>
+        )}
       </div>
 
       <div className="flex justify-between mt-8">
@@ -121,3 +129,4 @@ export default function SellerListingPreview({
     </div>
   );
 }
+
