@@ -24,6 +24,7 @@ export default function SellerOnboarding() {
   });
 
   const [imagePreviews, setImagePreviews] = useState([]);
+  const [errorMessage, setErrorMessage] = useState("");
   const [uploadStatus, setUploadStatus] = useState("");
   const [showForm, setShowForm] = useState(true);
   const [showAI, setShowAI] = useState(false);
@@ -176,25 +177,47 @@ export default function SellerOnboarding() {
               <option value="rent-to-own">Rent to Own</option>
             </select>
 
-            <label className="block font-medium">Business Description</label>
-            <div className="flex gap-4">
-              <button type="button" onClick={() => setDescriptionMode("ai")} className={`px-4 py-2 rounded ${descriptionMode === "ai" ? "bg-blue-600 text-white" : "bg-gray-200"}`}>Use AI</button>
-              <button type="button" onClick={() => setDescriptionMode("manual")} className={`px-4 py-2 rounded ${descriptionMode === "manual" ? "bg-blue-600 text-white" : "bg-gray-200"}`}>Write My Own</button>
-            </div>
-            {descriptionMode === 'manual' && (
-              <textarea name="businessDescription" value={formData.businessDescription} onChange={handleChange} placeholder="Describe your business..." className="w-full border p-2 rounded" rows={4} />
-            )}
-
-            {/* Updated Photo Upload Section */}
-            <div className="space-y-1">
-              <label className="block font-medium text-gray-700">
-                Upload Photos of Your Business
+            {/* 👇 Updated AI/manual description section */}
+            <div>
+              <label className="block font-medium text-gray-700 mb-1">
+                How would you like to describe your business to buyers?
               </label>
-              <p className="text-sm text-gray-500 mb-1">
-                Add clear photos of your storefront, equipment, team, or anything that helps buyers visualize the opportunity. (Up to 8 images, max 5MB each)
+              <p className="text-sm text-gray-500 mb-3">
+                You can write your own description, or let our AI ask a few quick questions and generate a paragraph for you.
               </p>
-              <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full border p-2 rounded" />
+              <div className="flex gap-4 mb-2">
+                <button
+                  type="button"
+                  onClick={() => setDescriptionMode("ai")}
+                  className={`px-4 py-2 rounded ${
+                    descriptionMode === "ai" ? "bg-blue-600 text-white" : "bg-gray-200"
+                  }`}
+                >
+                  Use AI Assistant
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDescriptionMode("manual")}
+                  className={`px-4 py-2 rounded ${
+                    descriptionMode === "manual" ? "bg-blue-600 text-white" : "bg-gray-200"
+                  }`}
+                >
+                  Write My Own
+                </button>
+              </div>
+              {descriptionMode === 'manual' && (
+                <textarea
+                  name="businessDescription"
+                  value={formData.businessDescription}
+                  onChange={handleChange}
+                  placeholder="Describe your business..."
+                  className="w-full border p-2 rounded"
+                  rows={4}
+                />
+              )}
             </div>
+
+            <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full" />
 
             {imagePreviews.length > 0 && (
               <div className="grid grid-cols-2 gap-2 mt-2">
@@ -240,5 +263,4 @@ export default function SellerOnboarding() {
     </main>
   );
 }
-
 
