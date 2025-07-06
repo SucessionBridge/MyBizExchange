@@ -1,24 +1,3 @@
-// pages/sellers.js
-import { supabase } from '../lib/supabaseClient';
-import React, { useState } from "react";
-import SellerListingPreview from '@/components/SellerListingPreview';
-
-export default function SellerOnboarding() {
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    businessName: "",
-    industry: "",
-    location: "",
-    annualRevenue: "",
-    annualProfit: "",
-    askingPrice: "",
-    includesInventory: "",
-    includesBuilding: "",
-    financingType: "seller-financing",
-    images: [],
-    businessDescription: "",
-  });
 
   const [imagePreviews, setImagePreviews] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
