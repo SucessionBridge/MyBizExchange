@@ -1,6 +1,10 @@
 import React, { useState } from "react";
 
-export default function AIDescriptionWizard({ onComplete, uploadedImages = [] }) {
+export default function AIDescriptionWizard({
+  onComplete,
+  uploadedImages = [],
+  sellerInfo = {}
+}) {
   const questions = [
     { key: "sentenceSummary", question: "How would you describe your business in one sentence to a stranger?", placeholder: "It’s a cozy wine shop that’s been part of our main street for over 30 years." },
     { key: "customers", question: "What kind of customers do you typically serve?", placeholder: "Mostly locals, plus some tourists in the summer." },
@@ -27,7 +31,7 @@ export default function AIDescriptionWizard({ onComplete, uploadedImages = [] })
     if (step < questions.length - 1) {
       setStep(step + 1);
     } else {
-      // Final step: Call API
+      // Final step: Call API with full payload
       setLoading(true);
       setError("");
 
@@ -35,7 +39,7 @@ export default function AIDescriptionWizard({ onComplete, uploadedImages = [] })
         const response = await fetch("/api/generate-description", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...answers })
+          body: JSON.stringify({ ...answers, ...sellerInfo })
         });
 
         const data = await response.json();
@@ -44,7 +48,7 @@ export default function AIDescriptionWizard({ onComplete, uploadedImages = [] })
           throw new Error(data.error || "Failed to generate description");
         }
 
-        onComplete(data.description); // ✅ Pass string, not object
+        onComplete(data.description);
       } catch (err) {
         console.error("AI generation error:", err);
         setError("There was a problem generating the description. Please try again.");
@@ -110,5 +114,4 @@ export default function AIDescriptionWizard({ onComplete, uploadedImages = [] })
     </div>
   );
 }
-
 
