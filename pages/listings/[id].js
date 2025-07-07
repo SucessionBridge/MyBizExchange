@@ -78,16 +78,26 @@ export default function ListingDetail() {
   if (!id || loading) return <div className="p-6">Loading...</div>;
   if (!listing) return <div className="p-6">Listing not found.</div>;
 
-  const description =
-    listing.ai_description ||
-    listing.original_description ||
-    listing.business_description ||
-    'No description available.';
-
   return (
     <main className="p-6 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold mb-2">{listing.business_name}</h1>
-      <p className="text-gray-700 mb-4 whitespace-pre-wrap">{description}</p>
+      <p className="text-gray-700 text-sm mb-1 italic">{listing.industry} – {listing.location}</p>
+      <p className="text-lg text-green-700 font-semibold mb-4">
+        Asking Price: ${listing.asking_price?.toLocaleString()}
+      </p>
+
+      {listing.images?.length > 0 && (
+        <div className="grid grid-cols-2 gap-2 mb-6">
+          {listing.images.map((url, idx) => (
+            <img key={idx} src={url} alt={`Business Image ${idx + 1}`} className="w-full h-40 object-cover rounded" />
+          ))}
+        </div>
+      )}
+
+      <h2 className="text-xl font-semibold mb-2">Business Description</h2>
+      <p className="text-gray-800 mb-6">
+        {listing.ai_description || listing.business_description || 'No description available.'}
+      </p>
 
       {buyer ? (
         <div className="mt-6 border-t pt-6">
