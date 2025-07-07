@@ -1,34 +1,45 @@
-""// pages/seller-dashboard.js
-import { useState } from 'react';
+// pages/seller-dashboard.js
+import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabaseClient';
 
 export default function SellerDashboard() {
-  const [email, setEmail] = useState('');
   const [listings, setListings] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [sellerEmail, setSellerEmail] = useState('');
   const [error, setError] = useState('');
 
-  const handleFetchListings = async () => {
-    setLoading(true);
-    setError('');
-    setListings([]);
+  useEffect(() => {
+    const fetchListings = async () => {
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
 
-    const { data, error } = await supabase
-      .from('sellers')
-      .select('*')
-      .eq('email', email.trim());
+      if (authError || !user) {
+        setError("You must be logged in to view your listings.");
+        setLoading(false);
+        return;
+      }
 
-    if (error) {
-      console.error('Error fetching listings:', error.message);
-      setError('There was a problem retrieving your listings.');
-    } else if (data.length === 0) {
-      setError('No listings found for that email.');
-    } else {
-      setListings(data);
-    }
+      setSellerEmail(user.email);
 
-    setLoading(false);
-  };
+      const { data, error } = await supabase
+        .from('sellers')
+        .select('*')
+        .eq('email', user.email);
+
+      if (error) {
+        console.error('Error loading listings:', error);
+        setError("There was an issue loading your listings.");
+      } else {
+        setListings(data);
+      }
+
+      setLoading(false);
+    };
+
+    fetchListings();
+  }, []);
 
   const handleDelete = async (id) => {
     const confirm = window.confirm("Are you sure you want to delete this listing?");
@@ -40,43 +51,27 @@ export default function SellerDashboard() {
       .eq('id', id);
 
     if (error) {
-      alert('Error deleting listing');
+      alert('Error deleting listing.');
     } else {
-      setListings((prev) => prev.filter(listing => listing.id !== id));
-      alert('Listing deleted.');
+      setListings((prev) => prev.filter((l) => l.id !== id));
     }
   };
 
-  const formatCurrency = (value) => {
-    return value ? `$${parseFloat(value).toLocaleString()}` : 'N/A';
-  };
+  const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : 'N/A';
 
   const getPublicListingUrl = (id) => `${window.location.origin}/listings/${id}`;
 
+  if (loading) return <div className="p-6">Loading your listings...</div>;
+  if (error) return <div className="p-6 text-red-600">{error}</div>;
+
   return (
-    <main className="min-h-screen bg-gray-100 p-8">
+    <main className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Seller Dashboard</h1>
 
-        <div className="bg-white p-6 rounded-xl shadow mb-6">
-          <input
-            type="email"
-            placeholder="Enter your email to view listings"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full border border-gray-300 p-3 rounded-xl mb-4"
-          />
-          <button
-            onClick={handleFetchListings}
-            className="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 text-lg font-semibold"
-            disabled={loading || !email}
-          >
-            {loading ? 'Loading...' : 'View My Listings'}
-          </button>
-          {error && <p className="text-red-600 mt-4 text-center">{error}</p>}
-        </div>
-
-        {listings.length > 0 && (
+        {listings.length === 0 ? (
+          <p className="text-center text-gray-600">You have no listings yet.</p>
+        ) : (
           <div className="space-y-6">
             {listings.map((listing) => (
               <div key={listing.id} className="bg-white p-6 rounded-xl shadow relative">
@@ -137,3 +132,4 @@ export default function SellerDashboard() {
     </main>
   );
 }
+
