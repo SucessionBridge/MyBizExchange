@@ -177,7 +177,6 @@ export default function SellerOnboarding() {
               <option value="rent-to-own">Rent to Own</option>
             </select>
 
-            {/* 👇 Updated AI/manual description section */}
             <div>
               <label className="block font-medium text-gray-700 mb-1">
                 How would you like to describe your business to buyers?
@@ -189,18 +188,14 @@ export default function SellerOnboarding() {
                 <button
                   type="button"
                   onClick={() => setDescriptionMode("ai")}
-                  className={`px-4 py-2 rounded ${
-                    descriptionMode === "ai" ? "bg-blue-600 text-white" : "bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded ${descriptionMode === "ai" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
                 >
                   Use AI Assistant
                 </button>
                 <button
                   type="button"
                   onClick={() => setDescriptionMode("manual")}
-                  className={`px-4 py-2 rounded ${
-                    descriptionMode === "manual" ? "bg-blue-600 text-white" : "bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded ${descriptionMode === "manual" ? "bg-blue-600 text-white" : "bg-gray-200"}`}
                 >
                   Write My Own
                 </button>
@@ -217,7 +212,16 @@ export default function SellerOnboarding() {
               )}
             </div>
 
-            <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full" />
+            {/* 👇 Updated upload section */}
+            <div>
+              <label className="block font-medium text-gray-700 mb-1">
+                Upload Photos of Your Business
+              </label>
+              <p className="text-sm text-gray-500 mb-2">
+                Choose up to 8 images that show off your business, products, workspace, or storefront. Max size: 5MB each.
+              </p>
+              <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full" />
+            </div>
 
             {imagePreviews.length > 0 && (
               <div className="grid grid-cols-2 gap-2 mt-2">
@@ -263,4 +267,3 @@ export default function SellerOnboarding() {
     </main>
   );
 }
-
