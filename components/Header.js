@@ -37,6 +37,9 @@ export default function Header() {
           <Link href="/listings">
             <a className="hover:text-blue-600">Marketplace</a>
           </Link>
+          <Link href="/login">
+            <a className="hover:text-blue-600">Login</a>
+          </Link>
         </nav>
 
         {/* Mobile Hamburger Button */}
@@ -65,6 +68,9 @@ export default function Header() {
             </Link>
             <Link href="/listings">
               <a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Marketplace</a>
+            </Link>
+            <Link href="/login">
+              <a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Login</a>
             </Link>
           </nav>
         </div>
