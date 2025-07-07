@@ -177,12 +177,13 @@ export default function SellerOnboarding() {
               <option value="rent-to-own">Rent to Own</option>
             </select>
 
+            {/* 👇 Updated AI/manual description section */}
             <div>
               <label className="block font-medium text-gray-700 mb-1">
                 How would you like to describe your business to buyers?
               </label>
               <p className="text-sm text-gray-500 mb-3">
-                You can write your own description, or let our AI ask a few quick questions and generate a paragraph for you.
+                Choose whether you'd like to write your own business description, or use our AI Assistant to guide you with a few quick questions. You can continue after making your selection by clicking <strong>"Next Step"</strong> at the bottom.
               </p>
               <div className="flex gap-4 mb-2">
                 <button
@@ -212,13 +213,12 @@ export default function SellerOnboarding() {
               )}
             </div>
 
-            {/* 👇 Updated upload section */}
             <div>
-              <label className="block font-medium text-gray-700 mb-1">
-                Upload Photos of Your Business
+              <label className="block font-medium text-gray-700 mt-4 mb-1">
+                Upload photos of your business
               </label>
               <p className="text-sm text-gray-500 mb-2">
-                Choose up to 8 images that show off your business, products, workspace, or storefront. Max size: 5MB each.
+                Add up to 8 images that show your storefront, equipment, staff, products, or anything else buyers should see.
               </p>
               <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full" />
             </div>
