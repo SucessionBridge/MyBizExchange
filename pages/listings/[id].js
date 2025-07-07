@@ -1,3 +1,5 @@
+// pages/listings/[id].js
+
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
@@ -76,12 +78,16 @@ export default function ListingDetail() {
   if (!id || loading) return <div className="p-6">Loading...</div>;
   if (!listing) return <div className="p-6">Listing not found.</div>;
 
+  const description =
+    listing.ai_description ||
+    listing.original_description ||
+    listing.business_description ||
+    'No description available.';
+
   return (
     <main className="p-6 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold mb-2">{listing.business_name}</h1>
-      <p className="text-gray-700 mb-4">
-        {listing.description || 'No description available.'}
-      </p>
+      <p className="text-gray-700 mb-4 whitespace-pre-wrap">{description}</p>
 
       {buyer ? (
         <div className="mt-6 border-t pt-6">
