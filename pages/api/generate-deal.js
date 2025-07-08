@@ -1,11 +1,5 @@
 // pages/api/generate-deal.js
 
-import { OpenAI } from "openai";
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // Make sure this is set in your .env file
-});
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
@@ -39,16 +33,30 @@ Please write a clear and persuasive deal summary from the buyer’s point of vie
   `;
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: 400,
+    const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 400,
+      }),
     });
 
-    const aiSummary = completion.choices[0].message.content.trim();
+    const data = await openaiRes.json();
+
+    if (!openaiRes.ok) {
+      console.error("OpenAI API error:", data);
+      return res.status(500).json({ error: "AI generation failed." });
+    }
+
+    const aiSummary = data.choices[0].message.content.trim();
     return res.status(200).json({ summary: aiSummary });
   } catch (err) {
-    console.error("OpenAI error:", err);
-    return res.status(500).json({ error: "AI generation failed" });
+    console.error("Fetch error:", err);
+    return res.status(500).json({ error: "Something went wrong" });
   }
 }
