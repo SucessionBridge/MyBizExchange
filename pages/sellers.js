@@ -100,94 +100,81 @@ export default function SellerWizard() {
     }
   };
 
-  const StepOne = () => (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold">Financials</h2>
-      <input name="askingPrice" type="number" placeholder="Asking Price" className="input" onChange={handleChange} />
-      <input name="annualRevenue" type="number" placeholder="Annual Revenue" className="input" onChange={handleChange} />
-      <input name="sde" type="number" placeholder="Seller Discretionary Earnings (SDE)" className="input" onChange={handleChange} />
-      <input name="inventoryValue" type="number" placeholder="Inventory Value" className="input" onChange={handleChange} />
-      <label className="flex items-center"><input name="inventoryIncluded" type="checkbox" className="mr-2" onChange={handleChange} />Inventory Included?</label>
-      <input name="equipmentValue" type="number" placeholder="Equipment/FF&E Value" className="input" onChange={handleChange} />
-      <input name="rent" type="text" placeholder="Rent (monthly)" className="input" onChange={handleChange} />
-      <label className="flex items-center"><input name="realEstateIncluded" type="checkbox" className="mr-2" onChange={handleChange} />Real Estate Included?</label>
-    </div>
+  const Step = ({ title, children }) => (
+    <section className="space-y-4">
+      <h2 className="text-2xl font-semibold text-gray-800 border-b pb-2 mb-4">{title}</h2>
+      {children}
+    </section>
   );
 
-  const StepTwo = () => (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold">Business Overview</h2>
-      <input name="yearEstablished" type="number" placeholder="Year Established" className="input" onChange={handleChange} />
-      <input name="employees" type="number" placeholder="Number of Employees" className="input" onChange={handleChange} />
-      <input name="location" type="text" placeholder="Location (City, State)" className="input" onChange={handleChange} />
-      <label className="flex items-center"><input name="homeBased" type="checkbox" className="mr-2" onChange={handleChange} />Home-Based?</label>
-      <label className="flex items-center"><input name="relocatable" type="checkbox" className="mr-2" onChange={handleChange} />Relocatable?</label>
-      <input name="website" type="url" placeholder="Website (optional)" className="input" onChange={handleChange} />
-    </div>
-  );
+  const steps = [
+    <Step title="Financials">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input name="askingPrice" type="number" placeholder="Asking Price" className="input" onChange={handleChange} />
+        <input name="annualRevenue" type="number" placeholder="Annual Revenue" className="input" onChange={handleChange} />
+        <input name="sde" type="number" placeholder="Seller Discretionary Earnings (SDE)" className="input" onChange={handleChange} />
+        <input name="inventoryValue" type="number" placeholder="Inventory Value" className="input" onChange={handleChange} />
+        <input name="equipmentValue" type="number" placeholder="Equipment/FF&E Value" className="input" onChange={handleChange} />
+        <input name="rent" type="text" placeholder="Rent (monthly)" className="input" onChange={handleChange} />
+      </div>
+      <label className="block mt-4"><input name="inventoryIncluded" type="checkbox" className="mr-2" onChange={handleChange} /> Inventory Included?</label>
+      <label><input name="realEstateIncluded" type="checkbox" className="mr-2" onChange={handleChange} /> Real Estate Included?</label>
+    </Step>,
 
-  const StepThree = () => (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold">Operations</h2>
+    <Step title="Business Overview">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <input name="yearEstablished" type="number" placeholder="Year Established" className="input" onChange={handleChange} />
+        <input name="employees" type="number" placeholder="Number of Employees" className="input" onChange={handleChange} />
+        <input name="location" type="text" placeholder="Location (City, State)" className="input" onChange={handleChange} />
+        <input name="website" type="url" placeholder="Website (optional)" className="input" onChange={handleChange} />
+      </div>
+      <label className="block mt-4"><input name="homeBased" type="checkbox" className="mr-2" onChange={handleChange} /> Home-Based?</label>
+      <label><input name="relocatable" type="checkbox" className="mr-2" onChange={handleChange} /> Relocatable?</label>
+    </Step>,
+
+    <Step title="Operations">
       <textarea name="businessDescription" placeholder="What does your business do?" className="textarea" onChange={handleChange}></textarea>
       <input name="customerType" type="text" placeholder="Who are your customers?" className="input" onChange={handleChange} />
       <input name="marketingMethod" type="text" placeholder="How do you find customers?" className="input" onChange={handleChange} />
       <input name="ownerInvolvement" type="text" placeholder="Your role in the business" className="input" onChange={handleChange} />
       <input name="canRunWithoutOwner" type="text" placeholder="Can it run without you?" className="input" onChange={handleChange} />
-    </div>
-  );
+    </Step>,
 
-  const StepFour = () => (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold">Opportunity</h2>
+    <Step title="Opportunity">
       <textarea name="competitiveEdge" placeholder="Why do customers choose you?" className="textarea" onChange={handleChange}></textarea>
       <textarea name="competitors" placeholder="Who are your competitors?" className="textarea" onChange={handleChange}></textarea>
       <textarea name="growthPotential" placeholder="How could a new owner grow the business?" className="textarea" onChange={handleChange}></textarea>
       <textarea name="reasonForSelling" placeholder="Why are you selling?" className="textarea" onChange={handleChange}></textarea>
-    </div>
-  );
+    </Step>,
 
-  const StepFive = () => (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold">Support & Financing</h2>
+    <Step title="Support & Financing">
       <input name="trainingOffered" type="text" placeholder="How much training will you offer?" className="input" onChange={handleChange} />
-      <label className="flex items-center"><input name="creativeFinancing" type="checkbox" className="mr-2" onChange={handleChange} />Open to creative financing (e.g. rent-to-own)?</label>
-      <label className="flex items-center"><input name="willingToMentor" type="checkbox" className="mr-2" onChange={handleChange} />Willing to mentor or stay involved post-sale?</label>
-    </div>
-  );
+      <label className="block mt-4"><input name="creativeFinancing" type="checkbox" className="mr-2" onChange={handleChange} /> Open to creative financing (e.g. rent-to-own)?</label>
+      <label><input name="willingToMentor" type="checkbox" className="mr-2" onChange={handleChange} /> Willing to mentor or stay involved post-sale?</label>
+    </Step>,
 
-  const StepSix = () => (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold">Review & Generate Listing Description</h2>
-      <p className="text-sm text-gray-600">Click below to generate your professional listing summary based on your answers.</p>
+    <Step title="Review & Generate Listing Description">
+      <p className="text-sm text-gray-600 mb-2">Click below to generate your professional listing summary based on your answers.</p>
       <button onClick={generateDescription} className="btn btn-secondary">
         {loadingDescription ? 'Generating...' : 'Generate Description'}
       </button>
-
       {aiDescription && (
         <div className="mt-4 p-4 border rounded bg-gray-50">
           <h3 className="font-semibold mb-2">AI-Generated Description:</h3>
           <p>{aiDescription}</p>
         </div>
       )}
-
-      {error && <p className="text-red-600">{error}</p>}
-    </div>
-  );
+      {error && <p className="text-red-600 mt-2">{error}</p>}
+    </Step>,
+  ];
 
   return (
-    <div className="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow space-y-6">
-      {step === 1 && <StepOne />}
-      {step === 2 && <StepTwo />}
-      {step === 3 && <StepThree />}
-      {step === 4 && <StepFour />}
-      {step === 5 && <StepFive />}
-      {step === 6 && <StepSix />}
-
+    <div className="max-w-3xl mx-auto p-6 bg-white rounded-xl shadow space-y-6">
+      {steps[step - 1]}
       <div className="flex justify-between pt-4">
         {step > 1 && <button onClick={prevStep} className="btn">Back</button>}
-        {step < 6 && <button onClick={nextStep} className="btn">Next</button>}
-        {step === 6 && <button onClick={handleSubmit} className="btn btn-primary">Submit</button>}
+        {step < steps.length && <button onClick={nextStep} className="btn">Next</button>}
+        {step === steps.length && <button onClick={handleSubmit} className="btn btn-primary">Submit</button>}
       </div>
     </div>
   );
