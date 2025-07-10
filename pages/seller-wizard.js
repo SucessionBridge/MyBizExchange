@@ -1,122 +1,128 @@
 // pages/seller-wizard.js
-import React, { useState } from "react";
+import { useState } from 'react';
+import { useRouter } from 'next/router';
 
 export default function SellerWizard() {
+  const router = useRouter();
   const [step, setStep] = useState(1);
-  const [answers, setAnswers] = useState({
-    businessType: "",
-    customerType: "",
-    yearsInBusiness: "",
-    numEmployees: "",
-    hasWebsite: "",
-    websiteURL: "",
-    reasonForSelling: "",
-    growthOpportunities: "",
-    sellerInvolvement: "",
-    keyAssets: "",
-    profitDriver: ""
+  const [formData, setFormData] = useState({
+    askingPrice: '',
+    annualRevenue: '',
+    sde: '',
+    inventoryValue: '',
+    inventoryIncluded: false,
+    equipmentValue: '',
+    rent: '',
+    realEstateIncluded: false,
+    yearEstablished: '',
+    employees: '',
+    location: '',
+    homeBased: false,
+    relocatable: false,
+    website: '',
+    businessDescription: '',
+    customerType: '',
+    marketingMethod: '',
+    ownerInvolvement: '',
+    canRunWithoutOwner: '',
+    competitiveEdge: '',
+    competitors: '',
+    growthPotential: '',
+    reasonForSelling: '',
+    trainingOffered: '',
+    creativeFinancing: false,
+    willingToMentor: false,
   });
-  const [generatedDescription, setGeneratedDescription] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const handleChange = (field, value) => {
-    setAnswers((prev) => ({ ...prev, [field]: value }));
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
   };
 
-  const next = () => setStep((prev) => prev + 1);
-  const back = () => setStep((prev) => prev - 1);
+  const nextStep = () => setStep((prev) => prev + 1);
+  const prevStep = () => setStep((prev) => prev - 1);
 
-  const questions = [
-    { label: "What type of business do you operate?", field: "businessType", placeholder: "e.g. landscaping, bakery" },
-    { label: "Who are your main customers?", field: "customerType", placeholder: "e.g. homeowners, businesses" },
-    { label: "How many years have you been in business?", field: "yearsInBusiness", placeholder: "e.g. 12" },
-    { label: "How many employees do you have?", field: "numEmployees", placeholder: "e.g. 3 full-time, 2 part-time" },
-    { label: "Do you have a website?", field: "hasWebsite", placeholder: "Yes or No" },
-    { label: "If yes, what is the website URL?", field: "websiteURL", placeholder: "e.g. https://mybusiness.com" },
-    { label: "Why are you selling the business?", field: "reasonForSelling", placeholder: "e.g. retirement, relocation" },
-    { label: "What growth opportunities exist for a new owner?", field: "growthOpportunities", placeholder: "e.g. expand services, go online" },
-    { label: "What is your role in daily operations?", field: "sellerInvolvement", placeholder: "e.g. manage staff and accounting" },
-    { label: "List any key assets (equipment, vehicles, inventory):", field: "keyAssets", placeholder: "e.g. 2 trucks, POS system" },
-    { label: "What drives most of your business profit?", field: "profitDriver", placeholder: "e.g. recurring contracts, seasonal peaks" }
-  ];
-
-  const isFinalStep = step > questions.length;
-  const current = questions[step - 1];
-
-  const generateDescription = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/generate-description", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          industry: answers.businessType,
-          customers: answers.customerType,
-          whatItDoes: `This business has been operating for ${answers.yearsInBusiness} years with ${answers.numEmployees} employees. ${answers.sellerInvolvement}. Assets include: ${answers.keyAssets}. Main profit driver: ${answers.profitDriver}.`,
-          whySelling: answers.reasonForSelling,
-          uniqueEdge: answers.growthOpportunities
-        }),
-      });
-
-      const data = await res.json();
-      setGeneratedDescription(data.description || "AI failed to generate a description.");
-    } catch (err) {
-      console.error("AI Error:", err);
-      setGeneratedDescription("There was an error generating the description.");
-    } finally {
-      setLoading(false);
-    }
+  const handleSubmit = async () => {
+    const res = await fetch('/api/submit-seller-listing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
+    if (res.ok) router.push('/dashboard');
   };
 
-  return (
-    <div className="max-w-2xl mx-auto p-8">
-      <h1 className="text-3xl font-bold mb-6">Seller Wizard</h1>
-
-      {!isFinalStep ? (
-        <div>
-          <label className="block mb-2 font-semibold">{current.label}</label>
-          <input
-            className="border p-3 rounded w-full mb-6"
-            value={answers[current.field]}
-            onChange={(e) => handleChange(current.field, e.target.value)}
-            placeholder={current.placeholder}
-          />
-
-          <div className="flex justify-between">
-            {step > 1 ? (
-              <button onClick={back} className="bg-gray-300 px-4 py-2 rounded">Back</button>
-            ) : <span></span>}
-
-            <button onClick={next} className="bg-blue-600 text-white px-4 py-2 rounded">Next</button>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-white p-6 rounded shadow">
-          <h2 className="text-xl font-semibold mb-4">Review Your Answers</h2>
-          <ul className="space-y-2">
-            {Object.entries(answers).map(([key, value]) => (
-              <li key={key}><strong>{key}:</strong> {value}</li>
-            ))}
-          </ul>
-
-          <div className="mt-6">
-            <button
-              onClick={generateDescription}
-              disabled={loading}
-              className="bg-green-600 text-white px-6 py-2 rounded"
-            >
-              {loading ? "Generating..." : "Generate AI Description"}
-            </button>
-          </div>
-
-          {generatedDescription && (
-            <div className="mt-6 bg-gray-100 p-4 rounded">
-              <h3 className="font-semibold mb-2">AI-Generated Description:</h3>
-              <p>{generatedDescription}</p>
-            </div>
-          )}
-        </div>
-      )}
+  const StepOne = () => (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold">Financials</h2>
+      <input name="askingPrice" type="number" placeholder="Asking Price" className="input" onChange={handleChange} />
+      <input name="annualRevenue" type="number" placeholder="Annual Revenue" className="input" onChange={handleChange} />
+      <input name="sde" type="number" placeholder="Seller Discretionary Earnings (SDE)" className="input" onChange={handleChange} />
+      <input name="inventoryValue" type="number" placeholder="Inventory Value" className="input" onChange={handleChange} />
+      <label className="flex items-center"><input name="inventoryIncluded" type="checkbox" className="mr-2" onChange={handleChange} />Inventory Included?</label>
+      <input name="equipmentValue" type="number" placeholder="Equipment/FF&E Value" className="input" onChange={handleChange} />
+      <input name="rent" type="text" placeholder="Rent (monthly)" className="input" onChange={handleChange} />
+      <label className="flex items-center"><input name="realEstateIncluded" type="checkbox" className="mr-2" onChange={handleChange} />Real Estate Included?</label>
     </div>
   );
-}
+
+  const StepTwo = () => (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold">Business Overview</h2>
+      <input name="yearEstablished" type="number" placeholder="Year Established" className="input" onChange={handleChange} />
+      <input name="employees" type="number" placeholder="Number of Employees" className="input" onChange={handleChange} />
+      <input name="location" type="text" placeholder="Location (City, State)" className="input" onChange={handleChange} />
+      <label className="flex items-center"><input name="homeBased" type="checkbox" className="mr-2" onChange={handleChange} />Home-Based?</label>
+      <label className="flex items-center"><input name="relocatable" type="checkbox" className="mr-2" onChange={handleChange} />Relocatable?</label>
+      <input name="website" type="url" placeholder="Website (optional)" className="input" onChange={handleChange} />
+    </div>
+  );
+
+  const StepThree = () => (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold">Operations</h2>
+      <textarea name="businessDescription" placeholder="What does your business do?" className="textarea" onChange={handleChange}></textarea>
+      <input name="customerType" type="text" placeholder="Who are your customers?" className="input" onChange={handleChange} />
+      <input name="marketingMethod" type="text" placeholder="How do you find customers?" className="input" onChange={handleChange} />
+      <input name="ownerInvolvement" type="text" placeholder="Your role in the business" className="input" onChange={handleChange} />
+      <input name="canRunWithoutOwner" type="text" placeholder="Can it run without you?" className="input" onChange={handleChange} />
+    </div>
+  );
+
+  const StepFour = () => (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold">Opportunity</h2>
+      <textarea name="competitiveEdge" placeholder="Why do customers choose you?" className="textarea" onChange={handleChange}></textarea>
+      <textarea name="competitors" placeholder="Who are your competitors?" className="textarea" onChange={handleChange}></textarea>
+      <textarea name="growthPotential" placeholder="How could a new owner grow the business?" className="textarea" onChange={handleChange}></textarea>
+      <textarea name="reasonForSelling" placeholder="Why are you selling?" className="textarea" onChange={handleChange}></textarea>
+    </div>
+  );
+
+  const StepFive = () => (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold">Support & Financing</h2>
+      <input name="trainingOffered" type="text" placeholder="How much training will you offer?" className="input" onChange={handleChange} />
+      <label className="flex items-center"><input name="creativeFinancing" type="checkbox" className="mr-2" onChange={handleChange} />Open to creative financing (e.g. rent-to-own)?</label>
+      <label className="flex items-center"><input name="willingToMentor" type="checkbox" className="mr-2" onChange={handleChange} />Willing to mentor or stay involved post-sale?</label>
+    </div>
+  );
+
+  return (
+    <div className="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow space-y-6">
+      {step === 1 && <StepOne />}
+      {step === 2 && <StepTwo />}
+      {step === 3 && <StepThree />}
+      {step === 4 && <StepFour />}
+      {step === 5 && <StepFive />}
+
+      <div className="flex justify-between pt-4">
+        {step > 1 && <button onClick={prevStep} className="btn">Back</button>}
+        {step < 5 && <button onClick={nextStep} className="btn">Next</button>}
+        {step === 5 && <button onClick={handleSubmit} className="btn btn-primary">Submit</button>}
+      </div>
+    </div>
+  );
+}  
