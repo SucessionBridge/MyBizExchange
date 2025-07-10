@@ -1,159 +1,202 @@
 // pages/seller-wizard.js
-import { useState, useEffect } from 'react';
+
+import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 
 export default function SellerWizard() {
   const router = useRouter();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(1);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState('');
+  const [imagePreviews, setImagePreviews] = useState([]);
   const [aiDescription, setAiDescription] = useState('');
-  const [loadingDescription, setLoadingDescription] = useState(false);
-  const [error, setError] = useState('');
+  const [descriptionMode, setDescriptionMode] = useState('ai');
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     businessName: '',
-    askingPrice: '',
+    hideBusinessName: false,
+    industry: '',
+    location: '',
     annualRevenue: '',
     sde: '',
-    inventoryValue: '',
-    inventoryIncluded: false,
-    equipmentValue: '',
-    rent: '',
-    realEstateIncluded: false,
-    yearEstablished: '',
-    employees: '',
-    location: '',
-    homeBased: false,
-    relocatable: false,
-    website: '',
+    askingPrice: '',
+    includesInventory: false,
+    includesBuilding: false,
+    financingType: 'buyer-financed',
     businessDescription: '',
+    images: [],
     customerType: '',
-    marketingMethod: '',
     ownerInvolvement: '',
-    canRunWithoutOwner: '',
-    competitiveEdge: '',
-    competitors: '',
     growthPotential: '',
     reasonForSelling: '',
     trainingOffered: '',
-    creativeFinancing: false,
-    willingToMentor: false,
   });
 
-  useEffect(() => {
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setFormData((prev) => ({ ...prev, email: user.email }));
-      }
-    };
-    getUser();
-  }, []);
-
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, type, value, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }));
   };
 
-  const nextStep = () => setStep((prev) => prev + 1);
-  const prevStep = () => setStep((prev) => prev - 1);
+  const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    const validFiles = files.filter(file => file.size <= 5 * 1024 * 1024);
+    const previews = validFiles.map(file => URL.createObjectURL(file));
+    setFormData(prev => ({ ...prev, images: [...prev.images, ...validFiles] }));
+    setImagePreviews(prev => [...prev, ...previews]);
+  };
 
-  const handleSubmit = async () => {
-    const res = await fetch('/api/submit-seller-listing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...formData, aiDescription }),
-    });
-    if (res.ok) router.push('/dashboard');
+  const uploadImages = async (files) => {
+    const uploadedUrls = [];
+    setUploadStatus('Uploading images...');
+
+    for (let file of files) {
+      const fileName = `seller-${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage.from('new-business-photos').upload(fileName, file);
+      if (uploadError) continue;
+      const { data } = supabase.storage.from('new-business-photos').getPublicUrl(fileName);
+      uploadedUrls.push(data.publicUrl);
+    }
+
+    setUploadStatus('');
+    return uploadedUrls;
   };
 
   const generateDescription = async () => {
-    setLoadingDescription(true);
-    setError('');
-
-    try {
-      const res = await fetch('/api/generate-description', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          businessName: formData.businessName || 'N/A',
-          industry: formData.industry || 'Small Business',
-          location: formData.location,
-          sentenceSummary: formData.businessDescription,
-          customers: formData.customerType,
-          bestSellers: '',
-          customerLove: '',
-          repeatCustomers: '',
-          keepsThemComing: '',
-          ownerInvolvement: formData.ownerInvolvement,
-          opportunity: formData.growthPotential,
-          proudOf: '',
-          adviceToBuyer: formData.trainingOffered,
-          annualRevenue: formData.annualRevenue,
-          annualProfit: formData.sde,
-          includesInventory: formData.inventoryIncluded,
-          includesBuilding: formData.realEstateIncluded,
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setAiDescription(data.description);
-      } else {
-        setError(data.error || 'Failed to generate description');
-      }
-    } catch (err) {
-      setError('Something went wrong');
-    } finally {
-      setLoadingDescription(false);
-    }
+    const res = await fetch('/api/generate-description', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        businessName: formData.businessName,
+        industry: formData.industry,
+        location: formData.location,
+        sentenceSummary: formData.businessDescription,
+        customers: formData.customerType,
+        ownerInvolvement: formData.ownerInvolvement,
+        opportunity: formData.growthPotential,
+        adviceToBuyer: formData.trainingOffered,
+        annualRevenue: formData.annualRevenue,
+        annualProfit: formData.sde,
+        includesInventory: formData.includesInventory,
+        includesBuilding: formData.includesBuilding,
+      })
+    });
+    const data = await res.json();
+    if (res.ok) setAiDescription(data.description);
   };
 
-  const StepZero = () => (
-    <div className="space-y-4">
-      <h2 className="text-xl font-bold">Tell us about yourself</h2>
-      <input name="name" value={formData.name} onChange={handleChange} placeholder="Your Name" className="w-full border p-3 rounded" />
-      <input name="email" value={formData.email} onChange={handleChange} placeholder="Your Email" className="w-full border p-3 rounded" disabled />
-      <input name="businessName" value={formData.businessName} onChange={handleChange} placeholder="Business Name (optional)" className="w-full border p-3 rounded" />
-    </div>
-  );
+  const handleSubmit = async () => {
+    const uploadedUrls = await uploadImages(formData.images);
+    const payload = {
+      ...formData,
+      annual_revenue: parseFloat(formData.annualRevenue),
+      annual_profit: parseFloat(formData.sde),
+      asking_price: parseFloat(formData.askingPrice),
+      images: uploadedUrls,
+      ai_description: aiDescription,
+    };
+
+    const { error } = await supabase.from('sellers').insert([payload]);
+    if (!error) router.push('/listings');
+  };
 
   const StepOne = () => (
     <div className="space-y-4">
-      <h2 className="text-xl font-bold">Financials</h2>
-      <input name="askingPrice" value={formData.askingPrice} onChange={handleChange} placeholder="Asking Price" className="input" />
-      <input name="annualRevenue" value={formData.annualRevenue} onChange={handleChange} placeholder="Annual Revenue" className="input" />
-      <input name="sde" value={formData.sde} onChange={handleChange} placeholder="Seller Discretionary Earnings (SDE)" className="input" />
-      <input name="inventoryValue" value={formData.inventoryValue} onChange={handleChange} placeholder="Inventory Value" className="input" />
-      <label className="flex items-center"><input name="inventoryIncluded" type="checkbox" className="mr-2" onChange={handleChange} />Inventory Included?</label>
-      <input name="equipmentValue" value={formData.equipmentValue} onChange={handleChange} placeholder="Equipment/FF&E Value" className="input" />
-      <input name="rent" value={formData.rent} onChange={handleChange} placeholder="Rent (monthly)" className="input" />
-      <label className="flex items-center"><input name="realEstateIncluded" type="checkbox" className="mr-2" onChange={handleChange} />Real Estate Included?</label>
+      <h2 className="text-xl font-bold mb-2">Step 1: Contact Info</h2>
+      <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="input" />
+      <input name="email" placeholder="Email" value={formData.email} onChange={handleChange} className="input" />
+      <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="input" />
+      <label className="flex items-center">
+        <input type="checkbox" name="hideBusinessName" checked={formData.hideBusinessName} onChange={handleChange} className="mr-2" /> Hide business name from public listing
+      </label>
     </div>
   );
 
-  // (Keep StepTwo to StepSix same as before)
+  const StepTwo = () => (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold mb-2">Step 2: Business Info</h2>
+      <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="input" />
+      <input name="location" placeholder="Location (City, State)" value={formData.location} onChange={handleChange} className="input" />
+      <input name="annualRevenue" placeholder="Annual Revenue" value={formData.annualRevenue} onChange={handleChange} className="input" />
+      <input name="sde" placeholder="Annual Profit / SDE" value={formData.sde} onChange={handleChange} className="input" />
+      <input name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="input" />
+      <label className="flex items-center"><input type="checkbox" name="includesInventory" checked={formData.includesInventory} onChange={handleChange} className="mr-2" />Includes Inventory</label>
+      <label className="flex items-center"><input type="checkbox" name="includesBuilding" checked={formData.includesBuilding} onChange={handleChange} className="mr-2" />Includes Building</label>
+    </div>
+  );
+
+  const StepThree = () => (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold mb-2">Step 3: Operations</h2>
+      <input name="customerType" placeholder="Who are your customers?" value={formData.customerType} onChange={handleChange} className="input" />
+      <input name="ownerInvolvement" placeholder="Your involvement in the business" value={formData.ownerInvolvement} onChange={handleChange} className="input" />
+      <textarea name="businessDescription" placeholder="What does your business do?" value={formData.businessDescription} onChange={handleChange} className="textarea" rows={4} />
+    </div>
+  );
+
+  const StepFour = () => (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold mb-2">Step 4: Opportunity</h2>
+      <textarea name="growthPotential" placeholder="How could a new owner grow this business?" value={formData.growthPotential} onChange={handleChange} className="textarea" rows={3} />
+      <textarea name="reasonForSelling" placeholder="Why are you selling?" value={formData.reasonForSelling} onChange={handleChange} className="textarea" rows={2} />
+      <textarea name="trainingOffered" placeholder="Will you provide training to the new owner?" value={formData.trainingOffered} onChange={handleChange} className="textarea" rows={2} />
+    </div>
+  );
+
+  const StepFive = () => (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold mb-2">Step 5: Upload Images</h2>
+      <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="w-full" />
+      {imagePreviews.length > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          {imagePreviews.map((src, idx) => (
+            <img key={idx} src={src} alt="preview" className="w-full h-32 object-cover rounded" />
+          ))}
+        </div>
+      )}
+      <div>
+        <label className="block text-sm font-medium">Business Description Method:</label>
+        <div className="flex gap-4 mt-1">
+          <button type="button" className={`btn ${descriptionMode === 'ai' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`} onClick={() => setDescriptionMode('ai')}>Use AI</button>
+          <button type="button" className={`btn ${descriptionMode === 'manual' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`} onClick={() => setDescriptionMode('manual')}>Write Myself</button>
+        </div>
+        {descriptionMode === 'ai' && <button onClick={generateDescription} className="btn btn-secondary mt-3">Generate AI Description</button>}
+        {aiDescription && <div className="mt-3 p-3 bg-gray-100 rounded">{aiDescription}</div>}
+      </div>
+    </div>
+  );
+
+  const StepSix = () => (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold mb-2">Step 6: Review & Submit</h2>
+      <button onClick={handleSubmit} className="btn btn-primary">Submit Listing</button>
+    </div>
+  );
+
+  const steps = [StepOne, StepTwo, StepThree, StepFour, StepFive, StepSix];
+  const CurrentStep = steps[step - 1];
 
   return (
-    <main className="min-h-screen bg-gray-100 p-6">
-      <div className="max-w-3xl mx-auto bg-white rounded-xl shadow p-6 space-y-6">
-        {step === 0 && <StepZero />}
-        {step === 1 && <StepOne />}
-        {/* Add StepTwo ... StepSix */}
-
-        <div className="flex justify-between pt-4">
-          {step > 0 && <button onClick={prevStep} className="bg-gray-300 px-4 py-2 rounded">Back</button>}
-          {step < 6 && <button onClick={nextStep} className="bg-blue-600 text-white px-4 py-2 rounded">Next</button>}
-          {step === 6 && <button onClick={handleSubmit} className="bg-green-600 text-white px-4 py-2 rounded">Submit</button>}
+    <main className="min-h-screen bg-white p-6">
+      <div className="max-w-3xl mx-auto">
+        <h1 className="text-3xl font-bold text-center mb-6">Seller Onboarding Wizard</h1>
+        {uploadStatus && <p className="text-blue-600 text-center mb-4">{uploadStatus}</p>}
+        <div className="space-y-6 bg-gray-50 p-6 rounded-xl shadow">
+          <CurrentStep />
+          <div className="flex justify-between">
+            {step > 1 && <button onClick={() => setStep((s) => s - 1)} className="btn">Back</button>}
+            {step < steps.length && <button onClick={() => setStep((s) => s + 1)} className="btn btn-primary">Next</button>}
+          </div>
         </div>
       </div>
     </main>
   );
 }
+
 
 
