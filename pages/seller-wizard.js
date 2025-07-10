@@ -5,6 +5,10 @@ import { useRouter } from 'next/router';
 export default function SellerWizard() {
   const router = useRouter();
   const [step, setStep] = useState(1);
+  const [aiDescription, setAiDescription] = useState('');
+  const [loadingDescription, setLoadingDescription] = useState(false);
+  const [error, setError] = useState('');
+
   const [formData, setFormData] = useState({
     askingPrice: '',
     annualRevenue: '',
@@ -49,9 +53,51 @@ export default function SellerWizard() {
     const res = await fetch('/api/submit-seller-listing', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
+      body: JSON.stringify({ ...formData, aiDescription }),
     });
     if (res.ok) router.push('/dashboard');
+  };
+
+  const generateDescription = async () => {
+    setLoadingDescription(true);
+    setError('');
+
+    try {
+      const res = await fetch('/api/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          businessName: 'N/A',
+          industry: formData.industry || 'Small Business',
+          location: formData.location,
+          sentenceSummary: formData.businessDescription,
+          customers: formData.customerType,
+          bestSellers: '',
+          customerLove: '',
+          repeatCustomers: '',
+          keepsThemComing: '',
+          ownerInvolvement: formData.ownerInvolvement,
+          opportunity: formData.growthPotential,
+          proudOf: '',
+          adviceToBuyer: formData.trainingOffered,
+          annualRevenue: formData.annualRevenue,
+          annualProfit: formData.sde,
+          includesInventory: formData.inventoryIncluded,
+          includesBuilding: formData.realEstateIncluded,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setAiDescription(data.description);
+      } else {
+        setError(data.error || 'Failed to generate description');
+      }
+    } catch (err) {
+      setError('Something went wrong');
+    } finally {
+      setLoadingDescription(false);
+    }
   };
 
   const StepOne = () => (
@@ -110,6 +156,25 @@ export default function SellerWizard() {
     </div>
   );
 
+  const StepSix = () => (
+    <div className="space-y-4">
+      <h2 className="text-xl font-bold">Review & Generate Listing Description</h2>
+      <p className="text-sm text-gray-600">Click below to generate your professional listing summary based on your answers.</p>
+      <button onClick={generateDescription} className="btn btn-secondary">
+        {loadingDescription ? 'Generating...' : 'Generate Description'}
+      </button>
+
+      {aiDescription && (
+        <div className="mt-4 p-4 border rounded bg-gray-50">
+          <h3 className="font-semibold mb-2">AI-Generated Description:</h3>
+          <p>{aiDescription}</p>
+        </div>
+      )}
+
+      {error && <p className="text-red-600">{error}</p>}
+    </div>
+  );
+
   return (
     <div className="max-w-2xl mx-auto p-6 bg-white rounded-xl shadow space-y-6">
       {step === 1 && <StepOne />}
@@ -117,12 +182,13 @@ export default function SellerWizard() {
       {step === 3 && <StepThree />}
       {step === 4 && <StepFour />}
       {step === 5 && <StepFive />}
+      {step === 6 && <StepSix />}
 
       <div className="flex justify-between pt-4">
         {step > 1 && <button onClick={prevStep} className="btn">Back</button>}
-        {step < 5 && <button onClick={nextStep} className="btn">Next</button>}
-        {step === 5 && <button onClick={handleSubmit} className="btn btn-primary">Submit</button>}
+        {step < 6 && <button onClick={nextStep} className="btn">Next</button>}
+        {step === 6 && <button onClick={handleSubmit} className="btn btn-primary">Submit</button>}
       </div>
     </div>
   );
-}  
+}
