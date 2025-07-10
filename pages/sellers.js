@@ -10,6 +10,7 @@ export default function SellerWizard() {
     email: '',
     businessName: '',
     hideBusinessName: false,
+    yearsInBusiness: '',
     industry: '',
     location: '',
     annualRevenue: '',
@@ -17,6 +18,7 @@ export default function SellerWizard() {
     askingPrice: '',
     includesInventory: false,
     includesBuilding: false,
+    paysLease: false,
     financingType: 'buyer-financed',
     businessDescription: '',
     customerType: '',
@@ -44,26 +46,9 @@ export default function SellerWizard() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        businessName: formData.businessName,
-        industry: formData.industry,
-        location: formData.location,
-        sentenceSummary: formData.businessDescription,
-        customers: formData.customerType,
-        bestSellers: '',
-        customerLove: '',
-        repeatCustomers: '',
-        keepsThemComing: '',
-        ownerInvolvement: formData.ownerInvolvement,
-        opportunity: formData.growthPotential,
-        proudOf: '',
-        adviceToBuyer: formData.trainingOffered,
-        annualRevenue: formData.annualRevenue,
-        annualProfit: formData.sde,
-        includesInventory: formData.includesInventory,
-        includesBuilding: formData.includesBuilding,
+        ...formData,
       }),
     });
-
     const data = await res.json();
     if (res.ok) {
       setAiDescription(data.description);
@@ -98,25 +83,17 @@ export default function SellerWizard() {
         )}
         <p><strong>Industry:</strong> {formData.industry}</p>
         <p><strong>Location:</strong> {formData.location}</p>
+        <p><strong>Years in Business:</strong> {formData.yearsInBusiness}</p>
         <p><strong>Annual Revenue:</strong> ${formData.annualRevenue}</p>
         <p><strong>SDE:</strong> ${formData.sde}</p>
         <p><strong>Asking Price:</strong> ${formData.askingPrice}</p>
+        <p><strong>Financing Option:</strong> {formData.financingType}</p>
         <p><strong>AI-Generated Description:</strong></p>
         <p className="bg-gray-100 p-4 rounded-md mt-2">{aiDescription || 'No AI description generated yet.'}</p>
 
         <div className="mt-6 flex gap-4">
-          <button
-            onClick={() => setPreviewMode(false)}
-            className="bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded"
-          >
-            Edit
-          </button>
-          <button
-            onClick={handleSubmit}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-          >
-            Submit Listing
-          </button>
+          <button onClick={() => setPreviewMode(false)} className="bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded">Edit</button>
+          <button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Submit Listing</button>
         </div>
       </main>
     );
@@ -132,7 +109,10 @@ export default function SellerWizard() {
             <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded" />
             <input name="email" placeholder="Email" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" />
             <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" />
-            <label className="flex items-center"><input name="hideBusinessName" type="checkbox" checked={formData.hideBusinessName} onChange={handleChange} className="mr-2" />Hide Business Name on Public Listing</label>
+            <label className="flex items-center">
+              <input name="hideBusinessName" type="checkbox" checked={formData.hideBusinessName} onChange={handleChange} className="mr-2" />
+              Hide Business Name on Public Listing
+            </label>
             <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
           </div>
         )}
@@ -141,9 +121,28 @@ export default function SellerWizard() {
           <div className="space-y-4">
             <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded" />
             <input name="location" placeholder="Location" value={formData.location} onChange={handleChange} className="w-full border p-3 rounded" />
+            <input name="yearsInBusiness" placeholder="Years in Business" value={formData.yearsInBusiness} onChange={handleChange} className="w-full border p-3 rounded" />
             <input name="annualRevenue" placeholder="Annual Revenue" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
             <input name="sde" placeholder="Seller Discretionary Earnings (SDE)" value={formData.sde} onChange={handleChange} className="w-full border p-3 rounded" />
             <input name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full border p-3 rounded" />
+            <label className="flex items-center">
+              <input name="includesInventory" type="checkbox" checked={formData.includesInventory} onChange={handleChange} className="mr-2" />
+              Includes Inventory
+            </label>
+            <label className="flex items-center">
+              <input name="includesBuilding" type="checkbox" checked={formData.includesBuilding} onChange={handleChange} className="mr-2" />
+              Includes Building
+            </label>
+            <label className="flex items-center">
+              <input name="paysLease" type="checkbox" checked={formData.paysLease} onChange={handleChange} className="mr-2" />
+              Business Pays Lease
+            </label>
+            <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded">
+              <option value="buyer-financed">Buyer Financed</option>
+              <option value="seller-financing">Seller Financing</option>
+              <option value="rent-to-own">Rent to Own</option>
+              <option value="third-party">3rd Party Financing</option>
+            </select>
             <button onClick={() => setStep(3)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
           </div>
         )}
@@ -166,4 +165,3 @@ export default function SellerWizard() {
     </main>
   );
 }
-
