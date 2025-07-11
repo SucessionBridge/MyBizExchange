@@ -22,31 +22,21 @@ export default function SellerWizard() {
     askingPrice: '',
     includesInventory: false,
     includesBuilding: false,
+    real_estate_included: false,
+    monthly_lease: '',
+    inventory_value: '',
+    equipment_value: '',
     financingType: 'buyer-financed',
+    website: '',
+    home_based: false,
+    relocatable: false,
+    employees: '',
     businessDescription: '',
     customerType: '',
     ownerInvolvement: '',
     growthPotential: '',
     reasonForSelling: '',
     trainingOffered: '',
-    year_established: '',
-    employees: '',
-    home_based: false,
-    relocatable: false,
-    website: '',
-    marketing_method: '',
-    can_run_without_owner: '',
-    competitive_edge: '',
-    competitors: '',
-    creative_financing: false,
-    willing_to_mentor: false,
-    rent: '',
-    monthly_lease: '',
-    rent_paid: false,
-    rent_amount: '',
-    inventory_value: '',
-    equipment_value: '',
-    real_estate_included: false,
     images: []
   });
 
@@ -99,6 +89,8 @@ export default function SellerWizard() {
     setPreviewMode(true);
   };
 
+  const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
+
   const renderImages = () => (
     <div className="space-y-2">
       <label>Upload Photos:</label>
@@ -117,10 +109,34 @@ export default function SellerWizard() {
 
   if (previewMode) {
     return (
-      <main className="p-6 max-w-3xl mx-auto">
+      <main className="p-6 max-w-4xl mx-auto">
         <h1 className="text-2xl font-bold mb-4">Preview Your Listing</h1>
-        <pre className="bg-gray-100 p-4 rounded whitespace-pre-wrap">{aiDescription}</pre>
-        {renderImages()}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            {!formData.hideBusinessName && <p><strong>Business Name:</strong> {formData.businessName}</p>}
+            <p><strong>Location:</strong> {formData.location}</p>
+            <p><strong>Website:</strong> {formData.website}</p>
+            <p><strong>Asking Price:</strong> {formatCurrency(formData.askingPrice)}</p>
+            <p><strong>Annual Revenue:</strong> {formatCurrency(formData.annualRevenue)}</p>
+            <p><strong>SDE:</strong> {formatCurrency(formData.sde)}</p>
+            <p><strong>Employees:</strong> {formData.employees}</p>
+            <p><strong>Monthly Lease:</strong> {formatCurrency(formData.monthly_lease)}</p>
+            <p><strong>Includes Inventory:</strong> {formData.includesInventory ? 'Yes' : 'No'}</p>
+            <p><strong>Includes Building:</strong> {formData.includesBuilding ? 'Yes' : 'No'}</p>
+            <p><strong>Real Estate Included:</strong> {formData.real_estate_included ? 'Yes' : 'No'}</p>
+            <p><strong>Relocatable:</strong> {formData.relocatable ? 'Yes' : 'No'}</p>
+            <p><strong>Home-Based:</strong> {formData.home_based ? 'Yes' : 'No'}</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {imagePreviews.map((src, idx) => (
+              <img key={idx} src={src} className="rounded w-full h-32 object-cover" />
+            ))}
+          </div>
+        </div>
+        <div className="mt-6">
+          <h2 className="text-xl font-semibold mb-2">Business Overview</h2>
+          <p className="bg-gray-100 p-4 rounded whitespace-pre-wrap">{aiDescription}</p>
+        </div>
         <div className="mt-6 flex gap-4">
           <button onClick={() => setPreviewMode(false)} className="bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded">Edit</button>
           <button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Submit Listing</button>
@@ -148,18 +164,24 @@ export default function SellerWizard() {
           <div className="space-y-4">
             <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded" />
             <input name="location" placeholder="Location" value={formData.location} onChange={handleChange} className="w-full border p-3 rounded" />
+            <input name="website" placeholder="Website" value={formData.website} onChange={handleChange} className="w-full border p-3 rounded" />
             <input name="annualRevenue" placeholder="Annual Revenue" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
             <input name="sde" placeholder="Seller Discretionary Earnings (SDE)" value={formData.sde} onChange={handleChange} className="w-full border p-3 rounded" />
             <input name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full border p-3 rounded" />
+            <input name="employees" placeholder="Number of Employees" value={formData.employees} onChange={handleChange} className="w-full border p-3 rounded" />
+            <input name="monthly_lease" placeholder="Monthly Lease Amount" value={formData.monthly_lease} onChange={handleChange} className="w-full border p-3 rounded" />
+            <input name="inventory_value" placeholder="Inventory Value" value={formData.inventory_value} onChange={handleChange} className="w-full border p-3 rounded" />
+            <input name="equipment_value" placeholder="Equipment Value" value={formData.equipment_value} onChange={handleChange} className="w-full border p-3 rounded" />
             <label className="flex items-center"><input name="includesInventory" type="checkbox" checked={formData.includesInventory} onChange={handleChange} className="mr-2" />Includes Inventory</label>
             <label className="flex items-center"><input name="includesBuilding" type="checkbox" checked={formData.includesBuilding} onChange={handleChange} className="mr-2" />Includes Building</label>
             <label className="flex items-center"><input name="real_estate_included" type="checkbox" checked={formData.real_estate_included} onChange={handleChange} className="mr-2" />Real Estate Included</label>
-            <label className="flex items-center"><input name="rent_paid" type="checkbox" checked={formData.rent_paid} onChange={handleChange} className="mr-2" />Do you pay rent?</label>
-            <input name="monthly_lease" placeholder="Monthly Lease Amount" value={formData.monthly_lease} onChange={handleChange} className="w-full border p-3 rounded" />
-            <input name="rent_amount" placeholder="Total Rent Paid" value={formData.rent_amount} onChange={handleChange} className="w-full border p-3 rounded" />
-            <input name="inventory_value" placeholder="Inventory Value" value={formData.inventory_value} onChange={handleChange} className="w-full border p-3 rounded" />
-            <input name="equipment_value" placeholder="Equipment Value" value={formData.equipment_value} onChange={handleChange} className="w-full border p-3 rounded" />
-            <input name="financingType" placeholder="Financing Type (e.g. seller-financing)" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded" />
+            <label className="flex items-center"><input name="relocatable" type="checkbox" checked={formData.relocatable} onChange={handleChange} className="mr-2" />Relocatable</label>
+            <label className="flex items-center"><input name="home_based" type="checkbox" checked={formData.home_based} onChange={handleChange} className="mr-2" />Home-Based</label>
+            <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded">
+              <option value="buyer-financed">Buyer Financed</option>
+              <option value="seller-financed">Seller Financed</option>
+              <option value="rent-to-own">Rent to Own</option>
+            </select>
             {renderImages()}
             <button onClick={() => setStep(3)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
             {renderBackButton()}
