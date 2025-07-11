@@ -165,10 +165,7 @@ export default function SellerWizard() {
       </Head>
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Seller Onboarding</h1>
-
-        {/* Steps reused from previous message (step 1-3 UI blocks) */}
-        {/* You can paste your existing step rendering here exactly as-is. */}
-
+        {/* Form steps go here */}
       </div>
     </main>
   );
