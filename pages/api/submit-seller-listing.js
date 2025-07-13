@@ -3,16 +3,14 @@
 import { createClient } from '@supabase/supabase-js';
 import formidable from 'formidable';
 import fs from 'fs';
-import path from 'path';
 
 export const config = {
   api: {
     bodyParser: false,
-    sizeLimit: '50mb', // Increase limit to handle larger form data + images
+    sizeLimit: '50mb',
   },
 };
 
-// Initialize Supabase client
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -27,106 +25,83 @@ export default async function handler(req, res) {
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
-      console.error('❌ Formidable parse error:', err);
+      console.error('❌ Form parsing error:', err);
       return res.status(500).json({ error: 'Form parsing failed' });
     }
 
     try {
-      const {
-        askingPrice,
-        annualRevenue,
-        sde,
-        inventoryValue,
-        inventoryIncluded,
-        equipmentValue,
-        rent,
-        realEstateIncluded,
-        yearEstablished,
-        employees,
-        location,
-        homeBased,
-        relocatable,
-        website,
-        businessDescription,
-        customerType,
-        marketingMethod,
-        ownerInvolvement,
-        canRunWithoutOwner,
-        competitiveEdge,
-        competitors,
-        growthPotential,
-        reasonForSelling,
-        trainingOffered,
-        creativeFinancing,
-        willingToMentor,
-        aiDescription,
-        userEmail,
-      } = fields;
-
-      // Upload images to Supabase Storage if provided
-      let imageUrls = [];
-      const images = Array.isArray(files['images[]']) ? files['images[]'] : [files['images[]']];
-      for (const file of images) {
+      const imageUrls = [];
+      const fileArray = Array.isArray(files['images[]']) ? files['images[]'] : [files['images[]']];
+      for (const file of fileArray) {
         if (!file) continue;
-        const fileBuffer = fs.readFileSync(file.filepath);
+        const buffer = fs.readFileSync(file.filepath);
         const filename = `${Date.now()}-${file.originalFilename}`;
-        const { data, error: uploadError } = await supabase.storage
+        const { data, error: uploadErr } = await supabase.storage
           .from('seller-images')
-          .upload(filename, fileBuffer, {
+          .upload(filename, buffer, {
             contentType: file.mimetype,
             upsert: true,
           });
 
-        if (uploadError) {
-          console.error('❌ Supabase image upload error:', uploadError);
-        } else {
+        if (!uploadErr) {
           const { publicURL } = supabase.storage.from('seller-images').getPublicUrl(filename).data;
           imageUrls.push(publicURL);
+        } else {
+          console.error('❌ Image upload error:', uploadErr);
         }
       }
 
       const { error } = await supabase.from('sellers').insert([
         {
-          user_email: userEmail || null,
-          asking_price: askingPrice,
-          annual_revenue: annualRevenue,
-          sde,
-          inventory_value: inventoryValue,
-          inventory_included: inventoryIncluded,
-          equipment_value: equipmentValue,
-          rent,
-          real_estate_included: realEstateIncluded,
-          year_established: yearEstablished,
-          employees,
-          location,
-          home_based: homeBased,
-          relocatable,
-          website,
-          business_description: businessDescription,
-          customer_type: customerType,
-          marketing_method: marketingMethod,
-          owner_involvement: ownerInvolvement,
-          can_run_without_owner: canRunWithoutOwner,
-          competitive_edge: competitiveEdge,
-          competitors,
-          growth_potential: growthPotential,
-          reason_for_selling: reasonForSelling,
-          training_offered: trainingOffered,
-          creative_financing: creativeFinancing,
-          willing_to_mentor: willingToMentor,
-          ai_description: aiDescription,
-          image_urls: imageUrls, // optional: if you store them in your DB
+          name: fields.name,
+          email: fields.email,
+          business_name: fields.businessName,
+          hide_business_name: fields.hideBusinessName === 'true',
+          industry: fields.industry,
+          location: fields.location,
+          website: fields.website,
+          annual_revenue: fields.annualRevenue,
+          annual_profit: fields.annualProfit,
+          sde: fields.sde,
+          asking_price: fields.askingPrice,
+          employees: fields.employees,
+          monthly_lease: fields.monthly_lease,
+          inventory_value: fields.inventory_value,
+          equipment_value: fields.equipment_value,
+          includes_inventory: fields.includesInventory === 'true',
+          includes_building: fields.includesBuilding === 'true',
+          real_estate_included: fields.real_estate_included === 'true',
+          relocatable: fields.relocatable === 'true',
+          home_based: fields.home_based === 'true',
+          financing_type: fields.financingType,
+          business_description: fields.businessDescription,
+          ai_description: fields.aiDescription,
+          description_choice: fields.descriptionChoice,
+          customer_type: fields.customerType,
+          owner_involvement: fields.ownerInvolvement,
+          growth_potential: fields.growthPotential,
+          reason_for_selling: fields.reasonForSelling,
+          training_offered: fields.trainingOffered,
+          sentence_summary: fields.sentenceSummary,
+          customers: fields.customers,
+          best_sellers: fields.bestSellers,
+          customer_love: fields.customerLove,
+          repeat_customers: fields.repeatCustomers,
+          keeps_them_coming: fields.keepsThemComing,
+          proud_of: fields.proudOf,
+          advice_to_buyer: fields.adviceToBuyer,
+          image_urls: imageUrls,
         },
       ]);
 
       if (error) {
-        console.error('❌ Supabase Insert Error:', error);
+        console.error('❌ Supabase insert error:', error);
         return res.status(500).json({ error: 'Failed to save listing' });
       }
 
       return res.status(200).json({ success: true });
-    } catch (err) {
-      console.error('❌ Server Error:', err);
+    } catch (e) {
+      console.error('❌ Server error:', e);
       return res.status(500).json({ error: 'Unexpected error occurred' });
     }
   });
