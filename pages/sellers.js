@@ -123,114 +123,150 @@ export default function SellerWizard() {
       <input type="file" multiple onChange={handleImageUpload} accept="image/*" />
     </div>
   );
-  const renderPreview = () => {
-    const toTitleCase = (str) =>
-      str
-        .toLowerCase()
-        .split(' ')
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
+ const renderPreview = () => {
+  const toTitleCase = (str) =>
+    str
+      .toLowerCase()
+      .split(' ')
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
 
-    const getListingTitle = () => {
-      if (formData.industry) {
-        return `${toTitleCase(formData.industry)} for Sale`;
-      } else if (formData.hideBusinessName) {
-        return 'Confidential Business Listing';
-      } else {
-        return formData.businessName;
-      }
-    };
+  const getListingTitle = () => {
+    if (formData.industry) {
+      return `${toTitleCase(formData.industry)} Business for Sale`;
+    } else if (formData.hideBusinessName) {
+      return 'Confidential Business Listing';
+    } else {
+      return formData.businessName;
+    }
+  };
 
-    const selectedDescription =
-      formData.descriptionChoice === 'ai'
-        ? formData.aiDescription
-        : formData.businessDescription;
+  return (
+    <div className="bg-white rounded shadow p-6 space-y-8 font-serif text-gray-900">
+      <h2 className="text-4xl font-bold tracking-tight mb-1">{getListingTitle()}</h2>
+      <p className="text-md text-gray-600">{formData.location}</p>
 
-    return (
-      <div className="bg-white rounded shadow p-6 space-y-8 font-serif text-gray-900">
-        <h2 className="text-4xl font-bold tracking-tight mb-1">{getListingTitle()}</h2>
-        <p className="text-md text-gray-600">{formData.location}</p>
-
-        {imagePreviews.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            {imagePreviews.map((src, idx) => (
-              <img key={idx} src={src} className="w-full h-64 object-cover rounded shadow-sm border" />
-            ))}
-          </div>
-        )}
-
-        <div className="grid md:grid-cols-2 gap-10 text-base mt-6">
-          <div>
-            <h3 className="text-xl font-semibold border-b pb-2 mb-3">Financial Overview</h3>
-            <p><strong>Asking Price:</strong> {formatCurrency(formData.askingPrice)}</p>
-            <p><strong>Annual Revenue:</strong> {formatCurrency(formData.annualRevenue)}</p>
-            <p><strong>SDE:</strong> {formatCurrency(formData.sde)}</p>
-            <p><strong>Annual Profit:</strong> {formatCurrency(formData.annualProfit)}</p>
-            <p><strong>Inventory Value:</strong> {formatCurrency(formData.inventory_value)}</p>
-            <p><strong>Equipment Value:</strong> {formatCurrency(formData.equipment_value)}</p>
-            <p><strong>Includes Inventory:</strong> {formData.includesInventory ? 'Yes' : 'No'}</p>
-            <p><strong>Includes Building:</strong> {formData.includesBuilding ? 'Yes' : 'No'}</p>
-            <p><strong>Real Estate Included:</strong> {formData.real_estate_included ? 'Yes' : 'No'}</p>
-          </div>
-          <div>
-            <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Details</h3>
-            <p><strong>Employees:</strong> {formData.employees}</p>
-            <p><strong>Monthly Lease:</strong> {formatCurrency(formData.monthly_lease)}</p>
-            <p><strong>Home-Based:</strong> {formData.home_based ? 'Yes' : 'No'}</p>
-            <p><strong>Relocatable:</strong> {formData.relocatable ? 'Yes' : 'No'}</p>
-            <p><strong>Financing Type:</strong> {formData.financingType.replace('-', ' ')}</p>
-            <p><strong>Customer Type:</strong> {formData.customerType}</p>
-            <p><strong>Owner Involvement:</strong> {formData.ownerInvolvement}</p>
-            <p><strong>Reason for Selling:</strong> {formData.reasonForSelling}</p>
-            <p><strong>Training Offered:</strong> {formData.trainingOffered}</p>
-          </div>
+      {imagePreviews.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+          {imagePreviews.map((src, idx) => (
+            <img
+              key={idx}
+              src={src}
+              className="w-full h-64 object-cover rounded shadow-sm border"
+            />
+          ))}
         </div>
+      )}
 
+      <div className="grid md:grid-cols-2 gap-10 text-base mt-6">
         <div>
-          <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Description</h3>
-          <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">{selectedDescription || 'No description provided.'}</p>
+          <h3 className="text-xl font-semibold border-b pb-2 mb-3">Financial Overview</h3>
+          <p><strong>Asking Price:</strong> {formatCurrency(formData.askingPrice)}</p>
+          <p><strong>Annual Revenue:</strong> {formatCurrency(formData.annualRevenue)}</p>
+          <p><strong>SDE:</strong> {formatCurrency(formData.sde)}</p>
+          <p><strong>Annual Profit:</strong> {formatCurrency(formData.annualProfit)}</p>
+          <p><strong>Inventory Value:</strong> {formatCurrency(formData.inventory_value)}</p>
+          <p><strong>Equipment Value:</strong> {formatCurrency(formData.equipment_value)}</p>
+          <p><strong>Includes Inventory:</strong> {formData.includesInventory ? 'Yes' : 'No'}</p>
+          <p><strong>Includes Building:</strong> {formData.includesBuilding ? 'Yes' : 'No'}</p>
+          <p><strong>Real Estate Included:</strong> {formData.real_estate_included ? 'Yes' : 'No'}</p>
         </div>
-
-        {formData.aiDescription && formData.businessDescription && (
-          <div>
-            <label className="block text-sm mt-2 mb-1 font-medium">Choose Description to Display:</label>
-            <select
-              name="descriptionChoice"
-              value={formData.descriptionChoice || 'manual'}
-              onChange={handleChange}
-              className="border p-2 rounded"
-            >
-              <option value="manual">Written by Seller</option>
-              <option value="ai">AI-Enhanced Version</option>
-            </select>
-          </div>
-        )}
-
-        <div className="grid md:grid-cols-2 gap-10 text-base">
-          <div>
-            <h3 className="text-xl font-semibold border-b pb-2 mb-3">Customer Insights</h3>
-            <p><strong>Who are your customers?</strong> {formData.customers}</p>
-            <p><strong>Best Sellers:</strong> {formData.bestSellers}</p>
-            <p><strong>What do customers love?</strong> {formData.customerLove}</p>
-            <p><strong>Repeat Customers:</strong> {formData.repeatCustomers}</p>
-            <p><strong>Why do they return?</strong> {formData.keepsThemComing}</p>
-          </div>
-          <div>
-            <h3 className="text-xl font-semibold border-b pb-2 mb-3">Owner Reflections</h3>
-            <p><strong>What are you proud of?</strong> {formData.proudOf}</p>
-            <p><strong>Advice to Buyer:</strong> {formData.adviceToBuyer}</p>
-            <p><strong>Growth Potential:</strong> {formData.growthPotential}</p>
-            <p><strong>One-Line Summary:</strong> {formData.sentenceSummary}</p>
-          </div>
-        </div>
-
-        <div className="mt-8 flex gap-4">
-          <button onClick={() => setPreviewMode(false)} className="bg-gray-300 hover:bg-gray-400 text-black px-5 py-2 rounded">Edit</button>
-          <button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded">Submit Listing</button>
+        <div>
+          <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Details</h3>
+          <p><strong>Employees:</strong> {formData.employees}</p>
+          <p><strong>Monthly Lease:</strong> {formatCurrency(formData.monthly_lease)}</p>
+          <p><strong>Home-Based:</strong> {formData.home_based ? 'Yes' : 'No'}</p>
+          <p><strong>Relocatable:</strong> {formData.relocatable ? 'Yes' : 'No'}</p>
+          <p><strong>Financing Type:</strong> {formData.financingType.replace('-', ' ')}</p>
+          <p><strong>Customer Type:</strong> {formData.customerType}</p>
+          <p><strong>Owner Involvement:</strong> {formData.ownerInvolvement}</p>
+          <p><strong>Reason for Selling:</strong> {formData.reasonForSelling}</p>
+          <p><strong>Training Offered:</strong> {formData.trainingOffered}</p>
         </div>
       </div>
-    );
-  };
+
+      {(formData.aiDescription || formData.businessDescription) && (
+        <div>
+          <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Description</h3>
+          <div className="mb-4">
+            <label className="block font-medium mb-1">Choose which description to publish:</label>
+            <div className="flex items-center gap-6">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="descriptionChoice"
+                  value="manual"
+                  checked={formData.descriptionChoice === 'manual'}
+                  onChange={handleChange}
+                  className="mr-2"
+                />
+                Written by Seller
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="descriptionChoice"
+                  value="ai"
+                  checked={formData.descriptionChoice === 'ai'}
+                  onChange={handleChange}
+                  className="mr-2"
+                />
+                AI-Enhanced Version
+              </label>
+            </div>
+          </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            <div>
+              <h4 className="font-semibold mb-1">Written by Seller:</h4>
+              <p className="text-gray-800 whitespace-pre-wrap border p-3 rounded bg-gray-50">
+                {formData.businessDescription || 'No description provided.'}
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-1">AI-Enhanced Version:</h4>
+              <p className="text-gray-800 whitespace-pre-wrap border p-3 rounded bg-gray-50">
+                {formData.aiDescription || 'AI description not yet generated.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-10 text-base">
+        <div>
+          <h3 className="text-xl font-semibold border-b pb-2 mb-3">Customer Insights</h3>
+          <p><strong>Who are your customers?</strong> {formData.customers}</p>
+          <p><strong>Best Sellers:</strong> {formData.bestSellers}</p>
+          <p><strong>What do customers love?</strong> {formData.customerLove}</p>
+          <p><strong>Repeat Customers:</strong> {formData.repeatCustomers}</p>
+          <p><strong>Why do they return?</strong> {formData.keepsThemComing}</p>
+        </div>
+        <div>
+          <h3 className="text-xl font-semibold border-b pb-2 mb-3">Owner Reflections</h3>
+          <p><strong>What are you proud of?</strong> {formData.proudOf}</p>
+          <p><strong>Advice to Buyer:</strong> {formData.adviceToBuyer}</p>
+          <p><strong>Growth Potential:</strong> {formData.growthPotential}</p>
+          <p><strong>One-Line Summary:</strong> {formData.sentenceSummary}</p>
+        </div>
+      </div>
+
+      <div className="mt-8 flex gap-4">
+        <button
+          onClick={() => setPreviewMode(false)}
+          className="bg-gray-300 hover:bg-gray-400 text-black px-5 py-2 rounded"
+        >
+          Edit
+        </button>
+        <button
+          onClick={handleSubmit}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded"
+        >
+          Submit Listing
+        </button>
+      </div>
+    </div>
+  );
+};
 
   return (
     <main className="bg-white min-h-screen p-6 font-sans">
