@@ -93,8 +93,8 @@ export default function SellerWizard() {
     setFormData(prev => ({ ...prev, images: [...prev.images, ...files] }));
     setImagePreviews(prev => [...prev, ...previews]);
   };
-
-  const handleSubmit = async () => {
+ const handleSubmit = async () => {
+  try {
     const form = new FormData();
     Object.entries(formData).forEach(([key, value]) => {
       if (key === 'images') {
@@ -108,8 +108,21 @@ export default function SellerWizard() {
       method: 'POST',
       body: form
     });
-    if (res.ok) router.push('/seller-dashboard');
-  };
+
+    if (res.ok) {
+      alert('✅ Listing submitted successfully!');
+      router.push('/seller-dashboard');
+    } else {
+      const errorData = await res.json();
+      console.error('❌ Submission failed:', errorData);
+      alert(`❌ Failed to submit: ${errorData.error || 'Unknown error'}`);
+    }
+  } catch (err) {
+    console.error('❌ Network error during submission:', err);
+    alert('❌ Something went wrong while submitting the listing.');
+  }
+};
+
 
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
 
