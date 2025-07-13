@@ -1,3 +1,4 @@
+// sellers.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
@@ -107,6 +108,7 @@ export default function SellerWizard() {
       method: 'POST',
       body: form
     });
+
     if (res.ok) router.push('/seller-dashboard');
   };
 
@@ -124,54 +126,51 @@ export default function SellerWizard() {
   );
 
   const renderPreview = () => (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-3xl font-bold mb-6 text-center">Preview Your Listing</h2>
+    <div>
+      <h2 className="text-2xl font-bold mb-6">Preview Your Listing</h2>
 
-      {imagePreviews.length > 0 && (
-        <div className="mb-6">
-          <img
-            src={imagePreviews[0]}
-            alt="Business photo"
-            className="w-full h-80 object-cover rounded-lg border"
-          />
-        </div>
+      {!formData.hideBusinessName && (
+        <h3 className="text-xl font-semibold text-blue-800">{formData.businessName}</h3>
+      )}
+      {imagePreviews[0] && (
+        <img src={imagePreviews[0]} alt="Main" className="w-full h-64 object-cover rounded border my-4" />
       )}
 
-      <div className="space-y-4 text-gray-800">
-        {!formData.hideBusinessName && (
-          <h3 className="text-2xl font-semibold">{formData.businessName}</h3>
-        )}
-        <p><strong>Location:</strong> {formData.location}</p>
-        <p><strong>Website:</strong> {formData.website}</p>
-        <p><strong>Asking Price:</strong> {formatCurrency(formData.askingPrice)}</p>
-        <p><strong>Annual Revenue:</strong> {formatCurrency(formData.annualRevenue)}</p>
-        <p><strong>SDE:</strong> {formatCurrency(formData.sde)}</p>
-        <p><strong>Employees:</strong> {formData.employees}</p>
-        <p><strong>Monthly Lease:</strong> {formatCurrency(formData.monthly_lease)}</p>
-        <p><strong>Inventory Value:</strong> {formatCurrency(formData.inventory_value)}</p>
-        <p><strong>Equipment Value:</strong> {formatCurrency(formData.equipment_value)}</p>
-        <p><strong>Includes Inventory:</strong> {formData.includesInventory ? 'Yes' : 'No'}</p>
-        <p><strong>Includes Building:</strong> {formData.includesBuilding ? 'Yes' : 'No'}</p>
-        <p><strong>Real Estate Included:</strong> {formData.real_estate_included ? 'Yes' : 'No'}</p>
-        <p><strong>Relocatable:</strong> {formData.relocatable ? 'Yes' : 'No'}</p>
-        <p><strong>Home-Based:</strong> {formData.home_based ? 'Yes' : 'No'}</p>
-        <p><strong>Customer Type:</strong> {formData.customerType}</p>
-        <p><strong>Owner Involvement:</strong> {formData.ownerInvolvement}</p>
-        <p><strong>Growth Potential:</strong> {formData.growthPotential}</p>
-        <p><strong>Reason for Selling:</strong> {formData.reasonForSelling}</p>
-        <p><strong>Training Offered:</strong> {formData.trainingOffered}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-gray-800 mt-4">
+        <div className="space-y-2 text-sm">
+          <p><strong>Location:</strong> {formData.location}</p>
+          <p><strong>Website:</strong> {formData.website}</p>
+          <p><strong>Asking Price:</strong> {formatCurrency(formData.askingPrice)}</p>
+          <p><strong>Annual Revenue:</strong> {formatCurrency(formData.annualRevenue)}</p>
+          <p><strong>SDE:</strong> {formatCurrency(formData.sde)}</p>
+          <p><strong>Annual Profit:</strong> {formatCurrency(formData.annualProfit)}</p>
+          <p><strong>Employees:</strong> {formData.employees}</p>
+          <p><strong>Monthly Lease:</strong> {formatCurrency(formData.monthly_lease)}</p>
+          <p><strong>Inventory Value:</strong> {formatCurrency(formData.inventory_value)}</p>
+          <p><strong>Equipment Value:</strong> {formatCurrency(formData.equipment_value)}</p>
+        </div>
+        <div className="space-y-2 text-sm">
+          <p><strong>Includes Inventory:</strong> {formData.includesInventory ? 'Yes' : 'No'}</p>
+          <p><strong>Includes Building:</strong> {formData.includesBuilding ? 'Yes' : 'No'}</p>
+          <p><strong>Real Estate Included:</strong> {formData.real_estate_included ? 'Yes' : 'No'}</p>
+          <p><strong>Relocatable:</strong> {formData.relocatable ? 'Yes' : 'No'}</p>
+          <p><strong>Home-Based:</strong> {formData.home_based ? 'Yes' : 'No'}</p>
+          <p><strong>Customer Type:</strong> {formData.customerType}</p>
+          <p><strong>Owner Involvement:</strong> {formData.ownerInvolvement}</p>
+          <p><strong>Reason for Selling:</strong> {formData.reasonForSelling}</p>
+          <p><strong>Training Offered:</strong> {formData.trainingOffered}</p>
+          <p><strong>Financing Type:</strong> {formData.financingType.replace('-', ' ')}</p>
+        </div>
       </div>
 
-      {imagePreviews.length > 1 && (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-6">
-          {imagePreviews.slice(1).map((src, idx) => (
-            <img key={idx} src={src} className="w-full h-40 object-cover rounded border" />
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-2 gap-2 mt-6">
+        {imagePreviews.map((src, idx) => (
+          <img key={idx} src={src} className="rounded w-full h-32 object-cover border" />
+        ))}
+      </div>
 
-      <div className="mt-8">
-        <h3 className="text-2xl font-semibold mb-2">Business Description</h3>
+      <div className="mt-6">
+        <h2 className="text-xl font-semibold mb-2">Business Description</h2>
         <p className="text-gray-700 whitespace-pre-wrap leading-relaxed border p-4 rounded bg-gray-50">
           {formData.businessDescription || 'No description provided.'}
         </p>
@@ -179,26 +178,16 @@ export default function SellerWizard() {
 
       {formData.aiDescription && (
         <div className="mt-6">
-          <h3 className="text-2xl font-semibold mb-2">AI-Enhanced Description</h3>
+          <h2 className="text-xl font-semibold mb-2">AI-Enhanced Description</h2>
           <p className="text-gray-800 whitespace-pre-wrap leading-relaxed border p-4 rounded bg-blue-50">
             {formData.aiDescription}
           </p>
         </div>
       )}
 
-      <div className="mt-8 flex gap-4 justify-end">
-        <button
-          onClick={() => setPreviewMode(false)}
-          className="bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded"
-        >
-          Edit
-        </button>
-        <button
-          onClick={handleSubmit}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-        >
-          Submit Listing
-        </button>
+      <div className="mt-6 flex gap-4">
+        <button onClick={() => setPreviewMode(false)} className="bg-gray-300 hover:bg-gray-400 text-black px-4 py-2 rounded">Edit</button>
+        <button onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">Submit Listing</button>
       </div>
     </div>
   );
@@ -206,15 +195,20 @@ export default function SellerWizard() {
   return (
     <main className="bg-white min-h-screen p-6 font-sans">
       <Head>
+        <title>Seller Onboarding</title>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
       </Head>
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">Seller Onboarding</h1>
-        {previewMode ? renderPreview() : null /* Step logic omitted here for brevity */}
+        {previewMode ? renderPreview() : (
+          // ⏩ This part is unchanged from your working version.
+          <p>[...Your working onboarding steps go here. Keep as-is from your last working code]</p>
+        )}
       </div>
     </main>
   );
 }
+
 
