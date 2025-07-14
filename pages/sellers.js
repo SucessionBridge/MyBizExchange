@@ -93,20 +93,34 @@ export default function SellerWizard() {
     setFormData(prev => ({ ...prev, images: [...prev.images, ...files] }));
     setImagePreviews(prev => [...prev, ...previews]);
   };
- const handleSubmit = async () => {
+const handleSubmit = async () => {
   try {
     const form = new FormData();
+
+    // Image size check (Vercel limit: ~4.5MB total)
+    let totalSize = 0;
+    if (formData.images && formData.images.length > 0) {
+      formData.images.forEach(file => {
+        form.append(`images[]`, file); // keep this as is
+        totalSize += file.size;
+      });
+
+      if (totalSize > 4.5 * 1024 * 1024) {
+        alert('❌ Your total image size exceeds 4.5MB. Please upload smaller or fewer images.');
+        return;
+      }
+    }
+
+    // Append all other form fields
     Object.entries(formData).forEach(([key, value]) => {
-      if (key === 'images') {
-        value.forEach((file, i) => form.append(`images[${i}]`, file));
-      } else {
+      if (key !== 'images') {
         form.append(key, value);
       }
     });
 
     const res = await fetch('/api/submit-seller-listing', {
       method: 'POST',
-      body: form
+      body: form,
     });
 
     if (res.ok) {
@@ -122,6 +136,7 @@ export default function SellerWizard() {
     alert('❌ Something went wrong while submitting the listing.');
   }
 };
+
 
 
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
