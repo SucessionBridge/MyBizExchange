@@ -22,7 +22,16 @@ export default async function handler(req, res) {
   const form = formidable({ multiples: true });
 
   try {
-    const [fields, files] = await form.parse(req);
+   const parseForm = (req) =>
+  new Promise((resolve, reject) => {
+    form.parse(req, (err, fields, files) => {
+      if (err) reject(err);
+      else resolve([fields, files]);
+    });
+  });
+
+const [fields, files] = await parseForm(req); // ✅ This now works
+
 
     console.log('✅ Parsed fields:', fields);
     console.log('✅ Parsed files:', files);
