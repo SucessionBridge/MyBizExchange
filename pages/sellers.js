@@ -103,23 +103,34 @@ export default function SellerWizard() {
 
 const handleSubmit = async () => {
   try {
-    const form = new FormData();
-
-    // Image size check (Vercel limit: ~4.5MB total)
-    let totalSize = 0;
-    if (formData.images && formData.images.length > 0) {
-      formData.images.forEach(file => {
-        form.append(`images[]`, file); // keep this as is
-        totalSize += file.size;
-      });
-
-      if (totalSize > 4.5 * 1024 * 1024) {
-        alert('❌ Your total image size exceeds 4.5MB. Please upload smaller or fewer images.');
-        return;
-      }
+    // Sanity check for image array
+    if (!formData.images || !Array.isArray(formData.images)) {
+      alert('❌ No images found in form. Please re-upload before submitting.');
+      return;
     }
 
-    // Append all other form fields
+    const fileArray = formData.images.filter(f => f && f.name && f.size);
+    if (fileArray.length === 0) {
+      alert('❌ No valid images to submit. Try re-uploading.');
+      return;
+    }
+
+    const form = new FormData();
+    let totalSize = 0;
+
+    // Add images
+    for (const file of fileArray) {
+      form.append('images[]', file);
+      totalSize += file.size;
+    }
+
+    // Check for Vercel's ~4.5MB total size limit
+    if (totalSize > 4.5 * 1024 * 1024) {
+      alert('❌ Total image size exceeds 4.5MB. Please upload fewer or smaller images.');
+      return;
+    }
+
+    // Add other form data (excluding images)
     Object.entries(formData).forEach(([key, value]) => {
       if (key !== 'images') {
         form.append(key, value);
@@ -135,15 +146,25 @@ const handleSubmit = async () => {
       alert('✅ Listing submitted successfully!');
       router.push('/seller-dashboard');
     } else {
-      const errorData = await res.json();
-      console.error('❌ Submission failed:', errorData);
-      alert(`❌ Failed to submit: ${errorData.error || 'Unknown error'}`);
+      // Handle non-JSON error response
+      let errorMessage = 'Unknown error';
+      try {
+        const errorData = await res.json();
+        errorMessage = errorData.error || errorMessage;
+      } catch {
+        const raw = await res.text();
+        errorMessage = raw || errorMessage;
+        console.error('❌ Non-JSON response from server:', raw);
+      }
+
+      alert(`❌ Failed to submit listing: ${errorMessage}`);
     }
   } catch (err) {
-    console.error('❌ Network error during submission:', err);
-    alert('❌ Something went wrong while submitting the listing.');
+    console.error('❌ Submission crashed:', err);
+    alert('❌ Something went wrong during submission.');
   }
 };
+
 
 
 
