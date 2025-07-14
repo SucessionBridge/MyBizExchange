@@ -99,10 +99,12 @@ export default async function handler(req, res) {
       },
     ]);
 
-    if (error) {
-      console.error('❌ Supabase insert error:', error);
-      return res.status(500).json({ error: 'Failed to save listing' });
-    }
+   if (error) {
+  console.error('❌ Supabase insert error:', JSON.stringify(error, null, 2));
+  console.error('🚨 Listing fields that failed:', fields);
+  return res.status(500).json({ error: 'Failed to save listing', detail: error.message });
+}
+
 
     console.log('✅ Listing inserted successfully!');
     return res.status(200).json({ success: true });
