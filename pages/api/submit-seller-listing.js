@@ -2,7 +2,7 @@
 
 import nextConnect from 'next-connect';
 import formidable from 'formidable';
-import fs from 'fs';
+import fs from 'fs/promises';
 import { createClient } from '@supabase/supabase-js';
 
 export const config = {
@@ -20,7 +20,7 @@ const handler = nextConnect();
 
 handler.use(async (req, res, next) => {
   const form = new formidable.IncomingForm({ multiples: true });
-  form.parse(req, (err, fields, files) => {
+  form.parse(req, async (err, fields, files) => {
     if (err) return res.status(500).json({ error: 'Form parse error' });
     req.body = fields;
     req.files = files;
@@ -38,22 +38,28 @@ handler.post(async (req, res) => {
     const fileArray = Array.isArray(fileField) ? fileField : fileField ? [fileField] : [];
 
     for (const file of fileArray) {
-      const buffer = fs.readFileSync(file.filepath);
-      const filename = `${Date.now()}-${file.originalFilename}`;
-      const { error: uploadErr } = await supabase.storage
-        .from('seller-images')
-        .upload(filename, buffer, {
-          contentType: file.mimetype,
-          upsert: true,
-        });
+      if (!file || !file.filepath) continue;
 
-      if (uploadErr) {
-        console.error('Image upload error:', uploadErr);
-        continue;
+      try {
+        const buffer = await fs.readFile(file.filepath);
+        const filename = `${Date.now()}-${file.originalFilename}`;
+
+        const { error: uploadErr } = await supabase.storage
+          .from('seller-images')
+          .upload(filename, buffer, {
+            contentType: file.mimetype,
+            upsert: true,
+          });
+
+        if (uploadErr) {
+          console.error('Image upload error:', uploadErr);
+        } else {
+          const { data: urlData } = supabase.storage.from('seller-images').getPublicUrl(filename);
+          imageUrls.push(urlData.publicURL);
+        }
+      } catch (err) {
+        console.error('Buffer read error:', err);
       }
-
-      const { data: urlData } = supabase.storage.from('seller-images').getPublicUrl(filename);
-      imageUrls.push(urlData.publicURL);
     }
 
     const { error } = await supabase.from('sellers').insert([
@@ -112,4 +118,3 @@ handler.post(async (req, res) => {
 });
 
 export default handler;
-
