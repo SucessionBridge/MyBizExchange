@@ -338,7 +338,3 @@ export default function SellerWizard() {
     </main>
   );
 }
-
-  );
-}
-
