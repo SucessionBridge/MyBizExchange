@@ -8,12 +8,13 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.38.3",
+    "formidable": "^3.5.1",
     "jspdf": "^3.0.1",
     "lucide-react": "^0.264.0",
     "next": "13.4.12",
+    "next-connect": "^0.12.2",
     "react": "18.2.0",
-    "react-dom": "18.2.0",
-    "formidable": "^3.5.1"
+    "react-dom": "18.2.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.16",
@@ -21,3 +22,4 @@
     "tailwindcss": "^3.4.1"
   }
 }
+
