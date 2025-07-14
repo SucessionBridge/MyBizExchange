@@ -117,7 +117,28 @@ const handleSubmit = async (e) => {
     }
   });
 
+  try {
+    const res = await fetch('/api/submit-seller-listing', {
+      method: 'POST',
+      body: form,
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Server error');
+    }
+
+    setSubmitSuccess(true);
+    setIsSubmitting(false);
+    setPreviewMode(false);
+    router.push('/thank-you'); // optional: redirect to thank you page
+  } catch (err) {
+    console.error('❌ Submission error:', err);
+    setSubmitError(err.message || 'Submission failed');
+    setIsSubmitting(false);
+  }
 };
+
  
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
 
