@@ -21,6 +21,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    console.error('❌ Missing Supabase env variables!');
+    return res.status(500).json({ error: 'Server misconfigured. Env variables missing.' });
+  }
+
   const form = new formidable.IncomingForm({ multiples: true });
 
   form.parse(req, async (err, fields, files) => {
@@ -29,25 +34,31 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: 'Form parsing failed' });
     }
 
+    console.log('✅ Parsed fields:', fields);
+    console.log('✅ Parsed files:', files);
+
     try {
       const imageUrls = [];
-      const fileArray = Array.isArray(files['images[]']) ? files['images[]'] : [files['images[]']];
+      const fileField = files['images[]'];
+      const fileArray = Array.isArray(fileField) ? fileField : fileField ? [fileField] : [];
+
       for (const file of fileArray) {
-        if (!file) continue;
+        if (!file || !file.filepath) continue;
+
         const buffer = fs.readFileSync(file.filepath);
         const filename = `${Date.now()}-${file.originalFilename}`;
-        const { data, error: uploadErr } = await supabase.storage
+        const { error: uploadErr } = await supabase.storage
           .from('seller-images')
           .upload(filename, buffer, {
             contentType: file.mimetype,
             upsert: true,
           });
 
-        if (!uploadErr) {
-          const { publicURL } = supabase.storage.from('seller-images').getPublicUrl(filename).data;
-          imageUrls.push(publicURL);
-        } else {
+        if (uploadErr) {
           console.error('❌ Image upload error:', uploadErr);
+        } else {
+          const { data: urlData } = supabase.storage.from('seller-images').getPublicUrl(filename);
+          imageUrls.push(urlData.publicURL);
         }
       }
 
@@ -99,11 +110,11 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Failed to save listing' });
       }
 
+      console.log('✅ Listing inserted successfully!');
       return res.status(200).json({ success: true });
     } catch (e) {
-      console.error('❌ Server error:', e);
+      console.error('❌ Unexpected server error:', e);
       return res.status(500).json({ error: 'Unexpected error occurred' });
     }
   });
 }
-
