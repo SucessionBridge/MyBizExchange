@@ -110,62 +110,63 @@ const handleSubmit = async (e) => {
   try {
     const uploadedImageUrls = [];
 
-    // Upload images to Supabase Storage
     for (const file of formData.images) {
       const filePath = `${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('seller-images')
         .upload(filePath, file);
 
       if (uploadError) {
         console.error('Image upload failed:', uploadError.message);
-        setSubmitError('Image upload failed. Please try again.');
+        setSubmitError('❌ Image upload failed. Please try again.');
         setIsSubmitting(false);
         return;
       }
 
-      const { publicUrl } = supabase.storage
+      const { data: publicUrlData } = supabase.storage
         .from('seller-images')
-        .getPublicUrl(filePath).data;
+        .getPublicUrl(filePath);
 
-      uploadedImageUrls.push(publicUrl);
+      if (!publicUrlData?.publicUrl) {
+        console.error('Failed to get public URL for image');
+        setSubmitError('❌ Could not get image URL.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      uploadedImageUrls.push(publicUrlData.publicUrl);
     }
 
-    // Prepare the form data to send to API
-    const form = new FormData();
-
-    Object.entries(formData).forEach(([key, value]) => {
-      if (key !== 'images') {
-        form.append(key, value);
-      }
-    });
-
-    form.append('image_urls', JSON.stringify(uploadedImageUrls));
+    const payload = {
+      ...formData,
+      image_urls: uploadedImageUrls,
+    };
 
     const res = await fetch('/api/submit-seller-listing', {
       method: 'POST',
-      body: form,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
       const data = await res.json();
-      throw new Error(data.error || 'Server error');
+      throw new Error(data.error || '❌ Submission failed');
     }
 
     setSubmitSuccess(true);
     setIsSubmitting(false);
     setPreviewMode(false);
-    router.push('/thank-you'); // optional: redirect to thank you page
+    router.push('/thank-you');
 
   } catch (err) {
-    console.error('❌ Submission error:', err);
-    setSubmitError(err.message || 'Submission failed');
+    console.error('❌ Submission error:', err.message);
+    setSubmitError(err.message || '❌ Submission failed');
     setIsSubmitting(false);
   }
 };
 
-
- 
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
 
   const renderBackButton = () => (
