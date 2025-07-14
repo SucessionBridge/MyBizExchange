@@ -110,49 +110,44 @@ const handleSubmit = async (e) => {
   try {
     const uploadedImageUrls = [];
 
+    // Upload images to Supabase Storage
     for (const file of formData.images) {
       const filePath = `${Date.now()}-${file.name}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('seller-images')
         .upload(filePath, file);
 
       if (uploadError) {
         console.error('Image upload failed:', uploadError.message);
-        setSubmitError('❌ Image upload failed. Please try again.');
+        setSubmitError('Image upload failed. Please try again.');
         setIsSubmitting(false);
         return;
       }
 
-      const { data: publicUrlData } = supabase.storage
+      const { publicUrl } = supabase.storage
         .from('seller-images')
-        .getPublicUrl(filePath);
+        .getPublicUrl(filePath).data;
 
-      if (!publicUrlData?.publicUrl) {
-        console.error('Failed to get public URL for image');
-        setSubmitError('❌ Could not get image URL.');
-        setIsSubmitting(false);
-        return;
-      }
-
-      uploadedImageUrls.push(publicUrlData.publicUrl);
+      uploadedImageUrls.push(publicUrl);
     }
 
+    // 🔁 Send full payload as JSON
     const payload = {
       ...formData,
-      image_urls: uploadedImageUrls,
+      image_urls: uploadedImageUrls
     };
 
     const res = await fetch('/api/submit-seller-listing', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload)
     });
 
     if (!res.ok) {
       const data = await res.json();
-      throw new Error(data.error || '❌ Submission failed');
+      throw new Error(data.error || 'Server error');
     }
 
     setSubmitSuccess(true);
@@ -161,8 +156,8 @@ const handleSubmit = async (e) => {
     router.push('/thank-you');
 
   } catch (err) {
-    console.error('❌ Submission error:', err.message);
-    setSubmitError(err.message || '❌ Submission failed');
+    console.error('❌ Submission error:', err);
+    setSubmitError(err.message || 'Submission failed');
     setIsSubmitting(false);
   }
 };
