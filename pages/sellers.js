@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-
 export default function SellerWizard() {
+  
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [previewMode, setPreviewMode] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
+
+  // ✅ New submission state hooks
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
 
   const [formData, setFormData] = useState({
     name: '',
@@ -93,16 +99,49 @@ export default function SellerWizard() {
     setFormData(prev => ({ ...prev, images: [...prev.images, ...files] }));
     setImagePreviews(prev => [...prev, ...previews]);
   };
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setIsSubmitting(true);
+  setSubmitSuccess(false);
+  setSubmitError('');
 
-  const handleSubmit = async () => {
-    const form = new FormData();
-    Object.entries(formData).forEach(([key, value]) => {
-      if (key === 'images') {
-        value.forEach((file, i) => form.append(`images[${i}]`, file));
-      } else {
-        form.append(key, value);
-      }
+  const form = new FormData();
+
+  Object.entries(formData).forEach(([key, value]) => {
+    if (key === 'images' && Array.isArray(value)) {
+      value.forEach((file) => {
+        form.append('images[]', file);
+      });
+    } else {
+      form.append(key, value);
+    }
+  });
+
+  try {
+    const res = await fetch('/api/submit-seller-listing', {
+      method: 'POST',
+      body: form,
     });
+
+    const result = await res.json();
+
+    if (!res.ok || result.error) {
+      throw new Error(result.error || 'Submission failed');
+    }
+
+    setSubmitSuccess(true);
+    setFormData({ ...initialFormData });
+    setImagePreviews([]);
+    setStep(1);
+  } catch (err) {
+    console.error('❌ Submit Error:', err);
+    setSubmitError(err.message || 'Something went wrong');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
+ 
 
     const res = await fetch('/api/submit-seller-listing', {
       method: 'POST',
