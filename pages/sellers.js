@@ -118,16 +118,22 @@ const handleSubmit = async (e) => {
   });
 
   try {
-    const res = await fetch('/api/submit-seller-listing', {
-      method: 'POST',
-      body: form,
-    });
+  const res = await fetch('/api/submit-seller-listing', {
+  method: 'POST',
+  body: form,
+});
 
-    const result = await res.json();
+let result;
+try {
+  result = await res.json();
+} catch {
+  throw new Error('Server did not return valid JSON');
+}
 
-    if (!res.ok || result.error) {
-      throw new Error(result.error || 'Submission failed');
-    }
+if (!res.ok || result.error) {
+  throw new Error(result.error || 'Submission failed');
+}
+
 
     setSubmitSuccess(true);
     setFormData({ ...initialFormData });
