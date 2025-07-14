@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   const form = formidable({ multiples: true });
 
   try {
-    const [fields, files] = await form.parse(req); // ✅ Use Promise form, not callback
+    const [fields, files] = await form.parse(req);
 
     console.log('✅ Parsed fields:', fields);
     console.log('✅ Parsed files:', files);
@@ -51,63 +51,13 @@ export default async function handler(req, res) {
       }
     }
 
-    if (!fields.name || !fields.email) {
-      console.error('❌ Missing required fields');
-      return res.status(400).json({ error: 'Missing required fields: name or email' });
-    }
-const { error } = await supabase.from('sellers').insert([
-  {
-    name: fields.name[0],
-    email: fields.email[0],
-    business_name: fields.businessName?.[0] || '',
-    hide_business_name: fields.hideBusinessName?.[0] === 'true',
-    industry: fields.industry?.[0] || '',
-    location: fields.location?.[0] || '',
-    website: fields.website?.[0] || '',
-    annual_revenue: Number(fields.annualRevenue?.[0] || 0),
-    annual_profit: Number(fields.annualProfit?.[0] || 0),
-    sde: Number(fields.sde?.[0] || 0),
-    asking_price: Number(fields.askingPrice?.[0] || 0),
-    employees: parseInt(fields.employees?.[0]) || 0,
-    monthly_lease: Number(fields.monthly_lease?.[0] || 0),
-    inventory_value: Number(fields.inventory_value?.[0] || 0),
-    equipment_value: Number(fields.equipment_value?.[0] || 0),
-    includes_inventory: fields.includesInventory?.[0] === 'true',
-    includes_building: fields.includesBuilding?.[0] === 'true',
-    real_estate_included: fields.real_estate_included?.[0] === 'true',
-    relocatable: fields.relocatable?.[0] === 'true',
-    home_based: fields.home_based?.[0] === 'true',
-    financing_type: fields.financingType?.[0] || '',
-    business_description: fields.businessDescription?.[0] || '',
-    ai_description: fields.aiDescription?.[0] || '',
-    description_choice: fields.descriptionChoice?.[0] || '',
-    customer_type: fields.customerType?.[0] || '',
-    owner_involvement: fields.ownerInvolvement?.[0] || '',
-    growth_potential: fields.growthPotential?.[0] || '',
-    reason_for_selling: fields.reasonForSelling?.[0] || '',
-    training_offered: fields.trainingOffered?.[0] || '',
-    sentence_summary: fields.sentenceSummary?.[0] || '',
-    customers: fields.customers?.[0] || '',
-    best_sellers: fields.bestSellers?.[0] || '',
-    customer_love: fields.customerLove?.[0] || '',
-    repeat_customers: fields.repeatCustomers?.[0] || '',
-    keeps_them_coming: fields.keepsThemComing?.[0] || '',
-    proud_of: fields.proudOf?.[0] || '',
-    advice_to_buyer: fields.adviceToBuyer?.[0] || '',
-    image_urls: imageUrls, // already handled
-  },
-]);
+    // ✅ Step 1: Skip DB insert and return image upload result
+    return res.status(200).json({
+      success: true,
+      message: 'Image upload test complete',
+      imageUrls,
+    });
 
-   
-   if (error) {
-  console.error('❌ Supabase insert error:', JSON.stringify(error, null, 2));
-  console.error('🚨 Listing fields that failed:', fields);
-  return res.status(500).json({ error: 'Failed to save listing', detail: error.message });
-}
-
-
-    console.log('✅ Listing inserted successfully!');
-    return res.status(200).json({ success: true });
   } catch (e) {
     console.error('❌ Unexpected error:', e.message, e.stack);
     return res.status(500).json({ error: 'Server error' });
