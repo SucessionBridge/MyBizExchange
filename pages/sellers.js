@@ -117,35 +117,7 @@ const handleSubmit = async (e) => {
     }
   });
 
-  try {
-    const res = await fetch('/api/submit-seller-listing', {
-      method: 'POST',
-      body: form,
-    });
-
-    const contentType = res.headers.get('content-type');
-
-    if (!res.ok) {
-      if (contentType && contentType.includes('application/json')) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Unknown server error');
-      } else {
-        throw new Error('Server did not return valid JSON');
-      }
-    }
-
-    const data = await res.json();
-    if (data.success) {
-      setSubmitSuccess(true);
-    } else {
-      throw new Error(data.error || 'Failed to save listing');
-    }
-  } catch (error) {
-    console.error('❌ Submit Error:', error);
-    setSubmitError(error.message);
-  } finally {
-    setIsSubmitting(false);
-  }
+  
 };
 
 
