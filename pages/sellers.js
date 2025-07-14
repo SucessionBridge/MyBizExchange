@@ -117,38 +117,6 @@ const handleSubmit = async (e) => {
     }
   });
 
-  
-};
-
-
-  try {
-  const res = await fetch('/api/submit-seller-listing', {
-  method: 'POST',
-  body: form,
-});
-
-let result;
-try {
-  result = await res.json();
-} catch {
-  throw new Error('Server did not return valid JSON');
-}
-
-if (!res.ok || result.error) {
-  throw new Error(result.error || 'Submission failed');
-}
-
-
-    setSubmitSuccess(true);
-    setFormData({ ...initialFormData });
-    setImagePreviews([]);
-    setStep(1);
-  } catch (err) {
-    console.error('❌ Submit Error:', err);
-    setSubmitError(err.message || 'Something went wrong');
-  } finally {
-    setIsSubmitting(false);
-  }
 };
  
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
