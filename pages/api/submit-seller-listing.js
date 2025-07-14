@@ -1,7 +1,7 @@
 // pages/api/submit-seller-listing.js
 
 import { createClient } from '@supabase/supabase-js';
-import formidable from 'formidable';
+import { IncomingForm } from 'formidable'; // ✅ FIXED import
 import fs from 'fs';
 
 export const config = {
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server misconfigured. Env variables missing.' });
   }
 
-  const form = new formidable.IncomingForm({ multiples: true });
+  const form = new IncomingForm({ multiples: true }); // ✅ FIXED usage
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
@@ -128,3 +128,4 @@ export default async function handler(req, res) {
     }
   });
 }
+
