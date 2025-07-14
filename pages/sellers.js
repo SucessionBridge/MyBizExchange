@@ -140,16 +140,7 @@ const handleSubmit = async (e) => {
     setIsSubmitting(false);
   }
 };
-
  
-
-    const res = await fetch('/api/submit-seller-listing', {
-      method: 'POST',
-      body: form
-    });
-    if (res.ok) router.push('/seller-dashboard');
-  };
-
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
 
   const renderBackButton = () => (
