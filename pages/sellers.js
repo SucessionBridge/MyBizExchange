@@ -93,6 +93,14 @@ export default function SellerWizard() {
     setFormData(prev => ({ ...prev, images: [...prev.images, ...files] }));
     setImagePreviews(prev => [...prev, ...previews]);
   };
+  const removeImage = (index) => {
+  setImagePreviews(prev => prev.filter((_, i) => i !== index));
+  setFormData(prev => ({
+    ...prev,
+    images: prev.images.filter((_, i) => i !== index)
+  }));
+};
+
 const handleSubmit = async () => {
   try {
     const form = new FormData();
@@ -145,12 +153,28 @@ const handleSubmit = async () => {
     <button onClick={() => setStep(s => Math.max(1, s - 1))} className="text-sm text-blue-600 underline mt-2">Back</button>
   );
 
-  const renderImages = () => (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">Upload Photos:</label>
-      <input type="file" multiple onChange={handleImageUpload} accept="image/*" />
+const renderImages = () => (
+  <div className="space-y-2">
+    <label className="text-sm font-medium">Upload Photos:</label>
+    <input type="file" multiple onChange={handleImageUpload} accept="image/*" />
+    <div className="grid grid-cols-2 gap-4 mt-4">
+      {imagePreviews.map((src, idx) => (
+        <div key={idx} className="relative">
+          <img src={src} className="w-full h-40 object-cover rounded shadow border" />
+          <button
+            type="button"
+            onClick={() => removeImage(idx)}
+            className="absolute top-1 right-1 bg-black text-white rounded-full w-6 h-6 text-xs flex items-center justify-center"
+            title="Remove"
+          >
+            ×
+          </button>
+        </div>
+      ))}
     </div>
-  );
+  </div>
+);
+
 
   const renderPreview = () => {
     const toTitleCase = (str) =>
