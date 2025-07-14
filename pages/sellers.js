@@ -99,25 +99,49 @@ export default function SellerWizard() {
     setFormData(prev => ({ ...prev, images: [...prev.images, ...files] }));
     setImagePreviews(prev => [...prev, ...previews]);
   };
+import { supabase } from '../lib/supabaseClient'; // Make sure this is at the top of your file
+
 const handleSubmit = async (e) => {
   e.preventDefault();
   setIsSubmitting(true);
   setSubmitSuccess(false);
   setSubmitError('');
 
-  const form = new FormData();
-
-  Object.entries(formData).forEach(([key, value]) => {
-    if (key === 'images' && Array.isArray(value)) {
-      value.forEach((file) => {
-        form.append('images[]', file);
-      });
-    } else {
-      form.append(key, value);
-    }
-  });
-
   try {
+    const uploadedImageUrls = [];
+
+    // Upload images to Supabase Storage
+    for (const file of formData.images) {
+      const filePath = `${Date.now()}-${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from('seller-images')
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error('Image upload failed:', uploadError.message);
+        setSubmitError('Image upload failed. Please try again.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const { publicUrl } = supabase.storage
+        .from('seller-images')
+        .getPublicUrl(filePath).data;
+
+      uploadedImageUrls.push(publicUrl);
+    }
+
+    // Prepare the form data to send to API
+    const form = new FormData();
+
+    Object.entries(formData).forEach(([key, value]) => {
+      if (key !== 'images') {
+        form.append(key, value);
+      }
+    });
+
+    form.append('image_urls', JSON.stringify(uploadedImageUrls));
+
     const res = await fetch('/api/submit-seller-listing', {
       method: 'POST',
       body: form,
@@ -132,12 +156,14 @@ const handleSubmit = async (e) => {
     setIsSubmitting(false);
     setPreviewMode(false);
     router.push('/thank-you'); // optional: redirect to thank you page
+
   } catch (err) {
     console.error('❌ Submission error:', err);
     setSubmitError(err.message || 'Submission failed');
     setIsSubmitting(false);
   }
 };
+
 
  
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
