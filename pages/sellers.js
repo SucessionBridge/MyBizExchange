@@ -157,26 +157,7 @@ const handleSubmit = async () => {
 };
 
 
-    const res = await fetch('/api/submit-seller-listing', {
-      method: 'POST',
-      body: form,
-    });
-
-    if (res.ok) {
-      alert('✅ Listing submitted successfully!');
-      router.push('/seller-dashboard');
-    } else {
-      // Handle non-JSON error response
-      let errorMessage = 'Unknown error';
-      try {
-        const errorData = await res.json();
-        errorMessage = errorData.error || errorMessage;
-      } catch {
-        const raw = await res.text();
-        errorMessage = raw || errorMessage;
-        console.error('❌ Non-JSON response from server:', raw);
-      }
-
+  
       alert(`❌ Failed to submit listing: ${errorMessage}`);
     }
   } catch (err) {
