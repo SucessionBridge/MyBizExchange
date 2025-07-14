@@ -288,21 +288,35 @@ const handleSubmit = async (e) => {
           <p><strong>One-Line Summary:</strong> {formData.sentenceSummary}</p>
         </div>
       </div>
+<div className="mt-8 space-y-4">
+  <div className="flex gap-4">
+    <button
+      onClick={() => setPreviewMode(false)}
+      className="bg-gray-300 hover:bg-gray-400 text-black px-5 py-2 rounded"
+    >
+      Edit
+    </button>
+    <button
+      onClick={handleSubmit}
+      disabled={isSubmitting}
+      className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded disabled:opacity-50"
+    >
+      {isSubmitting ? 'Submitting...' : 'Submit Listing'}
+    </button>
+  </div>
 
-      <div className="mt-8 flex gap-4">
-        <button
-          onClick={() => setPreviewMode(false)}
-          className="bg-gray-300 hover:bg-gray-400 text-black px-5 py-2 rounded"
-        >
-          Edit
-        </button>
-        <button
-          onClick={handleSubmit}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded"
-        >
-          Submit Listing
-        </button>
-      </div>
+  {isSubmitting && (
+    <p className="text-sm text-gray-600">⏳ Please wait while we submit your listing...</p>
+  )}
+  {submitSuccess && (
+    <p className="text-sm text-green-600">✅ Your listing has been submitted successfully!</p>
+  )}
+  {submitError && (
+    <p className="text-sm text-red-600">❌ {submitError}</p>
+  )}
+</div>
+
+     
     </div>
   );
 };
