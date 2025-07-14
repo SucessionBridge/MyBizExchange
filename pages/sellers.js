@@ -124,18 +124,38 @@ const handleSubmit = async () => {
       totalSize += file.size;
     }
 
-    // Check for Vercel's ~4.5MB total size limit
+    // Check for Vercel’s ~4.5MB total size limit
     if (totalSize > 4.5 * 1024 * 1024) {
       alert('❌ Total image size exceeds 4.5MB. Please upload fewer or smaller images.');
       return;
     }
 
-    // Add other form data (excluding images)
+    // Add other form fields
     Object.entries(formData).forEach(([key, value]) => {
       if (key !== 'images') {
         form.append(key, value);
       }
     });
+
+    const res = await fetch('/api/submit-seller-listing', {
+      method: 'POST',
+      body: form
+    });
+
+    if (res.ok) {
+      alert('✅ Listing submitted successfully!');
+      router.push('/seller-dashboard');
+    } else {
+      const errorText = await res.text();
+      console.error('❌ Server rejected submission:', errorText);
+      alert(`❌ Submission failed: ${errorText || 'Unknown error'}`);
+    }
+  } catch (err) {
+    console.error('❌ Network error during submission:', err);
+    alert('❌ Something went wrong while submitting the listing.');
+  }
+};
+
 
     const res = await fetch('/api/submit-seller-listing', {
       method: 'POST',
