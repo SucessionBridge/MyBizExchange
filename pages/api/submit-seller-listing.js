@@ -1,7 +1,7 @@
 // pages/api/submit-seller-listing.js
 
 import { createClient } from '@supabase/supabase-js';
-import { IncomingForm } from 'formidable'; // ✅ FIXED import
+import formidable from 'formidable';
 import fs from 'fs';
 
 export const config = {
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server misconfigured. Env variables missing.' });
   }
 
-  const form = new IncomingForm({ multiples: true }); // ✅ FIXED usage
+  const form = new formidable.IncomingForm({ multiples: true });
 
   form.parse(req, async (err, fields, files) => {
     if (err) {
@@ -116,8 +116,8 @@ export default async function handler(req, res) {
       ]);
 
       if (error) {
-        console.error('❌ Supabase insert error:', error);
-        return res.status(500).json({ error: 'Failed to save listing' });
+        console.error('❌ Supabase insert error:', JSON.stringify(error, null, 2));
+        return res.status(500).json({ error: 'Failed to save listing', details: error.message });
       }
 
       console.log('✅ Listing inserted successfully!');
@@ -128,4 +128,5 @@ export default async function handler(req, res) {
     }
   });
 }
+
 
