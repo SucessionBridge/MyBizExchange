@@ -86,10 +86,15 @@ export default function ListingDetail() {
         Asking Price: ${listing.asking_price?.toLocaleString()}
       </p>
 
-      {listing.images?.length > 0 && (
+      {listing.image_urls?.length > 0 && (
         <div className="grid grid-cols-2 gap-2 mb-6">
-          {listing.images.map((url, idx) => (
-            <img key={idx} src={url} alt={`Business Image ${idx + 1}`} className="w-full h-40 object-cover rounded" />
+          {listing.image_urls.map((url, idx) => (
+            <img
+              key={idx}
+              src={url}
+              alt={`Business Image ${idx + 1}`}
+              className="w-full h-40 object-cover rounded"
+            />
           ))}
         </div>
       )}
@@ -140,4 +145,5 @@ export default function ListingDetail() {
     </main>
   );
 }
+
 
