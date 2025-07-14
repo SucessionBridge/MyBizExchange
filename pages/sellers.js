@@ -100,7 +100,6 @@ export default function SellerWizard() {
     setFormData(prev => ({ ...prev, images: [...prev.images, ...files] }));
     setImagePreviews(prev => [...prev, ...previews]);
   };
-import { supabase } from '../lib/supabaseClient'; // Make sure this is at the top of your file
 
 const handleSubmit = async (e) => {
   e.preventDefault();
