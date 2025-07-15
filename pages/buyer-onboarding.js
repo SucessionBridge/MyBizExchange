@@ -1,4 +1,4 @@
-import { useRouter } from 'next/router'; 
+import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 import React, { useState, useEffect } from 'react';
 import { useSession } from '@supabase/auth-helpers-react';
@@ -28,6 +28,7 @@ export default function BuyerOnboarding() {
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -38,21 +39,18 @@ export default function BuyerOnboarding() {
 
   useEffect(() => {
     const fetchBuyerData = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
 
       if (user?.email) {
         const { data, error } = await supabase
           .from('buyers')
           .select('*')
-          .eq('email', user.email);
+          .eq('email', user.email)
+          .single();
 
-        if (error) {
-          console.error('❌ Error fetching buyer profile:', error.message);
-        } else if (data?.length > 0) {
-          console.log('✅ Existing buyer profile:', data[0]);
-          // Optional: setFormData(data[0]);
+        if (data) {
+          // ✅ Auto-redirect if already submitted
+          router.push('/buyer-dashboard');
         }
       }
     };
@@ -89,6 +87,7 @@ export default function BuyerOnboarding() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
+    if (alreadySubmitted) return;
 
     const {
       name,
@@ -113,26 +112,21 @@ export default function BuyerOnboarding() {
       const { error: uploadError } = await supabase.storage
         .from('buyers-videos')
         .upload(videoName, video);
-
       setIsUploading(false);
-
       if (uploadError) {
         console.error('❌ Error uploading video:', uploadError);
         alert('There was a problem uploading your video.');
         return;
       }
-
       const { data: publicUrlData } = supabase.storage
         .from('buyers-videos')
         .getPublicUrl(videoName);
-
       videoUrl = publicUrlData?.publicUrl;
     }
 
-    // ✅ Replace insert with upsert (safe re-submit logic)
-    const { error: insertError } = await supabase.from('buyers').upsert([{
-      email,
+    const { error: insertError } = await supabase.from('buyers').insert([{
       name,
+      email,
       financing_type: financingType,
       experience,
       industry_preference: industryPreference,
@@ -144,20 +138,15 @@ export default function BuyerOnboarding() {
       state_or_province: stateOrProvince,
       video_introduction: videoUrl,
       budget_for_purchase: budgetForPurchase,
-    }], {
-      onConflict: ['email'],
-    });
+    }]);
 
     if (insertError) {
       console.error('❌ Error submitting form:', insertError);
       alert('There was a problem submitting your form.');
     } else {
+      setAlreadySubmitted(true); // ✅ Prevent double submit
       alert('Your buyer profile was submitted successfully!');
-      if (redirectPath) {
-        router.push(redirectPath);
-      } else {
-        router.push('/listings');
-      }
+      router.push('/buyer-dashboard');
     }
   };
 
@@ -178,9 +167,7 @@ export default function BuyerOnboarding() {
           <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded text-black" />
 
           <p className="bg-gray-100 p-3 rounded text-sm text-gray-700">
-            Your email (from login): <strong>
-              {session?.user?.email || 'Not logged in'}
-            </strong>
+            Your email (from login): <strong>{session?.user?.email || 'Not logged in'}</strong>
           </p>
 
           <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded text-black">
@@ -218,7 +205,7 @@ export default function BuyerOnboarding() {
             </video>
           )}
 
-          <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold">
+          <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold" disabled={alreadySubmitted}>
             Submit Buyer Profile
           </button>
         </form>
@@ -226,5 +213,4 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
-
 
