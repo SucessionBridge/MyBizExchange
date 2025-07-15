@@ -56,7 +56,7 @@ const [fields, files] = await parseForm(req); // ✅ This now works
         console.error('❌ Image upload error:', uploadErr);
       } else {
         const { data: urlData } = supabase.storage.from('seller-images').getPublicUrl(filename);
-        imageUrls.push(urlData.publicURl);
+        imageUrls.push(urlData.publicUrl);
       }
     }
 
