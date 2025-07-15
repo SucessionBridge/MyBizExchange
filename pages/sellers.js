@@ -110,7 +110,7 @@ const handleSubmit = async (e) => {
   try {
     const uploadedImageUrls = [];
 
-    // ✅ Upload images to Supabase
+    // Upload each image to Supabase
     for (const file of formData.images || []) {
       const filePath = `${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
@@ -124,113 +124,57 @@ const handleSubmit = async (e) => {
         return;
       }
 
-      const { publicUrl } = supabase.storage
+      const { data } = supabase.storage
         .from('seller-images')
-        .getPublicUrl(filePath).data;
+        .getPublicUrl(filePath);
 
-      if (publicUrl) uploadedImageUrls.push(publicUrl);
+      if (data?.publicUrl) {
+        uploadedImageUrls.push(data.publicUrl);
+      }
     }
 
-    // ✅ Build payload matching your DB column names
-    const {
-      name,
-      email,
-      business_name,
-      industry,
-      location,
-      financing_type,
-      business_description,
-      askingPrice,
-      includes_inventory,
-      includes_building,
-      annualRevenue,
-      annualProfit,
-      sde,
-      inventory_value,
-      equipment_value,
-      rent,
-      real_estate_included,
-      year_established,
-      employees,
-      home_based,
-      relocatable,
-      website,
-      customer_type,
-      marketing_method,
-      owner_involvement,
-      can_run_without_owner,
-      competitive_edge,
-      competitors,
-      growth_potential,
-      reason_for_selling,
-      training_offered,
-      creative_financing,
-      willing_to_mentor,
-      hide_business_name,
-      rent_paid,
-      rent_amount,
-      years_in_business,
-      monthly_lease,
-      description_choice,
-      sentence_summary,
-      customers,
-      best_sellers,
-      customer_love,
-      repeat_customers,
-      keeps_them_coming,
-      proud_of,
-      advice_to_buyer,
-    } = formData;
-
+    // Map formData (camelCase) → payload (snake_case)
     const payload = {
-      name: name || '',
-      email: email || '',
-      business_name: business_name || '',
-      industry: industry || '',
-      location: location || '',
-      financing_type: financing_type || '',
-      business_description: business_description || '',
-      asking_price: parseFloat(askingPrice) || 0,
-      includes_inventory: includes_inventory === true,
-      includes_building: includes_building === true,
-      annual_revenue: parseFloat(annualRevenue) || 0,
-      annual_profit: parseFloat(annualProfit) || 0,
-      sde: parseFloat(sde) || 0,
-      inventory_value: parseFloat(inventory_value) || 0,
-      equipment_value: parseFloat(equipment_value) || 0,
-      rent: rent || '',
-      real_estate_included: real_estate_included === true,
-      year_established: parseInt(year_established) || 0,
-      employees: parseInt(employees) || 0,
-      home_based: home_based === true,
-      relocatable: relocatable === true,
-      website: website || '',
-      customer_type: customer_type || '',
-      marketing_method: marketing_method || '',
-      owner_involvement: owner_involvement || '',
-      can_run_without_owner: can_run_without_owner || '',
-      competitive_edge: competitive_edge || '',
-      competitors: competitors || '',
-      growth_potential: growth_potential || '',
-      reason_for_selling: reason_for_selling || '',
-      training_offered: training_offered || '',
-      creative_financing: creative_financing || '',
-      willing_to_mentor: willing_to_mentor === true,
-      hide_business_name: hide_business_name === true,
-      rent_paid: rent_paid === true,
-      rent_amount: parseFloat(rent_amount) || 0,
-      years_in_business: parseInt(years_in_business) || 0,
-      monthly_lease: parseFloat(monthly_lease) || 0,
-      description_choice: description_choice || '',
-      sentence_summary: sentence_summary || '',
-      customers: customers || '',
-      best_sellers: best_sellers || '',
-      customer_love: customer_love || '',
-      repeat_customers: repeat_customers || '',
-      keeps_them_coming: keeps_them_coming || '',
-      proud_of: proud_of || '',
-      advice_to_buyer: advice_to_buyer || '',
-      image_urls: uploadedImageUrls
+      name: formData.name || '',
+      email: formData.email || '',
+      business_name: formData.businessName || '',
+      hide_business_name: formData.hideBusinessName || false,
+      industry: formData.industry || '',
+      location: formData.location || '',
+      website: formData.website || '',
+      annual_revenue: parseFloat(formData.annualRevenue) || 0,
+      annual_profit: parseFloat(formData.annualProfit) || 0,
+      sde: parseFloat(formData.sde) || 0,
+      asking_price: parseFloat(formData.askingPrice) || 0,
+      employees: parseInt(formData.employees) || 0,
+      monthly_lease: parseFloat(formData.monthly_lease) || 0,
+      inventory_value: parseFloat(formData.inventory_value) || 0,
+      equipment_value: parseFloat(formData.equipment_value) || 0,
+      includes_inventory: formData.includesInventory || false,
+      includes_building: formData.includesBuilding || false,
+      real_estate_included: formData.real_estate_included || false,
+      relocatable: formData.relocatable || false,
+      home_based: formData.home_based || false,
+      financing_type: formData.financingType || '',
+      business_description:
+        formData.descriptionChoice === 'manual'
+          ? formData.businessDescription
+          : formData.aiDescription,
+      description_choice: formData.descriptionChoice || '',
+      customer_type: formData.customerType || '',
+      owner_involvement: formData.ownerInvolvement || '',
+      growth_potential: formData.growthPotential || '',
+      reason_for_selling: formData.reasonForSelling || '',
+      training_offered: formData.trainingOffered || '',
+      sentence_summary: formData.sentenceSummary || '',
+      customers: formData.customers || '',
+      best_sellers: formData.bestSellers || '',
+      customer_love: formData.customerLove || '',
+      repeat_customers: formData.repeatCustomers || '',
+      keeps_them_coming: formData.keepsThemComing || '',
+      proud_of: formData.proudOf || '',
+      advice_to_buyer: formData.adviceToBuyer || '',
+      image_urls: uploadedImageUrls,
     };
 
     const res = await fetch('/api/submit-seller-listing', {
@@ -246,7 +190,6 @@ const handleSubmit = async (e) => {
 
     setSubmitSuccess(true);
     setIsSubmitting(false);
-    setPreviewMode(false);
     router.push('/thank-you');
 
   } catch (err) {
@@ -255,9 +198,6 @@ const handleSubmit = async (e) => {
     setIsSubmitting(false);
   }
 };
-
-
-
 
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
 
