@@ -110,8 +110,8 @@ const handleSubmit = async (e) => {
   try {
     const uploadedImageUrls = [];
 
-    // Upload images to Supabase
-    for (const file of formData.images) {
+    // ✅ Upload images to Supabase
+    for (const file of formData.images || []) {
       const filePath = `${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('seller-images')
@@ -128,33 +128,108 @@ const handleSubmit = async (e) => {
         .from('seller-images')
         .getPublicUrl(filePath).data;
 
-      uploadedImageUrls.push(publicUrl);
+      if (publicUrl) uploadedImageUrls.push(publicUrl);
     }
 
-    // 🔁 Construct payload with corrected snake_case keys
+    // ✅ Build payload matching your DB column names
     const {
-      images,
+      name,
+      email,
+      business_name,
+      industry,
+      location,
+      financing_type,
+      business_description,
+      askingPrice,
+      includes_inventory,
+      includes_building,
       annualRevenue,
       annualProfit,
       sde,
-      askingPrice,
-      employees,
-      monthly_lease,
       inventory_value,
       equipment_value,
-      ...rest
+      rent,
+      real_estate_included,
+      year_established,
+      employees,
+      home_based,
+      relocatable,
+      website,
+      customer_type,
+      marketing_method,
+      owner_involvement,
+      can_run_without_owner,
+      competitive_edge,
+      competitors,
+      growth_potential,
+      reason_for_selling,
+      training_offered,
+      creative_financing,
+      willing_to_mentor,
+      hide_business_name,
+      rent_paid,
+      rent_amount,
+      years_in_business,
+      monthly_lease,
+      description_choice,
+      sentence_summary,
+      customers,
+      best_sellers,
+      customer_love,
+      repeat_customers,
+      keeps_them_coming,
+      proud_of,
+      advice_to_buyer,
     } = formData;
 
     const payload = {
-      ...rest,
+      name: name || '',
+      email: email || '',
+      business_name: business_name || '',
+      industry: industry || '',
+      location: location || '',
+      financing_type: financing_type || '',
+      business_description: business_description || '',
+      asking_price: parseFloat(askingPrice) || 0,
+      includes_inventory: includes_inventory === true,
+      includes_building: includes_building === true,
       annual_revenue: parseFloat(annualRevenue) || 0,
       annual_profit: parseFloat(annualProfit) || 0,
       sde: parseFloat(sde) || 0,
-      asking_price: parseFloat(askingPrice) || 0,
-      employees: parseInt(employees) || 0,
-      monthly_lease: parseFloat(monthly_lease) || 0,
       inventory_value: parseFloat(inventory_value) || 0,
       equipment_value: parseFloat(equipment_value) || 0,
+      rent: rent || '',
+      real_estate_included: real_estate_included === true,
+      year_established: parseInt(year_established) || 0,
+      employees: parseInt(employees) || 0,
+      home_based: home_based === true,
+      relocatable: relocatable === true,
+      website: website || '',
+      customer_type: customer_type || '',
+      marketing_method: marketing_method || '',
+      owner_involvement: owner_involvement || '',
+      can_run_without_owner: can_run_without_owner || '',
+      competitive_edge: competitive_edge || '',
+      competitors: competitors || '',
+      growth_potential: growth_potential || '',
+      reason_for_selling: reason_for_selling || '',
+      training_offered: training_offered || '',
+      creative_financing: creative_financing || '',
+      willing_to_mentor: willing_to_mentor === true,
+      hide_business_name: hide_business_name === true,
+      rent_paid: rent_paid === true,
+      rent_amount: parseFloat(rent_amount) || 0,
+      years_in_business: parseInt(years_in_business) || 0,
+      monthly_lease: parseFloat(monthly_lease) || 0,
+      description_choice: description_choice || '',
+      sentence_summary: sentence_summary || '',
+      customers: customers || '',
+      best_sellers: best_sellers || '',
+      customer_love: customer_love || '',
+      repeat_customers: repeat_customers || '',
+      keeps_them_coming: keeps_them_coming || '',
+      proud_of: proud_of || '',
+      advice_to_buyer: advice_to_buyer || '',
       image_urls: uploadedImageUrls
     };
 
@@ -180,6 +255,7 @@ const handleSubmit = async (e) => {
     setIsSubmitting(false);
   }
 };
+
 
 
 
