@@ -16,6 +16,7 @@ export default function Listings() {
       if (error) {
         console.error('Error fetching listings:', error);
       } else {
+        console.log('✅ Listings fetched:', data); // 🔍 Debug insert
         setListings(data);
       }
 
