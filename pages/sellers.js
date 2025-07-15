@@ -131,7 +131,7 @@ const handleSubmit = async (e) => {
       uploadedImageUrls.push(publicUrl);
     }
 
-    // 🔁 Construct clean payload (snake_case keys)
+    // 🔁 Construct payload with corrected snake_case keys
     const {
       images,
       annualRevenue,
@@ -180,6 +180,7 @@ const handleSubmit = async (e) => {
     setIsSubmitting(false);
   }
 };
+
 
 
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
