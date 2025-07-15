@@ -154,8 +154,13 @@ const payload = {
   inventory_value: parseFloat(inventory_value) || 0,
   equipment_value: parseFloat(equipment_value) || 0,
   image_urls: uploadedImageUrls,
-  original_description: formData.description_choice === 'manual' ? formData.business_description : '',
-  ai_description: formData.description_choice === 'ai' ? formData.ai_description : '',
+  // ✅ Descriptions (already present)
+  original_description: formData.descriptionChoice === 'manual' ? formData.businessDescription : '',
+  ai_description: formData.descriptionChoice === 'ai' ? formData.aiDescription : '',
+  // ✅ Missing fields added below
+  description_choice: formData.descriptionChoice,
+  hide_business_name: formData.hideBusinessName,
+  business_description: formData.businessDescription, // always send original text too
 };
 
    
