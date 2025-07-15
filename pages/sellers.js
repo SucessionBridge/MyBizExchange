@@ -131,9 +131,9 @@ const handleSubmit = async (e) => {
       uploadedImageUrls.push(publicUrl);
     }
 
-    // 🔁 Construct clean payload (remove images, convert numbers)
+    // 🔁 Construct clean payload (snake_case keys)
     const {
-      images, // remove this
+      images,
       annualRevenue,
       annualProfit,
       sde,
@@ -147,10 +147,10 @@ const handleSubmit = async (e) => {
 
     const payload = {
       ...rest,
-      annualRevenue: parseFloat(annualRevenue) || 0,
-      annualProfit: parseFloat(annualProfit) || 0,
+      annual_revenue: parseFloat(annualRevenue) || 0,
+      annual_profit: parseFloat(annualProfit) || 0,
       sde: parseFloat(sde) || 0,
-      askingPrice: parseFloat(askingPrice) || 0,
+      asking_price: parseFloat(askingPrice) || 0,
       employees: parseInt(employees) || 0,
       monthly_lease: parseFloat(monthly_lease) || 0,
       inventory_value: parseFloat(inventory_value) || 0,
