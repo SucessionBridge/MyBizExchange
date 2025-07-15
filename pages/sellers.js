@@ -110,8 +110,8 @@ const handleSubmit = async (e) => {
   try {
     const uploadedImageUrls = [];
 
-    // Upload each image to Supabase
-    for (const file of formData.images || []) {
+    // ✅ Upload images to Supabase and collect public URLs
+    for (const file of formData.images) {
       const filePath = `${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from('seller-images')
@@ -124,63 +124,44 @@ const handleSubmit = async (e) => {
         return;
       }
 
-      const { data } = supabase.storage
+      const { data: urlData } = supabase.storage
         .from('seller-images')
         .getPublicUrl(filePath);
-
-      if (data?.publicUrl) {
-        uploadedImageUrls.push(data.publicUrl);
-      }
+      uploadedImageUrls.push(urlData.publicUrl);
     }
 
-    // Map formData (camelCase) → payload (snake_case)
+    // ✅ Prepare clean JSON payload with correct snake_case keys
+    const {
+      images, // remove from payload
+      annualRevenue,
+      annualProfit,
+      sde,
+      askingPrice,
+      employees,
+      monthly_lease,
+      inventory_value,
+      equipment_value,
+      ...rest
+    } = formData;
+
     const payload = {
-      name: formData.name || '',
-      email: formData.email || '',
-      business_name: formData.businessName || '',
-      hide_business_name: formData.hideBusinessName || false,
-      industry: formData.industry || '',
-      location: formData.location || '',
-      website: formData.website || '',
-      annual_revenue: parseFloat(formData.annualRevenue) || 0,
-      annual_profit: parseFloat(formData.annualProfit) || 0,
-      sde: parseFloat(formData.sde) || 0,
-      asking_price: parseFloat(formData.askingPrice) || 0,
-      employees: parseInt(formData.employees) || 0,
-      monthly_lease: parseFloat(formData.monthly_lease) || 0,
-      inventory_value: parseFloat(formData.inventory_value) || 0,
-      equipment_value: parseFloat(formData.equipment_value) || 0,
-      includes_inventory: formData.includesInventory || false,
-      includes_building: formData.includesBuilding || false,
-      real_estate_included: formData.real_estate_included || false,
-      relocatable: formData.relocatable || false,
-      home_based: formData.home_based || false,
-      financing_type: formData.financingType || '',
-      business_description:
-        formData.descriptionChoice === 'manual'
-          ? formData.businessDescription
-          : formData.aiDescription,
-      description_choice: formData.descriptionChoice || '',
-      customer_type: formData.customerType || '',
-      owner_involvement: formData.ownerInvolvement || '',
-      growth_potential: formData.growthPotential || '',
-      reason_for_selling: formData.reasonForSelling || '',
-      training_offered: formData.trainingOffered || '',
-      sentence_summary: formData.sentenceSummary || '',
-      customers: formData.customers || '',
-      best_sellers: formData.bestSellers || '',
-      customer_love: formData.customerLove || '',
-      repeat_customers: formData.repeatCustomers || '',
-      keeps_them_coming: formData.keepsThemComing || '',
-      proud_of: formData.proudOf || '',
-      advice_to_buyer: formData.adviceToBuyer || '',
+      ...rest,
+      annual_revenue: parseFloat(annualRevenue) || 0,
+      annual_profit: parseFloat(annualProfit) || 0,
+      sde: parseFloat(sde) || 0,
+      asking_price: parseFloat(askingPrice) || 0,
+      employees: parseInt(employees) || 0,
+      monthly_lease: parseFloat(monthly_lease) || 0,
+      inventory_value: parseFloat(inventory_value) || 0,
+      equipment_value: parseFloat(equipment_value) || 0,
       image_urls: uploadedImageUrls,
     };
 
+    // ✅ Submit as JSON
     const res = await fetch('/api/submit-seller-listing', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
@@ -190,6 +171,7 @@ const handleSubmit = async (e) => {
 
     setSubmitSuccess(true);
     setIsSubmitting(false);
+    setPreviewMode(false);
     router.push('/thank-you');
 
   } catch (err) {
