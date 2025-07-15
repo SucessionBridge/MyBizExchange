@@ -39,9 +39,9 @@ export default function Listings() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {listings.map((listing) => (
             <div key={listing.id} className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition duration-300 overflow-hidden border border-gray-100">
-              {Array.isArray(listing.images) && listing.images.length > 0 && listing.images[0] ? (
+              {Array.isArray(listing.image_urls) && listing.image_urls.length > 0 && listing.image_urls[0] ? (
                 <img
-                  src={listing.images[0]}
+                  src={listing.image_urls[0]}
                   alt={`${listing.business_name} image`}
                   className="w-full h-48 object-cover"
                 />
@@ -83,3 +83,4 @@ export default function Listings() {
     </div>
   );
 }
+
