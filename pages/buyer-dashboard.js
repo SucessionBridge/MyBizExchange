@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"; 
 import { useRouter } from "next/router";
 import { supabase } from "../lib/supabaseClient";
 
@@ -85,9 +85,15 @@ export default function BuyerDashboard() {
               <video src={buyerProfile.video_introduction} controls className="w-full max-w-md rounded-lg" />
             </div>
           )}
+
+          <button
+            onClick={() => router.push('/buyers?redirect=/dashboard')}
+            className="mt-6 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
+          >
+            Edit My Profile
+          </button>
         </div>
       )}
     </div>
   );
 }
-
