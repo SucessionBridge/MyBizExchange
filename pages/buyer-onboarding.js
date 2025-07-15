@@ -1,15 +1,13 @@
-// pages/buyer-onboarding.js
-
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 import React, { useState, useEffect } from 'react';
+import { useSession } from '@supabase/auth-helpers-react'; // ✅ Add this line
 
 export default function BuyerOnboarding() {
   const router = useRouter();
   const redirectPath = router.query.redirect || null;
 
-  const [authUser, setAuthUser] = useState(null);
-  const [authChecked, setAuthChecked] = useState(false);
+  const session = useSession(); // ✅ Replace useState with useSession
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -33,16 +31,10 @@ export default function BuyerOnboarding() {
 
   useEffect(() => {
     setIsClient(true);
-    const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        setAuthUser(user);
-        setFormData((prev) => ({ ...prev, email: user.email }));
-      }
-      setAuthChecked(true);
-    };
-    getUser();
-  }, []);
+    if (session?.user?.email) {
+      setFormData((prev) => ({ ...prev, email: session.user.email }));
+    }
+  }, [session]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -158,10 +150,9 @@ export default function BuyerOnboarding() {
 
           <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded text-black" />
 
-          {/* Email shown as read-only from Supabase Auth */}
           <p className="bg-gray-100 p-3 rounded text-sm text-gray-700">
             Your email (from login): <strong>
-              {authChecked ? authUser?.email || 'Not logged in' : 'Loading...'}
+              {session?.user?.email || 'Not logged in'}
             </strong>
           </p>
 
@@ -208,3 +199,4 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
+
