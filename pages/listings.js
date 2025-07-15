@@ -16,6 +16,7 @@ export default function Listings() {
       if (error) {
         console.error('Error fetching listings:', error);
       } else {
+        console.log('Fetched listings:', data); // TEMP LOG
         setListings(data);
       }
 
@@ -67,23 +68,28 @@ export default function Listings() {
                 )}
 
                 <div className="p-5 space-y-2">
-                  <h2 className="text-lg font-bold text-blue-800">{listing.business_name}</h2>
+                  <h2 className="text-lg font-bold text-blue-800">
+                    {listing.business_name || 'Unnamed Business'}
+                  </h2>
                   <p className="text-sm text-gray-500">
-                    {listing.location} • {listing.industry}
+                    {(listing.location || 'Unknown')} • {(listing.industry || 'Unspecified')}
                   </p>
                   <p className="text-sm text-gray-700 line-clamp-3">
-                    {listing.business_description}
+                    {listing.business_description || listing.ai_description || 'No description provided.'}
                   </p>
 
                   <div className="text-sm text-gray-800 mt-2 space-y-1">
                     <p>
-                      <strong>Revenue:</strong> {listing.annual_revenue?.toLocaleString()}
+                      <strong>Revenue:</strong> $
+                      {Number(listing.annual_revenue || 0).toLocaleString()}
                     </p>
                     <p>
-                      <strong>Profit:</strong> {listing.annual_profit?.toLocaleString()}
+                      <strong>Profit:</strong> $
+                      {Number(listing.annual_profit || 0).toLocaleString()}
                     </p>
                     <p>
-                      <strong>Price:</strong> {listing.asking_price?.toLocaleString()}
+                      <strong>Price:</strong> $
+                      {Number(listing.asking_price || 0).toLocaleString()}
                     </p>
                   </div>
 
@@ -109,4 +115,6 @@ export default function Listings() {
     </div>
   );
 }
+
+
 
