@@ -143,19 +143,22 @@ const handleSubmit = async (e) => {
       equipment_value,
       ...rest
     } = formData;
+const payload = {
+  ...rest,
+  annual_revenue: parseFloat(annualRevenue) || 0,
+  annual_profit: parseFloat(annualProfit) || 0,
+  sde: parseFloat(sde) || 0,
+  asking_price: parseFloat(askingPrice) || 0,
+  employees: parseInt(employees) || 0,
+  monthly_lease: parseFloat(monthly_lease) || 0,
+  inventory_value: parseFloat(inventory_value) || 0,
+  equipment_value: parseFloat(equipment_value) || 0,
+  image_urls: uploadedImageUrls,
+  original_description: formData.description_choice === 'manual' ? formData.business_description : '',
+  ai_description: formData.description_choice === 'ai' ? formData.ai_description : '',
+};
 
-    const payload = {
-      ...rest,
-      annual_revenue: parseFloat(annualRevenue) || 0,
-      annual_profit: parseFloat(annualProfit) || 0,
-      sde: parseFloat(sde) || 0,
-      asking_price: parseFloat(askingPrice) || 0,
-      employees: parseInt(employees) || 0,
-      monthly_lease: parseFloat(monthly_lease) || 0,
-      inventory_value: parseFloat(inventory_value) || 0,
-      equipment_value: parseFloat(equipment_value) || 0,
-      image_urls: uploadedImageUrls,
-    };
+   
 
     // ✅ Submit as JSON
     const res = await fetch('/api/submit-seller-listing', {
