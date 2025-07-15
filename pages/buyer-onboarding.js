@@ -1,4 +1,4 @@
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/router'; 
 import { supabase } from '../lib/supabaseClient';
 import React, { useState, useEffect } from 'react';
 import { useSession } from '@supabase/auth-helpers-react';
@@ -36,7 +36,6 @@ export default function BuyerOnboarding() {
     }
   }, [session]);
 
-  // ✅ NEW useEffect to fetch existing buyer profile using Supabase SDK
   useEffect(() => {
     const fetchBuyerData = async () => {
       const {
@@ -130,9 +129,10 @@ export default function BuyerOnboarding() {
       videoUrl = publicUrlData?.publicUrl;
     }
 
-    const { error: insertError } = await supabase.from('buyers').insert([{
-      name,
+    // ✅ Replace insert with upsert (safe re-submit logic)
+    const { error: insertError } = await supabase.from('buyers').upsert([{
       email,
+      name,
       financing_type: financingType,
       experience,
       industry_preference: industryPreference,
@@ -144,7 +144,9 @@ export default function BuyerOnboarding() {
       state_or_province: stateOrProvince,
       video_introduction: videoUrl,
       budget_for_purchase: budgetForPurchase,
-    }]);
+    }], {
+      onConflict: ['email'],
+    });
 
     if (insertError) {
       console.error('❌ Error submitting form:', insertError);
@@ -224,4 +226,5 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
+
 
