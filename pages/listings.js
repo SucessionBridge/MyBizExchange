@@ -57,7 +57,7 @@ export default function Listings() {
                     className="w-full h-48 object-cover"
                     onError={(e) => {
                       e.target.onerror = null;
-                      e.target.src = '/placeholder.png'; // fallback image
+                      e.target.src = '/placeholder.png';
                     }}
                   />
                 ) : (
@@ -77,10 +77,36 @@ export default function Listings() {
 
                   <div className="text-sm text-gray-800 mt-2 space-y-1">
                     <p>
-                      <strong>Revenue:</strong> ${listing.annual_revenue?.toLocaleString()}
+                      <strong>Revenue:</strong> {listing.annual_revenue?.toLocaleString()}
                     </p>
                     <p>
-                      <strong>Profit:</strong> ${listing.annual_profit?.toLocaleString()}
+                      <strong>Profit:</strong> {listing.annual_profit?.toLocaleString()}
                     </p>
                     <p>
-                      <strong>Price:</strong> ${listing.asking_price?.toLocaleString()}
+                      <strong>Price:</strong> {listing.asking_price?.toLocaleString()}
+                    </p>
+                  </div>
+
+                  {listing.financing_type?.toLowerCase().includes('seller') && (
+                    <span className="inline-block mt-2 bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">
+                      Seller Financing Available
+                    </span>
+                  )}
+
+                  <div className="pt-3">
+                    <Link href={`/listings/${listing.id}`}>
+                      <a className="inline-block text-blue-600 hover:text-blue-800 font-medium text-sm">
+                        View Details →
+                      </a>
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
