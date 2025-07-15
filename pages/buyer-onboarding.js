@@ -9,6 +9,7 @@ export default function BuyerOnboarding() {
   const redirectPath = router.query.redirect || null;
 
   const [authUser, setAuthUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -33,11 +34,12 @@ export default function BuyerOnboarding() {
   useEffect(() => {
     setIsClient(true);
     const getUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (user) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
         setAuthUser(user);
         setFormData((prev) => ({ ...prev, email: user.email }));
       }
+      setAuthChecked(true);
     };
     getUser();
   }, []);
@@ -158,7 +160,9 @@ export default function BuyerOnboarding() {
 
           {/* Email shown as read-only from Supabase Auth */}
           <p className="bg-gray-100 p-3 rounded text-sm text-gray-700">
-            Your email (from login): <strong>{authUser?.email || 'Loading...'}</strong>
+            Your email (from login): <strong>
+              {authChecked ? authUser?.email || 'Not logged in' : 'Loading...'}
+            </strong>
           </p>
 
           <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded text-black">
