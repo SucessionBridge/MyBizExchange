@@ -52,7 +52,7 @@ export default async function handler(req, res) {
         keeps_them_coming: data.keeps_them_coming || '',
         proud_of: data.proud_of || '',
         advice_to_buyer: data.advice_to_buyer || '',
-        image_urls: data.image_urls || [],
+        image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
       },
     ]);
 
@@ -67,4 +67,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server error' });
   }
 }
-
