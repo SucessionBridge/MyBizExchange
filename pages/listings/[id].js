@@ -77,35 +77,48 @@ export default function ListingDetail() {
   if (!listing) return <div className="p-6">Listing not found.</div>;
 
   return (
-    <main className="p-6 max-w-3xl mx-auto">
-      <h1 className="text-3xl font-bold mb-2">{listing.business_name}</h1>
-      <p className="text-gray-700 text-sm mb-1 italic">{listing.industry} – {listing.location}</p>
-      <p className="text-lg text-green-700 font-semibold mb-4">
-        Asking Price: ${listing.asking_price?.toLocaleString()}
-      </p>
+    <main className="p-6 max-w-4xl mx-auto">
+      <div className="mb-4">
+        <h1 className="text-4xl font-bold text-[#2E3A59] mb-2">
+          {listing.industry} Business for Sale in {listing.location}
+        </h1>
+        <p className="text-2xl text-green-700 font-semibold">
+          Asking Price: ${listing.asking_price?.toLocaleString()}
+        </p>
+      </div>
 
       {listing.image_urls?.length > 0 && (
-        <div className="grid grid-cols-2 gap-2 mb-6">
-          {listing.image_urls.map((url, idx) => (
-            <img
-              key={idx}
-              src={url}
-              alt={`Business Image ${idx + 1}`}
-              className="w-full h-40 object-cover rounded"
-            />
-          ))}
+        <div className="mb-6">
+          <img
+            src={listing.image_urls[0]}
+            alt="Business Image"
+            className="w-full h-80 object-cover rounded-lg shadow"
+          />
+          {listing.image_urls.length > 1 && (
+            <div className="flex flex-wrap gap-2 mt-2">
+              {listing.image_urls.slice(1).map((url, idx) => (
+                <img
+                  key={idx}
+                  src={url}
+                  alt={`Additional Image ${idx + 1}`}
+                  className="w-24 h-24 object-cover rounded border"
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      <h2 className="text-xl font-semibold mb-2">Business Description</h2>
-      <p className="text-gray-800 mb-6">
-        {listing.ai_description || listing.business_description || 'No description available.'}
-      </p>
+      <section className="mb-10">
+        <h2 className="text-2xl font-semibold mb-2 text-[#2E3A59]">Business Overview</h2>
+        <p className="text-gray-800 leading-relaxed">
+          {listing.ai_description || listing.business_description || 'No description available.'}
+        </p>
+      </section>
 
-      {/* ✅ NEW SECTION START */}
-      <div className="grid md:grid-cols-2 gap-6 text-gray-800 mb-10">
+      <div className="grid md:grid-cols-2 gap-8 mb-12">
         <div>
-          <h3 className="text-lg font-semibold border-b pb-2 mb-2">Financials</h3>
+          <h3 className="text-xl font-semibold border-b pb-2 mb-2 text-[#2E3A59]">Financials</h3>
           <p><strong>Annual Revenue:</strong> ${listing.annual_revenue?.toLocaleString()}</p>
           <p><strong>Annual Profit:</strong> ${listing.annual_profit?.toLocaleString()}</p>
           <p><strong>SDE:</strong> ${listing.sde?.toLocaleString()}</p>
@@ -113,7 +126,7 @@ export default function ListingDetail() {
           <p><strong>Equipment Value:</strong> ${listing.equipment_value?.toLocaleString()}</p>
         </div>
         <div>
-          <h3 className="text-lg font-semibold border-b pb-2 mb-2">Business Details</h3>
+          <h3 className="text-xl font-semibold border-b pb-2 mb-2 text-[#2E3A59]">Business Details</h3>
           <p><strong>Employees:</strong> {listing.employees}</p>
           <p><strong>Monthly Lease:</strong> ${listing.monthly_lease?.toLocaleString()}</p>
           <p><strong>Home-Based:</strong> {listing.home_based ? 'Yes' : 'No'}</p>
@@ -124,11 +137,10 @@ export default function ListingDetail() {
           <p><strong>Financing Type:</strong> {listing.financing_type?.replace(/-/g, ' ')}</p>
         </div>
       </div>
-      {/* ✅ NEW SECTION END */}
 
       {buyer ? (
         <div className="mt-6 border-t pt-6">
-          <h2 className="text-xl font-semibold mb-2">Send a message to the seller</h2>
+          <h2 className="text-xl font-semibold mb-2 text-[#2E3A59]">Send a Message to the Seller</h2>
           {success ? (
             <p className="text-green-600">✅ Your message was sent!</p>
           ) : (
@@ -167,5 +179,6 @@ export default function ListingDetail() {
     </main>
   );
 }
+
 
 
