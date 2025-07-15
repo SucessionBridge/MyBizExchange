@@ -1,13 +1,13 @@
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 import React, { useState, useEffect } from 'react';
-import { useSession } from '@supabase/auth-helpers-react'; // ✅ Add this line
+import { useSession } from '@supabase/auth-helpers-react';
 
 export default function BuyerOnboarding() {
   const router = useRouter();
   const redirectPath = router.query.redirect || null;
 
-  const session = useSession(); // ✅ Replace useState with useSession
+  const session = useSession();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -35,6 +35,31 @@ export default function BuyerOnboarding() {
       setFormData((prev) => ({ ...prev, email: session.user.email }));
     }
   }, [session]);
+
+  // ✅ NEW useEffect to fetch existing buyer profile using Supabase SDK
+  useEffect(() => {
+    const fetchBuyerData = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user?.email) {
+        const { data, error } = await supabase
+          .from('buyers')
+          .select('*')
+          .eq('email', user.email);
+
+        if (error) {
+          console.error('❌ Error fetching buyer profile:', error.message);
+        } else if (data?.length > 0) {
+          console.log('✅ Existing buyer profile:', data[0]);
+          // Optional: setFormData(data[0]);
+        }
+      }
+    };
+
+    fetchBuyerData();
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
