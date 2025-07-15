@@ -98,7 +98,7 @@ export default function Listings() {
       if (error) {
         console.error('Error fetching listings:', error);
       } else {
-        console.log('Fetched listings:', data); // TEMP LOG
+        console.log('✅ Fetched listings:', data);
         setListings(data);
       }
 
@@ -120,9 +120,16 @@ export default function Listings() {
         <p className="text-center text-gray-500">No businesses available at the moment.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {listings.map((listing, index) => (
-            <ListingCard key={`${listing.id}-${index}`} listing={listing} index={index} />
-          ))}
+          {listings.map((listing, index) => {
+            console.log(`🔍 Listing #${index}`, listing);
+            for (const key in listing) {
+              console.log(`   - ${key}:`, listing[key], `(type: ${typeof listing[key]})`);
+            }
+
+            return (
+              <ListingCard key={`${listing.id}-${index}`} listing={listing} index={index} />
+            );
+          })}
         </div>
       )}
     </div>
