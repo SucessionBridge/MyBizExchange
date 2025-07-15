@@ -1,5 +1,3 @@
-// pages/listings/[id].js
-
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabaseClient';
@@ -103,6 +101,30 @@ export default function ListingDetail() {
       <p className="text-gray-800 mb-6">
         {listing.ai_description || listing.business_description || 'No description available.'}
       </p>
+
+      {/* ✅ NEW SECTION START */}
+      <div className="grid md:grid-cols-2 gap-6 text-gray-800 mb-10">
+        <div>
+          <h3 className="text-lg font-semibold border-b pb-2 mb-2">Financials</h3>
+          <p><strong>Annual Revenue:</strong> ${listing.annual_revenue?.toLocaleString()}</p>
+          <p><strong>Annual Profit:</strong> ${listing.annual_profit?.toLocaleString()}</p>
+          <p><strong>SDE:</strong> ${listing.sde?.toLocaleString()}</p>
+          <p><strong>Inventory Value:</strong> ${listing.inventory_value?.toLocaleString()}</p>
+          <p><strong>Equipment Value:</strong> ${listing.equipment_value?.toLocaleString()}</p>
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold border-b pb-2 mb-2">Business Details</h3>
+          <p><strong>Employees:</strong> {listing.employees}</p>
+          <p><strong>Monthly Lease:</strong> ${listing.monthly_lease?.toLocaleString()}</p>
+          <p><strong>Home-Based:</strong> {listing.home_based ? 'Yes' : 'No'}</p>
+          <p><strong>Relocatable:</strong> {listing.relocatable ? 'Yes' : 'No'}</p>
+          <p><strong>Includes Inventory:</strong> {listing.includes_inventory ? 'Yes' : 'No'}</p>
+          <p><strong>Includes Building:</strong> {listing.includes_building ? 'Yes' : 'No'}</p>
+          <p><strong>Real Estate Included:</strong> {listing.real_estate_included ? 'Yes' : 'No'}</p>
+          <p><strong>Financing Type:</strong> {listing.financing_type?.replace(/-/g, ' ')}</p>
+        </div>
+      </div>
+      {/* ✅ NEW SECTION END */}
 
       {buyer ? (
         <div className="mt-6 border-t pt-6">
