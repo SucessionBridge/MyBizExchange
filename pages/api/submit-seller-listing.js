@@ -37,6 +37,7 @@ export default async function handler(req, res) {
         home_based: data.home_based || false,
         financing_type: data.financing_type || '',
         business_description: data.business_description || '',
+        original_description: data.original_description || '',
         ai_description: data.ai_description || '',
         description_choice: data.description_choice || '',
         customer_type: data.customer_type || '',
