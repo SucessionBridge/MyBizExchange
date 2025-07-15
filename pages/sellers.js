@@ -110,7 +110,7 @@ const handleSubmit = async (e) => {
   try {
     const uploadedImageUrls = [];
 
-    // Upload images to Supabase Storage
+    // Upload images to Supabase
     for (const file of formData.images) {
       const filePath = `${Date.now()}-${file.name}`;
       const { error: uploadError } = await supabase.storage
@@ -131,17 +131,36 @@ const handleSubmit = async (e) => {
       uploadedImageUrls.push(publicUrl);
     }
 
-    // 🔁 Send full payload as JSON
+    // 🔁 Construct clean payload (remove images, convert numbers)
+    const {
+      images, // remove this
+      annualRevenue,
+      annualProfit,
+      sde,
+      askingPrice,
+      employees,
+      monthly_lease,
+      inventory_value,
+      equipment_value,
+      ...rest
+    } = formData;
+
     const payload = {
-      ...formData,
+      ...rest,
+      annualRevenue: parseFloat(annualRevenue) || 0,
+      annualProfit: parseFloat(annualProfit) || 0,
+      sde: parseFloat(sde) || 0,
+      askingPrice: parseFloat(askingPrice) || 0,
+      employees: parseInt(employees) || 0,
+      monthly_lease: parseFloat(monthly_lease) || 0,
+      inventory_value: parseFloat(inventory_value) || 0,
+      equipment_value: parseFloat(equipment_value) || 0,
       image_urls: uploadedImageUrls
     };
 
     const res = await fetch('/api/submit-seller-listing', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
 
@@ -161,6 +180,7 @@ const handleSubmit = async (e) => {
     setIsSubmitting(false);
   }
 };
+
 
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
 
