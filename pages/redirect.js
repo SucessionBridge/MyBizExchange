@@ -1,3 +1,4 @@
+// pages/redirect.js
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
@@ -6,26 +7,34 @@ export default function RedirectPage() {
   const router = useRouter();
 
   useEffect(() => {
-    const checkUserTypeAndRedirect = async () => {
+    const redirectWithSession = async () => {
+      // ✅ Wait for Supabase to restore session
+      const { data: sessionData } = await supabase.auth.getSession();
+
+      if (!sessionData?.session) {
+        console.warn("⚠️ No active session found");
+        router.push("/login");
+        return;
+      }
+
       const {
         data: { user },
-        error: authError,
+        error: userError,
       } = await supabase.auth.getUser();
 
-      if (authError || !user) {
-        console.error("Auth error:", authError);
-        router.push('/login');
+      if (userError || !user?.email) {
+        console.warn("⚠️ No user email found");
+        router.push("/login");
         return;
       }
 
       const email = user.email;
 
-      // Check if user is a seller
+      // ✅ Check if user is a seller
       const { data: seller } = await supabase
         .from('sellers')
         .select('id')
         .eq('email', email)
-        .limit(1)
         .single();
 
       if (seller) {
@@ -33,12 +42,11 @@ export default function RedirectPage() {
         return;
       }
 
-      // Check if user is a buyer
+      // ✅ Check if user is a buyer
       const { data: buyer } = await supabase
         .from('buyers')
         .select('id')
         .eq('email', email)
-        .limit(1)
         .single();
 
       if (buyer) {
@@ -46,11 +54,11 @@ export default function RedirectPage() {
         return;
       }
 
-      // Default if no match found
+      // 🚨 Default fallback if user type is unknown
       router.push('/login');
     };
 
-    checkUserTypeAndRedirect();
+    redirectWithSession();
   }, [router]);
 
   return (
