@@ -1,49 +1,42 @@
-import { useEffect, useState } from "react"; 
-import { useRouter } from "next/router";
-import { supabase } from "../lib/supabaseClient";
+// pages/buyer-dashboard.js
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import { supabase } from '../lib/supabaseClient';
 
 export default function BuyerDashboard() {
   const router = useRouter();
   const [buyerProfile, setBuyerProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
 
-  // Fetch current logged-in user
   useEffect(() => {
-    async function fetchUser() {
+    const fetchProfile = async () => {
       const {
         data: { user },
         error,
       } = await supabase.auth.getUser();
 
       if (error || !user) {
-        router.push("/login"); // Redirect to login if not authenticated
+        router.push('/login');
       } else {
-        setUser(user);
-        fetchBuyerProfile(user.email);
+        const { data, error: profileError } = await supabase
+          .from('buyers')
+          .select('*')
+          .eq('auth_id', user.id)
+          .maybeSingle();
+
+        if (profileError) {
+          console.warn('No buyer profile found.');
+          setBuyerProfile(null);
+        } else {
+          setBuyerProfile(data);
+        }
+
+        setLoading(false);
       }
-    }
+    };
 
-    fetchUser();
+    fetchProfile();
   }, []);
-
-  // Fetch buyer profile from Supabase
-  async function fetchBuyerProfile(email) {
-    const { data, error } = await supabase
-      .from("buyers")
-      .select("*")
-      .eq("email", email)
-      .single();
-
-    if (error) {
-      console.warn("No buyer profile found.");
-      setBuyerProfile(null);
-    } else {
-      setBuyerProfile(data);
-    }
-
-    setLoading(false);
-  }
 
   if (loading) {
     return <div className="p-8 text-center text-gray-600">Loading dashboard...</div>;
@@ -59,7 +52,7 @@ export default function BuyerDashboard() {
             You haven't completed your buyer profile yet.
           </p>
           <button
-            onClick={() => router.push("/buyers")}
+            onClick={() => router.push('/buyers')}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-lg font-semibold"
           >
             Complete Buyer Profile
