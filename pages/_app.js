@@ -11,21 +11,15 @@ function AuthRedirector() {
   const session = useSession();
   const router = useRouter();
 
+  // 1. Handle existing session (e.g., page reload)
   useEffect(() => {
-    if (session === undefined || router.pathname !== '/') return;
-
-    if (!session?.user) {
-      console.log('🔄 Waiting for session to be ready...');
-      return;
-    }
+    if (!session?.user || router.pathname !== '/') return;
 
     const checkBuyerProfile = async () => {
-      const userId = session.user.id;
-
-      const { data: profile, error } = await supabase
+      const { data: profile } = await supabase
         .from('buyers')
         .select('id')
-        .eq('auth_id', userId)
+        .eq('auth_id', session.user.id)
         .maybeSingle();
 
       if (profile) {
@@ -39,6 +33,32 @@ function AuthRedirector() {
 
     checkBuyerProfile();
   }, [session, router]);
+
+  // 2. Also listen for SIGNED_IN event (magic link trigger)
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user && router.pathname === '/') {
+          console.log('🔁 Auth SIGNED_IN event detected');
+          const { data: profile } = await supabase
+            .from('buyers')
+            .select('id')
+            .eq('auth_id', session.user.id)
+            .maybeSingle();
+
+          if (profile) {
+            router.replace('/buyer/dashboard');
+          } else {
+            router.replace('/buyers');
+          }
+        }
+      }
+    );
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, [router]);
 
   return null;
 }
