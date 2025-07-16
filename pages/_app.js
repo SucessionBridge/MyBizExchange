@@ -12,7 +12,12 @@ function AuthRedirector() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!session?.user || router.pathname !== '/') return;
+    if (session === undefined || router.pathname !== '/') return;
+
+    if (!session?.user) {
+      console.log('🔄 Waiting for session to be ready...');
+      return;
+    }
 
     const checkBuyerProfile = async () => {
       const userId = session.user.id;
@@ -53,3 +58,4 @@ export default function App({ Component, pageProps }) {
     </SessionContextProvider>
   );
 }
+
