@@ -1,6 +1,35 @@
-import Link from 'next/link';
+import { useEffect } from "react";
+import { useRouter } from "next/router";
+import { supabase } from "../lib/supabaseClient";
+import Link from "next/link";
 
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkUserAndRedirect = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) {
+        const { data: buyerProfile } = await supabase
+          .from("buyers")
+          .select("email")
+          .eq("email", user.email)
+          .maybeSingle();
+
+        if (buyerProfile) {
+          router.push("/buyer/dashboard");
+        } else {
+          router.push("/buyers");
+        }
+      }
+    };
+
+    checkUserAndRedirect();
+  }, []);
+
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937] px-4 py-12 font-sans">
       <div className="max-w-6xl mx-auto">
@@ -101,3 +130,4 @@ export default function Home() {
     </main>
   );
 }
+
