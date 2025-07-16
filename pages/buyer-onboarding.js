@@ -1,3 +1,4 @@
+// pages/buyer-onboarding.js
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
 import React, { useState, useEffect } from 'react';
@@ -5,9 +6,8 @@ import { useSession } from '@supabase/auth-helpers-react';
 
 export default function BuyerOnboarding() {
   const router = useRouter();
-  const redirectPath = router.query.redirect || null;
-
   const session = useSession();
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -27,35 +27,30 @@ export default function BuyerOnboarding() {
   const [errorMessage, setErrorMessage] = useState('');
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [isClient, setIsClient] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
 
   useEffect(() => {
-    setIsClient(true);
-    if (session?.user?.email) {
-      setFormData((prev) => ({ ...prev, email: session.user.email }));
-    }
-  }, [session]);
+    const checkExistingProfile = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  useEffect(() => {
-    const fetchBuyerData = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      if (user?.email) {
-        const { data, error } = await supabase
+      if (user) {
+        const { data } = await supabase
           .from('buyers')
-          .select('*')
-          .eq('email', user.email)
-          .single();
+          .select('id')
+          .eq('auth_id', user.id)
+          .maybeSingle();
 
         if (data) {
-          // ✅ Auto-redirect if already submitted
-          router.push('/buyer-dashboard');
+          router.push('/buyer/dashboard');
+        } else {
+          setFormData((prev) => ({ ...prev, email: user.email }));
         }
       }
     };
 
-    fetchBuyerData();
+    checkExistingProfile();
   }, []);
 
   const handleChange = (e) => {
@@ -67,8 +62,7 @@ export default function BuyerOnboarding() {
     const file = e.target.files?.[0];
     if (file) {
       setFormData((prev) => ({ ...prev, video: file }));
-      const videoURL = URL.createObjectURL(file);
-      setVideoPreview(videoURL);
+      setVideoPreview(URL.createObjectURL(file));
     }
   };
 
@@ -86,8 +80,11 @@ export default function BuyerOnboarding() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
-    if (alreadySubmitted) return;
+    if (!validateForm() || alreadySubmitted) return;
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
 
     const {
       name,
@@ -125,6 +122,7 @@ export default function BuyerOnboarding() {
     }
 
     const { error: insertError } = await supabase.from('buyers').insert([{
+      auth_id: user.id, // ✅ new
       name,
       email,
       financing_type: financingType,
@@ -144,9 +142,9 @@ export default function BuyerOnboarding() {
       console.error('❌ Error submitting form:', insertError);
       alert('There was a problem submitting your form.');
     } else {
-      setAlreadySubmitted(true); // ✅ Prevent double submit
+      setAlreadySubmitted(true);
       alert('Your buyer profile was submitted successfully!');
-      router.push('/buyer-dashboard');
+      router.push('/buyer/dashboard');
     }
   };
 
@@ -165,11 +163,9 @@ export default function BuyerOnboarding() {
           {errorMessage && <p className="text-red-500 font-semibold">{errorMessage}</p>}
 
           <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded text-black" />
-
           <p className="bg-gray-100 p-3 rounded text-sm text-gray-700">
-            Your email (from login): <strong>{session?.user?.email || 'Not logged in'}</strong>
+            Your email: <strong>{formData.email || 'Loading...'}</strong>
           </p>
-
           <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded text-black">
             <option value="self-financing">Self Financing</option>
             <option value="seller-financing">Seller Financing</option>
@@ -197,11 +193,11 @@ export default function BuyerOnboarding() {
           <input name="stateOrProvince" placeholder="State/Province" value={formData.stateOrProvince} onChange={handleChange} className="w-full border p-3 rounded text-black" />
 
           <label>Upload a short intro video (.mp4/.mov/.webm)</label>
-          <input type="file" accept="video/mp4,video/webm,video/quicktime" onChange={handleVideoUpload} className="w-full border p-3 rounded" />
+          <input type="file" accept="video/*" onChange={handleVideoUpload} className="w-full border p-3 rounded" />
 
-          {isClient && videoPreview && (
+          {videoPreview && (
             <video width="200" controls className="mt-4">
-              <source src={videoPreview} type={formData.video?.type || 'video/mp4'} />
+              <source src={videoPreview} />
             </video>
           )}
 
@@ -213,4 +209,3 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
-
