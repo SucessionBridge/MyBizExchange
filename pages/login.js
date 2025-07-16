@@ -11,7 +11,7 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/buyer-onboarding`, // ✅ fixed redirect path
+        emailRedirectTo: `${window.location.origin}/auth/callback`, // ✅ updated redirect path
       },
     });
 
@@ -42,5 +42,6 @@ export default function Login() {
     </main>
   );
 }
+
 
 
