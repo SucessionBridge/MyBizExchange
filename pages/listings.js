@@ -10,9 +10,9 @@ function ListingCard({ listing, index }) {
       ? listing.image_urls[0]
       : null;
 
-  const name = listing.business_name?.trim();
-  const description = listing.business_description?.trim();
-  const aiDescription = listing.ai_description?.trim();
+  const name = typeof listing.business_name === 'string' ? listing.business_name.trim() : '';
+  const description = typeof listing.business_description === 'string' ? listing.business_description.trim() : '';
+  const aiDescription = typeof listing.ai_description === 'string' ? listing.ai_description.trim() : '';
 
   return (
     <div
@@ -37,7 +37,7 @@ function ListingCard({ listing, index }) {
 
       <div className="p-5 space-y-2">
         <h2 className="text-lg font-bold text-blue-800">
-          {name || 'Unnamed Business'}
+          {name || `${listing.industry || 'Unnamed'} Business`}
         </h2>
         <p className="text-sm text-gray-500">
           {(listing.location || 'Unknown')} • {(listing.industry || 'Unspecified')}
@@ -151,4 +151,3 @@ export default function Listings() {
     </div>
   );
 }
-
