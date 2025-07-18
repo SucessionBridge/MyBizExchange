@@ -10,6 +10,10 @@ function ListingCard({ listing, index }) {
       ? listing.image_urls[0]
       : null;
 
+  const name = listing.business_name?.trim();
+  const description = listing.business_description?.trim();
+  const aiDescription = listing.ai_description?.trim();
+
   return (
     <div
       key={`${listing.id}-${index}`}
@@ -18,7 +22,7 @@ function ListingCard({ listing, index }) {
       {imageUrl ? (
         <img
           src={imageUrl}
-          alt={`${listing.business_name || 'Business'} image`}
+          alt={`${name || 'Business'} image`}
           className="w-full h-48 object-cover"
           onError={(e) => {
             e.target.onerror = null;
@@ -33,13 +37,13 @@ function ListingCard({ listing, index }) {
 
       <div className="p-5 space-y-2">
         <h2 className="text-lg font-bold text-blue-800">
-          {listing.business_name || 'Unnamed Business'}
+          {name || 'Unnamed Business'}
         </h2>
         <p className="text-sm text-gray-500">
           {(listing.location || 'Unknown')} • {(listing.industry || 'Unspecified')}
         </p>
         <p className="text-sm text-gray-700 line-clamp-3">
-          {listing.business_description || listing.ai_description || 'No description provided.'}
+          {description || aiDescription || 'No description provided.'}
         </p>
 
         <div className="text-sm text-gray-800 mt-2 space-y-1">
