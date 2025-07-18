@@ -80,7 +80,20 @@ export default function Listings() {
     async function fetchListings() {
       const { data, error } = await supabase
         .from('sellers')
-        .select('*')
+        .select(`
+          id,
+          business_name,
+          business_description,
+          ai_description,
+          image_urls,
+          location,
+          industry,
+          annual_revenue,
+          annual_profit,
+          asking_price,
+          financing_type,
+          created_at
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -138,6 +151,8 @@ export default function Listings() {
       )}
     </div>
   );
+}
+
 }
 
 
