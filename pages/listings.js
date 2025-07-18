@@ -10,9 +10,12 @@ function ListingCard({ listing, index }) {
       ? listing.image_urls[0]
       : null;
 
-  const name = typeof listing.business_name === 'string' ? listing.business_name.trim() : '';
-  const description = typeof listing.business_description === 'string' ? listing.business_description.trim() : '';
-  const aiDescription = typeof listing.ai_description === 'string' ? listing.ai_description.trim() : '';
+  const name = listing.business_name?.trim() || '';
+
+  const description =
+    listing.description_choice === 'ai'
+      ? listing.ai_description?.trim()
+      : listing.business_description?.trim();
 
   return (
     <div
@@ -43,7 +46,7 @@ function ListingCard({ listing, index }) {
           {(listing.location || 'Unknown')} • {(listing.industry || 'Unspecified')}
         </p>
         <p className="text-sm text-gray-700 line-clamp-3">
-          {description || aiDescription || 'No description provided.'}
+          {description || 'No description provided.'}
         </p>
 
         <div className="text-sm text-gray-800 mt-2 space-y-1">
@@ -89,6 +92,7 @@ export default function Listings() {
           business_name,
           business_description,
           ai_description,
+          description_choice,
           image_urls,
           location,
           industry,
@@ -151,3 +155,4 @@ export default function Listings() {
     </div>
   );
 }
+
