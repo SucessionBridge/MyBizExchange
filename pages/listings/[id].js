@@ -166,7 +166,9 @@ export default function ListingDetail() {
 
       <h2 className="text-xl font-semibold mb-2">Business Description</h2>
       <p className="text-gray-800 mb-6">
-        {listing.ai_description || listing.business_description || 'No description available.'}
+        {listing.description_choice === 'ai'
+          ? listing.ai_description
+          : listing.business_description || 'No description available.'}
       </p>
 
       <div className="grid md:grid-cols-2 gap-6 text-gray-800 mb-10">
@@ -232,5 +234,6 @@ export default function ListingDetail() {
     </main>
   );
 }
+
 
 
