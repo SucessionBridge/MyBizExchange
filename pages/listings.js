@@ -123,11 +123,6 @@ export default function Listings() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {listings.map((listing, index) => {
             try {
-              console.log(`📦 Listing [${index}] ID: ${listing.id}`);
-              for (const key in listing) {
-                console.log(`   🔹 ${key}:`, listing[key], `(type: ${typeof listing[key]})`);
-              }
-
               return (
                 <ListingCard
                   key={`${listing.id}-${index}`}
@@ -152,7 +147,4 @@ export default function Listings() {
     </div>
   );
 }
-
-}
-
 
