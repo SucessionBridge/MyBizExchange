@@ -56,7 +56,31 @@ export default function SellerDashboard() {
     val ? `$${parseFloat(val).toLocaleString()}` : 'N/A';
 
   const getPublicListingUrl = (id) => `${window.location.origin}/listings/${id}`;
+  
+const handleConfirmDelete = async () => {
+  if (!deletionTargetId) return;
 
+  const confirmed = window.confirm(
+    `Are you sure you want to delete this listing for reason: "${deleteReason || 'No reason provided'}"?`
+  );
+  if (!confirmed) return;
+
+  const { error } = await supabase
+    .from('sellers')
+    .delete()
+    .eq('id', deletionTargetId);
+
+  if (error) {
+    alert('❌ Error deleting listing.');
+    console.error(error);
+  } else {
+    setListings((prev) => prev.filter((l) => l.id !== deletionTargetId));
+    setShowReasonDropdown(false);
+    setDeleteReason('');
+    setDeletionTargetId(null);
+    alert('✅ Listing deleted successfully.');
+  }
+};
   if (loading) return <div className="p-6">Loading your listings...</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
 
