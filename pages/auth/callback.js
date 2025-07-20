@@ -13,6 +13,14 @@ export default function AuthCallback() {
       console.log('📍 Entered /auth/callback');
 
       try {
+        // ✅ Required to complete magic link login from hash URL
+        const { error: urlError } = await supabase.auth.getSessionFromUrl();
+        if (urlError) {
+          console.error('❌ Error parsing session from URL:', urlError);
+          router.replace('/');
+          return;
+        }
+
         const { data: { user }, error } = await supabase.auth.getUser();
 
         if (!isMounted) return;
@@ -41,10 +49,10 @@ export default function AuthCallback() {
 
         if (profile) {
           console.log('✅ Buyer profile found — redirecting to dashboard');
-          router.replace('/buyer-dashboard'); // ✅ this is your actual dashboard
+          router.replace('/buyer-dashboard');
         } else {
           console.log('👤 No profile found — redirecting to onboarding');
-          router.replace('/buyer-onboarding'); // ✅ updated to your actual onboarding route
+          router.replace('/buyer-onboarding');
         }
       } catch (err) {
         console.error('🔥 Unexpected error:', err);
@@ -67,3 +75,4 @@ export default function AuthCallback() {
     </div>
   );
 }
+
