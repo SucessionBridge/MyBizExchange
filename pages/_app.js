@@ -27,7 +27,7 @@ function AuthRedirector() {
         router.replace('/buyer/dashboard');
       } else {
         console.log('🆕 No profile — redirecting to onboarding');
-        router.replace('/buyers');
+        router.replace('/buyer-onboarding'); // ✅ FIXED
       }
     };
 
@@ -49,7 +49,7 @@ function AuthRedirector() {
           if (profile) {
             router.replace('/buyer/dashboard');
           } else {
-            router.replace('/buyers');
+            router.replace('/buyer-onboarding'); // ✅ FIXED
           }
         }
       }
@@ -78,4 +78,3 @@ export default function App({ Component, pageProps }) {
     </SessionContextProvider>
   );
 }
-
