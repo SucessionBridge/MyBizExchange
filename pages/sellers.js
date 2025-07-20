@@ -8,6 +8,8 @@ export default function SellerWizard() {
   const [step, setStep] = useState(1);
   const [previewMode, setPreviewMode] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
+const [isEditing, setIsEditing] = useState(false);
+const [listingId, setListingId] = useState(null);
 
   // ✅ New submission state hooks
   const [isSubmitting, setIsSubmitting] = useState(false);
