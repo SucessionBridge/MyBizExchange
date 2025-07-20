@@ -24,10 +24,10 @@ function AuthRedirector() {
 
       if (profile) {
         console.log('✅ Buyer found — redirecting to dashboard');
-        router.replace('/buyer/dashboard');
+        router.replace('/buyer-dashboard'); // ✅ FIXED
       } else {
         console.log('🆕 No profile — redirecting to onboarding');
-        router.replace('/buyer-onboarding'); // ✅ FIXED
+        router.replace('/buyer-onboarding'); // ✅ OK
       }
     };
 
@@ -47,9 +47,9 @@ function AuthRedirector() {
             .maybeSingle();
 
           if (profile) {
-            router.replace('/buyer/dashboard');
+            router.replace('/buyer-dashboard'); // ✅ FIXED
           } else {
-            router.replace('/buyer-onboarding'); // ✅ FIXED
+            router.replace('/buyer-onboarding'); // ✅ OK
           }
         }
       }
