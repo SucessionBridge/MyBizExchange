@@ -43,7 +43,7 @@ export default function BuyerOnboarding() {
           .maybeSingle();
 
         if (data) {
-          router.push('/buyer/dashboard');
+          router.push('/buyer-dashboard'); // ✅ Fixed
         } else {
           setFormData((prev) => ({ ...prev, email: user.email }));
         }
@@ -122,7 +122,7 @@ export default function BuyerOnboarding() {
     }
 
     const { error: insertError } = await supabase.from('buyers').insert([{
-      auth_id: user.id, // ✅ new
+      auth_id: user.id,
       name,
       email,
       financing_type: financingType,
@@ -144,7 +144,7 @@ export default function BuyerOnboarding() {
     } else {
       setAlreadySubmitted(true);
       alert('Your buyer profile was submitted successfully!');
-      router.push('/buyer/dashboard');
+      router.push('/buyer-dashboard'); // ✅ Fixed
     }
   };
 
@@ -209,3 +209,5 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
+
+
