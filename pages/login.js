@@ -1,12 +1,16 @@
-import { useState } from "react";
-import { supabase } from "../lib/supabaseClient";
+// pages/login.js
+import { useState } from 'react';
+import { useRouter } from 'next/router';
+import { supabase } from '../lib/supabaseClient';
 
 export default function Login() {
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
 
   const handleMagicLinkLogin = async (e) => {
     e.preventDefault();
+    setMessage('Sending magic link...');
 
     const { error } = await supabase.auth.signInWithOtp({
       email,
@@ -16,9 +20,9 @@ export default function Login() {
     });
 
     if (error) {
-      setMessage("❌ Magic link login failed. Please try again.");
+      setMessage('❌ Failed to send magic link. Try again.');
     } else {
-      setMessage("✅ Check your email for the magic login link.");
+      setMessage('✅ Check your email for the magic login link.');
     }
   };
 
@@ -31,13 +35,13 @@ export default function Login() {
     });
 
     if (error) {
-      setMessage("❌ Google login failed. Please try again.");
+      setMessage('❌ Google login failed.');
     }
   };
 
   return (
     <main className="max-w-md mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-4">Login</h1>
+      <h1 className="text-2xl font-bold mb-6 text-center">Sign In to SuccessionBridge</h1>
 
       <form onSubmit={handleMagicLinkLogin} className="space-y-4">
         <input
@@ -48,26 +52,21 @@ export default function Login() {
           className="w-full border p-2 rounded"
           required
         />
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded"
-        >
+        <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded">
           Send Magic Link
         </button>
       </form>
 
-      <div className="my-4 text-center text-gray-500">OR</div>
+      <div className="text-center my-4 text-gray-500">or</div>
 
       <button
         onClick={handleGoogleLogin}
-        className="w-full bg-red-600 text-white py-2 rounded"
+        className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded"
       >
-        Continue with Google
+        Sign in with Google
       </button>
 
-      {message && (
-        <p className="mt-4 text-center text-gray-700">{message}</p>
-      )}
+      {message && <p className="mt-4 text-center text-gray-700">{message}</p>}
     </main>
   );
 }
