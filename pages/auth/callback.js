@@ -13,8 +13,8 @@ export default function AuthCallback() {
       console.log('📍 Entered /auth/callback');
 
       try {
-        // Complete magic link or OAuth redirect session
-        const { error: sessionError } = await supabase.auth.getSessionFromUrl();
+        // ✅ Complete magic link or OAuth login flow
+        const { error: sessionError } = await supabase.auth.exchangeCodeForSession(); // 🔧 FIXED
         if (sessionError) {
           console.error('❌ Session parsing failed:', sessionError);
           router.replace('/');
