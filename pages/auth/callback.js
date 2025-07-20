@@ -41,10 +41,10 @@ export default function AuthCallback() {
 
         if (profile) {
           console.log('✅ Buyer profile found — redirecting to dashboard');
-          router.replace('/buyer-dashboard'); // ✅ this is correct
+          router.replace('/buyer-dashboard'); // ✅ this is your actual dashboard
         } else {
           console.log('👤 No profile found — redirecting to onboarding');
-          router.replace('/buyer-onboarding'); // ✅ fixed from '/buyers'
+          router.replace('/buyer-onboarding'); // ✅ updated to your actual onboarding route
         }
       } catch (err) {
         console.error('🔥 Unexpected error:', err);
