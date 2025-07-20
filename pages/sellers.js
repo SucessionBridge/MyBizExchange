@@ -168,11 +168,24 @@ const payload = {
    
 
     // ✅ Submit as JSON
-    const res = await fetch('/api/submit-seller-listing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
+  let res;
+
+if (isEditing && listingId) {
+  // ✏️ Update existing listing
+  res = await fetch(`/api/update-seller-listing?id=${listingId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+} else {
+  // 🆕 Create new listing
+  res = await fetch('/api/submit-seller-listing', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
 
     if (!res.ok) {
       const data = await res.json();
