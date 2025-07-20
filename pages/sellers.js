@@ -196,10 +196,11 @@ const payload = {
   );
 
   const renderImages = () => (
-    <div className="space-y-2">
-      <label className="text-sm font-medium">Upload Photos:</label>
-      <input type="file" multiple onChange={handleImageUpload} accept="image/*" />
-    </div>
+  <div className="space-y-2">
+  <label className="block font-medium text-gray-700">Photos of your business (max 8)</label>
+  <input type="file" multiple onChange={handleImageUpload} accept="image/*" className="w-full border rounded p-2" />
+</div>
+
   );
  const renderPreview = () => {
   const toTitleCase = (str) =>
