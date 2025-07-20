@@ -44,7 +44,9 @@ export default function BuyerDashboard() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6 text-blue-900 text-center">Buyer Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-6 text-blue-900 text-center">
+        {buyerProfile?.name ? `Welcome back, ${buyerProfile.name}` : 'Buyer Dashboard'}
+      </h1>
 
       {!buyerProfile ? (
         <div className="text-center">
