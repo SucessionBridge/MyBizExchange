@@ -54,7 +54,7 @@ export default function BuyerDashboard() {
             You haven't completed your buyer profile yet.
           </p>
           <button
-            onClick={() => router.push('/buyers')}
+            onClick={() => router.push('/buyer-onboarding')}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg text-lg font-semibold"
           >
             Complete Buyer Profile
@@ -82,7 +82,7 @@ export default function BuyerDashboard() {
           )}
 
           <button
-            onClick={() => router.push('/buyers?redirect=/dashboard')}
+            onClick={() => router.push('/buyer-onboarding?redirect=/dashboard')}
             className="mt-6 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
           >
             Edit My Profile
@@ -92,3 +92,4 @@ export default function BuyerDashboard() {
     </div>
   );
 }
+
