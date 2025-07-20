@@ -1,3 +1,4 @@
+// pages/auth/callback.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabaseClient';
@@ -14,14 +15,17 @@ export default function AuthCallback() {
 
       try {
         // ✅ Complete magic link or OAuth login flow
-        const { error: sessionError } = await supabase.auth.exchangeCodeForSession(); // 🔧 FIXED
+        const { error: sessionError } = await supabase.auth.exchangeCodeForSession();
         if (sessionError) {
           console.error('❌ Session parsing failed:', sessionError);
           router.replace('/');
           return;
         }
 
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
         if (!isMounted) return;
         if (userError || !user) {
@@ -47,11 +51,11 @@ export default function AuthCallback() {
         }
 
         if (profile && profile.name) {
-          // ✅ Welcome back redirect
+          // ✅ Redirect to dashboard with name
           const nameParam = encodeURIComponent(profile.name);
-          router.replace(`/buyer-dashboard?name=${nameParam}`);
+          router.replace(`/buyer-dashboard?name=${nameParam}`); // ✅ FIXED
         } else {
-          // 🚧 No profile yet
+          // 🚧 Redirect to onboarding
           router.replace('/buyer-onboarding');
         }
       } catch (err) {
