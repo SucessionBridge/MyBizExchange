@@ -7,32 +7,37 @@ export default function AuthCallback() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true; // 🔒 Prevent state update if component unmounted
+    let isMounted = true;
 
     const handleRedirect = async () => {
       console.log('📍 Entered /auth/callback');
 
       try {
-        // ✅ Required to complete magic link login from hash URL
+        // ✅ Complete magic link login by parsing URL
         const { error: urlError } = await supabase.auth.getSessionFromUrl();
         if (urlError) {
-          console.error('❌ Error parsing session from URL:', urlError);
+          console.error('❌ Error getting session from URL:', urlError);
           router.replace('/');
           return;
         }
 
-        const { data: { user }, error } = await supabase.auth.getUser();
+        // ✅ Give Supabase time to sync session
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.getUser();
 
         if (!isMounted) return;
 
         if (error || !user) {
-          console.error('❌ No user found after magic link login:', error);
+          console.error('❌ No user found after login:', error);
           router.replace('/');
           return;
         }
 
         console.log('🔐 Logged in user:', user.id);
 
+        // 🔍 Check for buyer profile
         const { data: profile, error: profileError } = await supabase
           .from('buyers')
           .select('id')
@@ -42,20 +47,20 @@ export default function AuthCallback() {
         if (!isMounted) return;
 
         if (profileError) {
-          console.error('❌ Error loading buyer profile:', profileError);
+          console.error('❌ Error fetching buyer profile:', profileError);
           router.replace('/');
           return;
         }
 
         if (profile) {
-          console.log('✅ Buyer profile found — redirecting to dashboard');
+          console.log('✅ Buyer profile exists — redirecting to dashboard');
           router.replace('/buyer-dashboard');
         } else {
           console.log('👤 No profile found — redirecting to onboarding');
           router.replace('/buyer-onboarding');
         }
       } catch (err) {
-        console.error('🔥 Unexpected error:', err);
+        console.error('🔥 Unexpected error in auth callback:', err);
         router.replace('/');
       } finally {
         if (isMounted) setLoading(false);
