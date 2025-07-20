@@ -22,7 +22,8 @@ export default function Home() {
         if (buyerProfile) {
           router.push("/buyer/dashboard");
         } else {
-          router.push("/buyers");
+        router.push("/buyer-onboarding");
+
         }
       }
     };
