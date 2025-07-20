@@ -9,6 +9,10 @@ export default function SellerDashboard() {
   const [sellerEmail, setSellerEmail] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
+    const [showReasonDropdown, setShowReasonDropdown] = useState(false);
+  const [deletionTargetId, setDeletionTargetId] = useState(null);
+  const [selectedReason, setSelectedReason] = useState('');
+
 
   useEffect(() => {
     const fetchListings = async () => {
@@ -43,19 +47,10 @@ export default function SellerDashboard() {
     fetchListings();
   }, []);
 
-  const handleDelete = async (id) => {
-    const confirm = window.confirm("Are you sure you want to delete this listing?");
-    if (!confirm) return;
-
-    const { error } = await supabase.from('sellers').delete().eq('id', id);
-
-    if (error) {
-      alert('Error deleting listing.');
-    } else {
-      setListings((prev) => prev.filter((l) => l.id !== id));
-      alert('✅ Listing deleted.');
-    }
-  };
+ const handleDeleteClick = (id) => {
+  setDeletionTargetId(id);
+  setShowReasonDropdown(true);
+};
 
   const formatCurrency = (val) =>
     val ? `$${parseFloat(val).toLocaleString()}` : 'N/A';
@@ -76,6 +71,32 @@ export default function SellerDashboard() {
           <div className="space-y-6">
             {listings.map((listing) => (
               <div key={listing.id} className="bg-white p-6 rounded-xl shadow relative">
+          {deletionTargetId === listing.id && showReasonDropdown && (
+  <div className="mt-4 space-y-2">
+    <label className="block font-medium text-gray-700">
+      Why are you deleting this listing?
+    </label>
+    <select
+      className="w-full border p-2 rounded"
+      value={deleteReason}
+      onChange={(e) => setDeleteReason(e.target.value)}
+    >
+      <option value="">Select a reason</option>
+      <option value="Business Sold">Business Sold</option>
+      <option value="No Longer for Sale">No Longer for Sale</option>
+      <option value="Created by Mistake">Created by Mistake</option>
+      <option value="Other">Other</option>
+    </select>
+
+    <button
+      onClick={handleConfirmDelete}
+      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+    >
+      ✅ Confirm Delete
+    </button>
+  </div>
+)}
+
                 <h2 className="text-xl font-semibold mb-1">{listing.business_name}</h2>
                 <p className="text-gray-700 mb-2">
                   {listing.industry} • {listing.location}
