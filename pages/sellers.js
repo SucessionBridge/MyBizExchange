@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import { supabase } from '../lib/supabaseClient'; // Make sure this is at the top of your file
+import supabase from '../lib/supabaseClient'; // ✅ correct
+// Make sure this is at the top of your file
 export default function SellerWizard() {
   
   const router = useRouter();
