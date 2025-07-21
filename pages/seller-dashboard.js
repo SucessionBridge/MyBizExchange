@@ -2,6 +2,21 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { supabase } from '../lib/supabaseClient';
+const deleteImageFromStorage = async (imageUrl) => {
+  try {
+    const url = new URL(imageUrl);
+    const pathParts = url.pathname.split('/');
+    const filePath = pathParts.slice(3).join('/'); // removes '/storage/v1/object/public/seller-images/'
+
+    const { error } = await supabase.storage
+      .from('seller-images')
+      .remove([filePath]);
+
+    if (error) throw error;
+  } catch (err) {
+    console.error('Storage deletion error:', err);
+  }
+};
 
 export default function SellerDashboard() {
   const [listings, setListings] = useState([]);
