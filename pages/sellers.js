@@ -240,17 +240,30 @@ if (isEditing && listingId) {
       <h2 className="text-4xl font-bold tracking-tight mb-1">{getListingTitle()}</h2>
       <p className="text-md text-gray-600">{formData.location}</p>
 
-      {imagePreviews.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          {imagePreviews.map((src, idx) => (
-            <img
-              key={idx}
-              src={src}
-              className="w-full h-64 object-cover rounded shadow-sm border"
-            />
-          ))}
-        </div>
-      )}
+     {formData.images.length > 0 && (
+  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
+    {formData.images.map((url, i) => (
+      <div key={i} className="relative">
+        <img
+          src={url}
+          alt={`Image ${i + 1}`}
+          className="rounded-md border h-32 w-full object-cover"
+        />
+        <button
+          type="button"
+          onClick={() => {
+            const updatedImages = formData.images.filter((img) => img !== url);
+            setFormData((prev) => ({ ...prev, images: updatedImages }));
+          }}
+          className="absolute top-1 right-1 bg-red-600 text-white text-xs rounded-full px-2 py-1 hover:bg-red-700"
+        >
+          ❌
+        </button>
+      </div>
+    ))}
+  </div>
+)}
+
 
       <div className="grid md:grid-cols-2 gap-10 text-base mt-6">
         <div>
