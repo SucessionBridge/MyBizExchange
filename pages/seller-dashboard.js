@@ -65,14 +65,26 @@ const handleConfirmDelete = async () => {
   );
   if (!confirmed) return;
 
-  const { error } = await supabase
+  // ✅ Save reason into the DB before deleting
+  const { error: updateError } = await supabase
+    .from('sellers')
+    .update({ delete_reason: deleteReason || 'No reason provided' })
+    .eq('id', deletionTargetId);
+
+  if (updateError) {
+    alert('❌ Failed to record delete reason.');
+    console.error(updateError);
+    return;
+  }
+
+  const { error: deleteError } = await supabase
     .from('sellers')
     .delete()
     .eq('id', deletionTargetId);
 
-  if (error) {
+  if (deleteError) {
     alert('❌ Error deleting listing.');
-    console.error(error);
+    console.error(deleteError);
   } else {
     setListings((prev) => prev.filter((l) => l.id !== deletionTargetId));
     setShowReasonDropdown(false);
@@ -81,6 +93,7 @@ const handleConfirmDelete = async () => {
     alert('✅ Listing deleted successfully.');
   }
 };
+
   if (loading) return <div className="p-6">Loading your listings...</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
 
