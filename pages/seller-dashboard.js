@@ -199,21 +199,30 @@ const handleDeletePhoto = async (listingId, imageUrl) => {
                   {listing.business_description}
                 </p>
 
-                {listing.images?.length > 0 && (
-                  <div className="mt-4">
-                    <h3 className="font-medium mb-2">Uploaded Photos</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {listing.images.map((url, i) => (
-                        <img
-                          key={i}
-                          src={url}
-                          alt={`Image ${i + 1}`}
-                          className="rounded-md border h-32 w-full object-cover"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
+{listing.images?.length > 0 && (
+  <div className="mt-4">
+    <h3 className="font-medium mb-2">Uploaded Photos</h3>
+    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+      {listing.images.map((url, i) => (
+        <div key={i} className="relative">
+          <img
+            src={url}
+            alt={`Image ${i + 1}`}
+            className="rounded-md border h-32 w-full object-cover"
+          />
+          <button
+            onClick={() => handleDeletePhoto(listing.id, url)}
+            className="absolute top-1 right-1 bg-red-600 text-white text-xs rounded-full px-2 py-1 hover:bg-red-700"
+          >
+            ❌
+          </button>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+
+                
 
                 <p className="mt-4 text-sm text-gray-500">
                   Submitted: {new Date(listing.created_at).toLocaleDateString()}
