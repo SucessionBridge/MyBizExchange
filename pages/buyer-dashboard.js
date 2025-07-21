@@ -1,7 +1,8 @@
 // pages/buyer-dashboard.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { supabase } from '../lib/supabaseClient';
+import supabase from "../lib/supabaseClient"; // ✅ correct
+
 
 export default function BuyerDashboard() {
   const router = useRouter();
