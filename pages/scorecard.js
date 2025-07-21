@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
-import { supabase } from '../lib/supabaseClient';
+import supabase from '../lib/supabaseClient'; // ✅ correct
+
 
 export default function ScorecardPage() {
   const [formData, setFormData] = useState({
