@@ -5,7 +5,8 @@ import { useState, useEffect } from 'react';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import { SessionContextProvider, useSession } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
-import { supabase } from '../lib/supabaseClient';
+import supabase from '../lib/supabaseClient';
+
 
 function AuthRedirector() {
   const session = useSession();
