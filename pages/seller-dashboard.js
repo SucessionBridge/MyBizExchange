@@ -62,16 +62,17 @@ export default function SellerDashboard() {
     fetchListings();
   }, []);
 
- const handleDeleteClick = (id) => {
+const handleDeleteClick = (id) => {
   setDeletionTargetId(id);
   setShowReasonDropdown(true);
 };
 
-  const formatCurrency = (val) =>
-    val ? `$${parseFloat(val).toLocaleString()}` : 'N/A';
+const formatCurrency = (val) =>
+  val ? `$${parseFloat(val).toLocaleString()}` : 'N/A';
 
-  const getPublicListingUrl = (id) => `${window.location.origin}/listings/${id}`;
-  
+const getPublicListingUrl = (id) => `${window.location.origin}/listings/${id}`;
+
+// ✅ FULL handleConfirmDelete
 const handleConfirmDelete = async () => {
   if (!deletionTargetId) return;
 
@@ -80,7 +81,6 @@ const handleConfirmDelete = async () => {
   );
   if (!confirmed) return;
 
-  // ✅ Save reason into the DB before deleting
   const { error: updateError } = await supabase
     .from('sellers')
     .update({ delete_reason: deleteReason || 'No reason provided' })
@@ -108,6 +108,33 @@ const handleConfirmDelete = async () => {
     alert('✅ Listing deleted successfully.');
   }
 };
+
+// ✅ Now define handleDeletePhoto AFTER ^ is complete
+const handleDeletePhoto = async (listingId, imageUrl) => {
+  const confirmed = window.confirm('Are you sure you want to delete this photo?');
+  if (!confirmed) return;
+
+  await deleteImageFromStorage(imageUrl);
+
+  const listing = listings.find((l) => l.id === listingId);
+  const updatedImages = listing.images.filter((url) => url !== imageUrl);
+
+  const { error } = await supabase
+    .from('sellers')
+    .update({ images: updatedImages })
+    .eq('id', listingId);
+
+  if (error) {
+    alert('❌ Failed to update listing after deleting image.');
+    console.error(error);
+    return;
+  }
+
+  setListings((prev) =>
+    prev.map((l) => (l.id === listingId ? { ...l, images: updatedImages } : l))
+  );
+};
+
 
   if (loading) return <div className="p-6">Loading your listings...</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
