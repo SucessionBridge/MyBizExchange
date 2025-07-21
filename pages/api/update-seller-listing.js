@@ -1,5 +1,6 @@
 // pages/api/update-seller-listing.js
-import { supabase } from '../../lib/supabaseClient';
+import supabase from '../../lib/supabaseClient';
+
 
 export default async function handler(req, res) {
   if (req.method !== 'PUT') {
