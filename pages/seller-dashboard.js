@@ -176,32 +176,35 @@ const handleConfirmDelete = async () => {
                 <p className="mt-4 text-sm text-gray-500">
                   Submitted: {new Date(listing.created_at).toLocaleDateString()}
                 </p>
+<div className="mt-4 flex flex-wrap gap-3">
+  <button
+    onClick={() => {
+      navigator.clipboard.writeText(getPublicListingUrl(listing.id));
+      alert('✅ Link copied to clipboard!');
+    }}
+    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+  >
+    📋 Copy Listing Link
+  </button>
 
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(getPublicListingUrl(listing.id));
-                      alert('✅ Link copied to clipboard!');
-                    }}
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                  >
-                    📋 Copy Listing Link
-                  </button>
+  <button
+    onClick={() => router.push(`/edit-listing/${listing.id}`)}
+    className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+  >
+    ✏️ Edit Listing
+  </button>
 
-                  <button
-                    onClick={() => router.push(`/edit-listing/${listing.id}`)}
-                    className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
-                  >
-                    ✏️ Edit Listing
-                  </button>
+  {deletionTargetId !== listing.id && (
+    <button
+      onClick={() => handleDeleteClick(listing.id)}
+      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+    >
+      🗑️ Delete Listing
+    </button>
+  )}
+</div>
 
-                  <button
-                    onClick={() => handleDelete(listing.id)}
-                    className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-                  >
-                    🗑️ Delete Listing
-                  </button>
-                </div>
+               
               </div>
             ))}
           </div>
