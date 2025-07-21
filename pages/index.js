@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
-import { supabase } from "../lib/supabaseClient";
+import supabase from "../lib/supabaseClient"; // ✅ correct
+
 import Link from "next/link";
 
 export default function Home() {
