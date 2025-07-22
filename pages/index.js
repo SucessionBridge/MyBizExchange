@@ -20,10 +20,12 @@ export default function Home() {
           .eq("email", user.email)
           .maybeSingle();
 
-        if (buyerProfile) {
-          router.push("/buyer/dashboard");
-        } else {
-        router.push("/buyer-onboarding");
+       if (buyerProfile) {
+  router.push("/buyer-dashboard");
+} else {
+  router.push("/buyer-onboarding");
+}
+
 
         }
       }
