@@ -20,13 +20,10 @@ export default function Home() {
           .eq("email", user.email)
           .maybeSingle();
 
-       if (buyerProfile) {
-  router.push("/buyer-dashboard");
-} else {
-  router.push("/buyer-onboarding");
-}
-
-
+        if (buyerProfile) {
+          router.push("/buyer-dashboard"); // ✅ FIXED REDIRECT PATH
+        } else {
+          router.push("/buyer-onboarding");
         }
       }
     };
@@ -134,5 +131,3 @@ export default function Home() {
     </main>
   );
 }
-
-
