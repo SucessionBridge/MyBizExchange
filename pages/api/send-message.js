@@ -1,34 +1,44 @@
-async function handleSubmit(e) {
-  e.preventDefault();
+// pages/api/send-message.js
+import supabase from '../../lib/supabaseClient';
 
-  if (!message || !buyer || !listing) return;
-
-  try {
-    const response = await fetch('/api/send-message', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message,
-        seller_id: listing.user_id || listing.seller_id, // adjust as needed
-        buyer_name: buyer.name || buyer.full_name || buyer.email,
-        buyer_email: buyer.email,
-        topic: 'business-inquiry',
-        extension: 'successionbridge',
-      }),
-    });
-
-    const result = await response.json();
-
-    if (!response.ok) {
-      console.error('❌ Message failed:', result.error);
-      alert('Message failed to send.');
-    } else {
-      console.log('✅ Message sent!');
-      alert('Message sent to the seller!');
-      setMessage('');
-    }
-  } catch (err) {
-    console.error('❌ Error sending message:', err);
-    alert('Something went wrong.');
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  const {
+    message,
+    seller_id,
+    buyer_email,
+    buyer_name,
+    listing_id,
+    extension = 'successionbridge',
+    topic = 'business-inquiry',
+  } = req.body;
+
+  // ✅ Validate required fields
+  if (!message || !seller_id || !buyer_email || !buyer_name) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  // ✅ Insert message into Supabase 'messages' table
+  const { error } = await supabase.from('messages').insert([
+    {
+      message,
+      seller_id,
+      buyer_email,
+      buyer_name,
+      listing_id,
+      extension,
+      topic,
+    },
+  ]);
+
+  if (error) {
+    console.error('❌ Supabase insert error:', error.message);
+    return res.status(500).json({ error: error.message });
+  }
+
+  return res.status(200).json({ success: true });
 }
+
