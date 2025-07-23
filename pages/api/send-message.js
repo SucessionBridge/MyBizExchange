@@ -4,15 +4,15 @@ import supabase from '../../lib/supabaseClient';
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { sender_id, seller_id, listing_id, message } = req.body;
+  const { seller_id, message, extension, topic, buyer_name, buyer_email } = req.body;
 
-  if (!sender_id || !seller_id || !listing_id || !message) {
+  if (!seller_id || !message || !extension || !topic || !buyer_name || !buyer_email) {
     return res.status(400).json({ error: 'Missing fields' });
   }
 
   const { error } = await supabase
     .from('messages')
-    .insert({ sender_id, seller_id, listing_id, message });
+    .insert([{ seller_id, message, extension, topic, buyer_name, buyer_email }]);
 
   if (error) {
     return res.status(500).json({ error: error.message });
