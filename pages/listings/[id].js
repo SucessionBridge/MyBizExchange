@@ -65,7 +65,7 @@ async function handleSubmit(e) {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     message,
-    seller_id: listing.user_id || listing.seller_id,
+   seller_id: listing.auth_id,
     listing_id: listing.id, // ✅ Add this line
     buyer_name: buyer.name || buyer.full_name || buyer.email,
     buyer_email: buyer.email,
