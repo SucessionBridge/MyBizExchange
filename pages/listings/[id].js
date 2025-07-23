@@ -54,8 +54,9 @@ export default function ListingDetail() {
     setLoading(false);
   }
 
- async function handleSubmit(e) {
+async function handleSubmit(e) {
   e.preventDefault();
+
   if (!message || !buyer || !listing) return;
 
   try {
@@ -63,26 +64,32 @@ export default function ListingDetail() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        sender_id: buyer.auth_id,
-        seller_id: listing.auth_id,
-        listing_id: listing.id,
         message,
+        seller_id: listing.user_id || listing.seller_id, // adjust if needed
+        buyer_name: buyer.name || buyer.full_name || buyer.email,
+        buyer_email: buyer.email,
+        extension: 'successionbridge',
+        topic: 'business-inquiry',
       }),
     });
 
     const result = await response.json();
 
-    if (response.ok) {
-      setSuccess(true);
-    } else {
+    if (!response.ok) {
       console.error('❌ Message failed:', result.error);
-      alert('There was an error sending your message.');
+      alert('Message failed to send.');
+    } else {
+      console.log('✅ Message sent!');
+      alert('Message sent to the seller!');
+      setMessage('');
     }
   } catch (err) {
-    console.error('🔥 Message error:', err);
-    alert('Unexpected error sending message.');
+    console.error('❌ Error sending message:', err);
+    alert('Something went wrong.');
   }
 }
+
+ 
 
 
   async function handleSaveListing() {
