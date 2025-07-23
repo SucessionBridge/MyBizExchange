@@ -61,17 +61,19 @@ async function handleSubmit(e) {
 
   try {
     const response = await fetch('/api/send-message', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message,
-        seller_id: listing.user_id || listing.seller_id, // adjust if needed
-        buyer_name: buyer.name || buyer.full_name || buyer.email,
-        buyer_email: buyer.email,
-        extension: 'successionbridge',
-        topic: 'business-inquiry',
-      }),
-    });
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    message,
+    seller_id: listing.user_id || listing.seller_id,
+    listing_id: listing.id, // ✅ Add this line
+    buyer_name: buyer.name || buyer.full_name || buyer.email,
+    buyer_email: buyer.email,
+    topic: 'business-inquiry',
+    extension: 'successionbridge',
+  }),
+});
+
 
     const result = await response.json();
 
