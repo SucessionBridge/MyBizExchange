@@ -84,6 +84,7 @@ async function handleSubmit(e) {
       console.log('✅ Message sent!');
       alert('Message sent to the seller!');
       setMessage('');
+      setSuccess(true);
     }
   } catch (err) {
     console.error('❌ Error sending message:', err);
