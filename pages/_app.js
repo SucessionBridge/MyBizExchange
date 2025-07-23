@@ -6,13 +6,12 @@ import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
 import { SessionContextProvider, useSession } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
-
+import { Toaster } from 'react-hot-toast'; // ✅ Add this
 
 function AuthRedirector() {
   const session = useSession();
   const router = useRouter();
 
-  // 1. Handle existing session (e.g., page reload)
   useEffect(() => {
     if (!session?.user || router.pathname !== '/') return;
 
@@ -25,17 +24,16 @@ function AuthRedirector() {
 
       if (profile) {
         console.log('✅ Buyer found — redirecting to dashboard');
-        router.replace('/buyer-dashboard'); // ✅ FIXED
+        router.replace('/buyer-dashboard');
       } else {
         console.log('🆕 No profile — redirecting to onboarding');
-        router.replace('/buyer-onboarding'); // ✅ OK
+        router.replace('/buyer-onboarding');
       }
     };
 
     checkBuyerProfile();
   }, [session, router]);
 
-  // 2. Also listen for SIGNED_IN event (magic link trigger)
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
@@ -48,9 +46,9 @@ function AuthRedirector() {
             .maybeSingle();
 
           if (profile) {
-            router.replace('/buyer-dashboard'); // ✅ FIXED
+            router.replace('/buyer-dashboard');
           } else {
-            router.replace('/buyer-onboarding'); // ✅ OK
+            router.replace('/buyer-onboarding');
           }
         }
       }
@@ -75,6 +73,16 @@ export default function App({ Component, pageProps }) {
         <main className="pt-20 px-4">
           <Component {...pageProps} />
         </main>
+        <Toaster // ✅ Add this anywhere inside the layout
+          position="top-right"
+          toastOptions={{
+            duration: 3000,
+            style: {
+              background: '#333',
+              color: '#fff',
+            },
+          }}
+        />
       </div>
     </SessionContextProvider>
   );
