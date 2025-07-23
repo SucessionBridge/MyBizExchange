@@ -53,27 +53,36 @@ export default function ListingDetail() {
     if (!error) setBuyer(data);
     setLoading(false);
   }
-
 async function handleSubmit(e) {
   e.preventDefault();
 
-  if (!message || !buyer || !listing) return;
+  if (!message || !buyer || !listing) {
+    console.warn("⚠️ Missing message, buyer, or listing.");
+    return;
+  }
+
+  // ✅ Debug logs to verify the data being sent
+  console.log("📤 Sending message with data:");
+  console.log("message:", message);
+  console.log("seller_id:", listing.auth_id);
+  console.log("listing_id:", listing.id);
+  console.log("buyer_name:", buyer.name || buyer.full_name || buyer.email);
+  console.log("buyer_email:", buyer.email);
 
   try {
     const response = await fetch('/api/send-message', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    message,
-   seller_id: listing.auth_id,
-    listing_id: listing.id, // ✅ Add this line
-    buyer_name: buyer.name || buyer.full_name || buyer.email,
-    buyer_email: buyer.email,
-    topic: 'business-inquiry',
-    extension: 'successionbridge',
-  }),
-});
-
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        seller_id: listing.auth_id,
+        listing_id: listing.id,
+        buyer_name: buyer.name || buyer.full_name || buyer.email,
+        buyer_email: buyer.email,
+        topic: 'business-inquiry',
+        extension: 'successionbridge',
+      }),
+    });
 
     const result = await response.json();
 
@@ -81,7 +90,7 @@ async function handleSubmit(e) {
       console.error('❌ Message failed:', result.error);
       alert('Message failed to send.');
     } else {
-      console.log('✅ Message sent!');
+      console.log('✅ Message sent successfully!');
       alert('Message sent to the seller!');
       setMessage('');
       setSuccess(true);
@@ -91,6 +100,8 @@ async function handleSubmit(e) {
     alert('Something went wrong.');
   }
 }
+
+
 
  
 
