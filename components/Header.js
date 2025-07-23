@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Menu, X } from 'lucide-react';
 import supabase from '../lib/supabaseClient';
+import { toast } from 'react-hot-toast'; // ✅ NEW
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
@@ -65,13 +66,21 @@ export default function Header() {
               {dropdownOpen && (
                 <div className="absolute right-0 mt-2 w-44 bg-white border rounded shadow z-50">
                   <button
-                    onClick={() => { router.push('/buyer-dashboard'); setDropdownOpen(false); }}
+                    onClick={() => {
+                      toast.success('Switched to Buyer Dashboard');
+                      router.push('/buyer-dashboard');
+                      setDropdownOpen(false);
+                    }}
                     className="w-full text-left px-4 py-2 hover:bg-gray-100"
                   >
                     Buyer Dashboard
                   </button>
                   <button
-                    onClick={() => { router.push('/seller-dashboard'); setDropdownOpen(false); }}
+                    onClick={() => {
+                      toast.success('Switched to Seller Dashboard');
+                      router.push('/seller-dashboard');
+                      setDropdownOpen(false);
+                    }}
                     className="w-full text-left px-4 py-2 hover:bg-gray-100"
                   >
                     Seller Dashboard
@@ -112,9 +121,29 @@ export default function Header() {
 
             {user && (
               <>
-                <button onClick={() => { router.push('/buyer-dashboard'); setIsOpen(false); }} className="text-left hover:text-blue-600">Buyer Dashboard</button>
-                <button onClick={() => { router.push('/seller-dashboard'); setIsOpen(false); }} className="text-left hover:text-blue-600">Seller Dashboard</button>
-                <button onClick={handleLogout} className="text-left text-red-600 hover:text-red-800">Log Out</button>
+                <button
+                  onClick={() => {
+                    toast.success('Switched to Buyer Dashboard');
+                    router.push('/buyer-dashboard');
+                    setIsOpen(false);
+                  }}
+                  className="text-left hover:text-blue-600"
+                >
+                  Buyer Dashboard
+                </button>
+                <button
+                  onClick={() => {
+                    toast.success('Switched to Seller Dashboard');
+                    router.push('/seller-dashboard');
+                    setIsOpen(false);
+                  }}
+                  className="text-left hover:text-blue-600"
+                >
+                  Seller Dashboard
+                </button>
+                <button onClick={handleLogout} className="text-left text-red-600 hover:text-red-800">
+                  Log Out
+                </button>
               </>
             )}
 
