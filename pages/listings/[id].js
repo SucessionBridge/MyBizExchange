@@ -62,6 +62,7 @@ async function handleSubmit(e) {
   }
 
   // ✅ Debug logs to verify the data being sent
+  console.log("🔎 FULL LISTING OBJECT:", listing);
   console.log("📤 Sending message with data:");
   console.log("message:", message);
   console.log("seller_id:", listing.auth_id);
