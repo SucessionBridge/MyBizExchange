@@ -1,22 +1,34 @@
-// pages/api/send-message.js
-import supabase from '../../lib/supabaseClient';
+async function handleSubmit(e) {
+  e.preventDefault();
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  if (!message || !buyer || !listing) return;
 
-  const { seller_id, message, extension, topic, buyer_name, buyer_email } = req.body;
+  try {
+    const response = await fetch('/api/send-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message,
+        seller_id: listing.user_id || listing.seller_id, // adjust as needed
+        buyer_name: buyer.name || buyer.full_name || buyer.email,
+        buyer_email: buyer.email,
+        topic: 'business-inquiry',
+        extension: 'successionbridge',
+      }),
+    });
 
-  if (!seller_id || !message || !extension || !topic || !buyer_name || !buyer_email) {
-    return res.status(400).json({ error: 'Missing fields' });
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error('❌ Message failed:', result.error);
+      alert('Message failed to send.');
+    } else {
+      console.log('✅ Message sent!');
+      alert('Message sent to the seller!');
+      setMessage('');
+    }
+  } catch (err) {
+    console.error('❌ Error sending message:', err);
+    alert('Something went wrong.');
   }
-
-  const { error } = await supabase
-    .from('messages')
-    .insert([{ seller_id, message, extension, topic, buyer_name, buyer_email }]);
-
-  if (error) {
-    return res.status(500).json({ error: error.message });
-  }
-
-  return res.status(200).json({ success: true });
 }
