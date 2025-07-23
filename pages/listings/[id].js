@@ -54,25 +54,36 @@ export default function ListingDetail() {
     setLoading(false);
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!message || !buyer) return;
+ async function handleSubmit(e) {
+  e.preventDefault();
+  if (!message || !buyer || !listing) return;
 
-    const { error } = await supabase.from('messages').insert([
-      {
-        buyer_email: buyer.email,
-        buyer_name: buyer.name,
+  try {
+    const response = await fetch('/api/send-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sender_id: buyer.auth_id,
+        seller_id: listing.auth_id,
+        listing_id: listing.id,
         message,
-        seller_id: id,
-      },
-    ]);
+      }),
+    });
 
-    if (error) {
-      console.error('Message send failed:', error);
-    } else {
+    const result = await response.json();
+
+    if (response.ok) {
       setSuccess(true);
+    } else {
+      console.error('❌ Message failed:', result.error);
+      alert('There was an error sending your message.');
     }
+  } catch (err) {
+    console.error('🔥 Message error:', err);
+    alert('Unexpected error sending message.');
   }
+}
+
 
   async function handleSaveListing() {
     if (!buyer) {
