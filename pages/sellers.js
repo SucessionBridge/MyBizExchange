@@ -2,21 +2,19 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import supabase from '../lib/supabaseClient'; // ✅ correct
-// Make sure this is at the top of your file
+
 export default function SellerWizard() {
-  
+
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [previewMode, setPreviewMode] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
-const [isEditing, setIsEditing] = useState(false);
-const [listingId, setListingId] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [listingId, setListingId] = useState(null);
 
-  // ✅ New submission state hooks
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
-
 
   const [formData, setFormData] = useState({
     name: '',
@@ -25,6 +23,8 @@ const [listingId, setListingId] = useState(null);
     hideBusinessName: false,
     industry: '',
     location: '',
+    location_city: '',
+    location_state: '',
     website: '',
     annualRevenue: '',
     sde: '',
@@ -104,291 +104,266 @@ const [listingId, setListingId] = useState(null);
     setImagePreviews(prev => [...prev, ...previews]);
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setIsSubmitting(true);
-  setSubmitSuccess(false);
-  setSubmitError('');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setSubmitSuccess(false);
+    setSubmitError('');
 
-  try {
-    const uploadedImageUrls = [];
+    try {
+      const uploadedImageUrls = [];
 
-    // ✅ Upload images to Supabase and collect public URLs
-    for (const file of formData.images) {
-      const filePath = `${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('seller-images')
-        .upload(filePath, file);
+      for (const file of formData.images) {
+        const filePath = `${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('seller-images')
+          .upload(filePath, file);
 
-      if (uploadError) {
-        console.error('Image upload failed:', uploadError.message);
-        setSubmitError('Image upload failed. Please try again.');
-        setIsSubmitting(false);
-        return;
+        if (uploadError) {
+          console.error('Image upload failed:', uploadError.message);
+          setSubmitError('Image upload failed. Please try again.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('seller-images')
+          .getPublicUrl(filePath);
+        uploadedImageUrls.push(urlData.publicUrl);
       }
 
-      const { data: urlData } = supabase.storage
-        .from('seller-images')
-        .getPublicUrl(filePath);
-      uploadedImageUrls.push(urlData.publicUrl);
+      // ✅ Auto-combine city + state into location
+      const combinedLocation = formData.location_city && formData.location_state
+        ? `${formData.location_city}, ${formData.location_state}`
+        : formData.location;
+
+      const {
+        images,
+        annualRevenue,
+        annualProfit,
+        sde,
+        askingPrice,
+        employees,
+        monthly_lease,
+        inventory_value,
+        equipment_value,
+        ...rest
+      } = formData;
+
+      const payload = {
+        ...rest,
+        location: combinedLocation,
+        annual_revenue: parseFloat(annualRevenue) || 0,
+        annual_profit: parseFloat(annualProfit) || 0,
+        sde: parseFloat(sde) || 0,
+        asking_price: parseFloat(askingPrice) || 0,
+        employees: parseInt(employees) || 0,
+        monthly_lease: parseFloat(monthly_lease) || 0,
+        inventory_value: parseFloat(inventory_value) || 0,
+        equipment_value: parseFloat(equipment_value) || 0,
+        image_urls: uploadedImageUrls,
+        original_description: formData.descriptionChoice === 'manual' ? formData.businessDescription : '',
+        ai_description: formData.descriptionChoice === 'ai' ? formData.aiDescription : '',
+        description_choice: formData.descriptionChoice,
+        hide_business_name: formData.hideBusinessName,
+        business_description: formData.businessDescription,
+      };
+
+      let res;
+
+      if (isEditing && listingId) {
+        res = await fetch(`/api/update-seller-listing?id=${listingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        res = await fetch('/api/submit-seller-listing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Server error');
+      }
+
+      setSubmitSuccess(true);
+      setIsSubmitting(false);
+      setPreviewMode(false);
+      router.push('/thank-you');
+
+    } catch (err) {
+      console.error('❌ Submission error:', err);
+      setSubmitError(err.message || 'Submission failed');
+      setIsSubmitting(false);
     }
-
-    // ✅ Prepare clean JSON payload with correct snake_case keys
-    const {
-      images, // remove from payload
-      annualRevenue,
-      annualProfit,
-      sde,
-      askingPrice,
-      employees,
-      monthly_lease,
-      inventory_value,
-      equipment_value,
-      ...rest
-    } = formData;
-const payload = {
-  ...rest,
-  annual_revenue: parseFloat(annualRevenue) || 0,
-  annual_profit: parseFloat(annualProfit) || 0,
-  sde: parseFloat(sde) || 0,
-  asking_price: parseFloat(askingPrice) || 0,
-  employees: parseInt(employees) || 0,
-  monthly_lease: parseFloat(monthly_lease) || 0,
-  inventory_value: parseFloat(inventory_value) || 0,
-  equipment_value: parseFloat(equipment_value) || 0,
-  image_urls: uploadedImageUrls,
-  // ✅ Descriptions (already present)
-  original_description: formData.descriptionChoice === 'manual' ? formData.businessDescription : '',
-  ai_description: formData.descriptionChoice === 'ai' ? formData.aiDescription : '',
-  // ✅ Missing fields added below
-  description_choice: formData.descriptionChoice,
-  hide_business_name: formData.hideBusinessName,
-  business_description: formData.businessDescription, // always send original text too
-};
-
-   
-
-    // ✅ Submit as JSON
-  let res;
-
-if (isEditing && listingId) {
-  // ✏️ Update existing listing
-  res = await fetch(`/api/update-seller-listing?id=${listingId}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-} else {
-  // 🆕 Create new listing
-  res = await fetch('/api/submit-seller-listing', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-}
-
-
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.error || 'Server error');
-    }
-
-    setSubmitSuccess(true);
-    setIsSubmitting(false);
-    setPreviewMode(false);
-    router.push('/thank-you');
-
-  } catch (err) {
-    console.error('❌ Submission error:', err);
-    setSubmitError(err.message || 'Submission failed');
-    setIsSubmitting(false);
-  }
-};
+  };
 
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
-
   const renderBackButton = () => (
     <button onClick={() => setStep(s => Math.max(1, s - 1))} className="text-sm text-blue-600 underline mt-2">Back</button>
   );
 
   const renderImages = () => (
-  <div className="space-y-2">
-  <label className="block font-medium text-gray-700">Photos of your business (max 8)</label>
-  <input type="file" multiple onChange={handleImageUpload} accept="image/*" className="w-full border rounded p-2" />
-</div>
-
-  );
- const renderPreview = () => {
-  const toTitleCase = (str) =>
-    str
-      .toLowerCase()
-      .split(' ')
-      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-
-  const getListingTitle = () => {
-    if (formData.industry) {
-      return `${toTitleCase(formData.industry)} Business for Sale`;
-    } else if (formData.hideBusinessName) {
-      return 'Confidential Business Listing';
-    } else {
-      return formData.businessName;
-    }
-  };
-
-  return (
-    <div className="bg-white rounded shadow p-6 space-y-8 font-serif text-gray-900">
-      <h2 className="text-4xl font-bold tracking-tight mb-1">{getListingTitle()}</h2>
-      <p className="text-md text-gray-600">{formData.location}</p>
-
-     {formData.images.length > 0 && (
-  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
-    {formData.images.map((url, i) => (
-      <div key={i} className="relative">
-        <img
-          src={url}
-          alt={`Image ${i + 1}`}
-          className="rounded-md border h-32 w-full object-cover"
-        />
-        <button
-          type="button"
-          onClick={() => {
-            const updatedImages = formData.images.filter((img) => img !== url);
-            setFormData((prev) => ({ ...prev, images: updatedImages }));
-          }}
-          className="absolute top-1 right-1 bg-red-600 text-white text-xs rounded-full px-2 py-1 hover:bg-red-700"
-        >
-          ❌
-        </button>
-      </div>
-    ))}
-  </div>
-)}
-
-
-      <div className="grid md:grid-cols-2 gap-10 text-base mt-6">
-        <div>
-          <h3 className="text-xl font-semibold border-b pb-2 mb-3">Financial Overview</h3>
-          <p><strong>Asking Price:</strong> {formatCurrency(formData.askingPrice)}</p>
-          <p><strong>Annual Revenue:</strong> {formatCurrency(formData.annualRevenue)}</p>
-          <p><strong>SDE:</strong> {formatCurrency(formData.sde)}</p>
-          <p><strong>Annual Profit:</strong> {formatCurrency(formData.annualProfit)}</p>
-          <p><strong>Inventory Value:</strong> {formatCurrency(formData.inventory_value)}</p>
-          <p><strong>Equipment Value:</strong> {formatCurrency(formData.equipment_value)}</p>
-          <p><strong>Includes Inventory:</strong> {formData.includesInventory ? 'Yes' : 'No'}</p>
-          <p><strong>Includes Building:</strong> {formData.includesBuilding ? 'Yes' : 'No'}</p>
-          <p><strong>Real Estate Included:</strong> {formData.real_estate_included ? 'Yes' : 'No'}</p>
-        </div>
-        <div>
-          <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Details</h3>
-          <p><strong>Employees:</strong> {formData.employees}</p>
-          <p><strong>Monthly Lease:</strong> {formatCurrency(formData.monthly_lease)}</p>
-          <p><strong>Home-Based:</strong> {formData.home_based ? 'Yes' : 'No'}</p>
-          <p><strong>Relocatable:</strong> {formData.relocatable ? 'Yes' : 'No'}</p>
-          <p><strong>Financing Type:</strong> {formData.financingType.replace('-', ' ')}</p>
-          <p><strong>Customer Type:</strong> {formData.customerType}</p>
-          <p><strong>Owner Involvement:</strong> {formData.ownerInvolvement}</p>
-          <p><strong>Reason for Selling:</strong> {formData.reasonForSelling}</p>
-          <p><strong>Training Offered:</strong> {formData.trainingOffered}</p>
-        </div>
-      </div>
-
-      {(formData.aiDescription || formData.businessDescription) && (
-        <div>
-          <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Description</h3>
-          <div className="mb-4">
-            <label className="block font-medium mb-1">Choose which description to publish:</label>
-            <div className="flex items-center gap-6">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="descriptionChoice"
-                  value="manual"
-                  checked={formData.descriptionChoice === 'manual'}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                Written by Seller
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  name="descriptionChoice"
-                  value="ai"
-                  checked={formData.descriptionChoice === 'ai'}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                AI-Enhanced Version
-              </label>
-            </div>
-          </div>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="font-semibold mb-1">Written by Seller:</h4>
-              <p className="text-gray-800 whitespace-pre-wrap border p-3 rounded bg-gray-50">
-                {formData.businessDescription || 'No description provided.'}
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-1">AI-Enhanced Version:</h4>
-              <p className="text-gray-800 whitespace-pre-wrap border p-3 rounded bg-gray-50">
-                {formData.aiDescription || 'AI description not yet generated.'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="grid md:grid-cols-2 gap-10 text-base">
-        <div>
-          <h3 className="text-xl font-semibold border-b pb-2 mb-3">Customer Insights</h3>
-          <p><strong>Who are your customers?</strong> {formData.customers}</p>
-          <p><strong>Best Sellers:</strong> {formData.bestSellers}</p>
-          <p><strong>What do customers love?</strong> {formData.customerLove}</p>
-          <p><strong>Repeat Customers:</strong> {formData.repeatCustomers}</p>
-          <p><strong>Why do they return?</strong> {formData.keepsThemComing}</p>
-        </div>
-        <div>
-          <h3 className="text-xl font-semibold border-b pb-2 mb-3">Owner Reflections</h3>
-          <p><strong>What are you proud of?</strong> {formData.proudOf}</p>
-          <p><strong>Advice to Buyer:</strong> {formData.adviceToBuyer}</p>
-          <p><strong>Growth Potential:</strong> {formData.growthPotential}</p>
-          <p><strong>One-Line Summary:</strong> {formData.sentenceSummary}</p>
-        </div>
-      </div>
-<div className="mt-8 space-y-4">
-  <div className="flex gap-4">
-    <button
-      onClick={() => setPreviewMode(false)}
-      className="bg-gray-300 hover:bg-gray-400 text-black px-5 py-2 rounded"
-    >
-      Edit
-    </button>
-    <button
-      onClick={handleSubmit}
-      disabled={isSubmitting}
-      className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded disabled:opacity-50"
-    >
-      {isSubmitting ? 'Submitting...' : 'Submit Listing'}
-    </button>
-  </div>
-
-  {isSubmitting && (
-    <p className="text-sm text-gray-600">⏳ Please wait while we submit your listing...</p>
-  )}
-  {submitSuccess && (
-    <p className="text-sm text-green-600">✅ Your listing has been submitted successfully!</p>
-  )}
-  {submitError && (
-    <p className="text-sm text-red-600">❌ {submitError}</p>
-  )}
-</div>
-
-     
+    <div className="space-y-2">
+      <label className="block font-medium text-gray-700">Photos of your business (max 8)</label>
+      <input type="file" multiple onChange={handleImageUpload} accept="image/*" className="w-full border rounded p-2" />
     </div>
   );
-};
+
+  const renderPreview = () => {
+    const toTitleCase = (str) =>
+      str
+        .toLowerCase()
+        .split(' ')
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+
+    const getListingTitle = () => {
+      if (formData.industry) {
+        return `${toTitleCase(formData.industry)} Business for Sale`;
+      } else if (formData.hideBusinessName) {
+        return 'Confidential Business Listing';
+      } else {
+        return formData.businessName;
+      }
+    };
+
+    return (
+      <div className="bg-white rounded shadow p-6 space-y-8 font-serif text-gray-900">
+        <h2 className="text-4xl font-bold tracking-tight mb-1">{getListingTitle()}</h2>
+        <p className="text-md text-gray-600">
+          {formData.location_city && formData.location_state
+            ? `${formData.location_city}, ${formData.location_state}`
+            : formData.location}
+        </p>
+
+        {formData.images.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
+            {formData.images.map((url, i) => (
+              <div key={i} className="relative">
+                <img
+                  src={url}
+                  alt={`Image ${i + 1}`}
+                  className="rounded-md border h-32 w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updatedImages = formData.images.filter((img) => img !== url);
+                    setFormData((prev) => ({ ...prev, images: updatedImages }));
+                  }}
+                  className="absolute top-1 right-1 bg-red-600 text-white text-xs rounded-full px-2 py-1 hover:bg-red-700"
+                >
+                  ❌
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Financials + Business Details */}
+        <div className="grid md:grid-cols-2 gap-10 text-base mt-6">
+          <div>
+            <h3 className="text-xl font-semibold border-b pb-2 mb-3">Financial Overview</h3>
+            <p><strong>Asking Price:</strong> {formatCurrency(formData.askingPrice)}</p>
+            <p><strong>Annual Revenue:</strong> {formatCurrency(formData.annualRevenue)}</p>
+            <p><strong>SDE:</strong> {formatCurrency(formData.sde)}</p>
+            <p><strong>Annual Profit:</strong> {formatCurrency(formData.annualProfit)}</p>
+            <p><strong>Inventory Value:</strong> {formatCurrency(formData.inventory_value)}</p>
+            <p><strong>Equipment Value:</strong> {formatCurrency(formData.equipment_value)}</p>
+            <p><strong>Includes Inventory:</strong> {formData.includesInventory ? 'Yes' : 'No'}</p>
+            <p><strong>Includes Building:</strong> {formData.includesBuilding ? 'Yes' : 'No'}</p>
+            <p><strong>Real Estate Included:</strong> {formData.real_estate_included ? 'Yes' : 'No'}</p>
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Details</h3>
+            <p><strong>Employees:</strong> {formData.employees}</p>
+            <p><strong>Monthly Lease:</strong> {formatCurrency(formData.monthly_lease)}</p>
+            <p><strong>Home-Based:</strong> {formData.home_based ? 'Yes' : 'No'}</p>
+            <p><strong>Relocatable:</strong> {formData.relocatable ? 'Yes' : 'No'}</p>
+            <p><strong>Financing Type:</strong> {formData.financingType.replace('-', ' ')}</p>
+            <p><strong>Customer Type:</strong> {formData.customerType}</p>
+            <p><strong>Owner Involvement:</strong> {formData.ownerInvolvement}</p>
+            <p><strong>Reason for Selling:</strong> {formData.reasonForSelling}</p>
+            <p><strong>Training Offered:</strong> {formData.trainingOffered}</p>
+          </div>
+        </div>
+
+        {/* Description Section */}
+        {(formData.aiDescription || formData.businessDescription) && (
+          <div>
+            <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Description</h3>
+            <div className="mb-4">
+              <label className="block font-medium mb-1">Choose which description to publish:</label>
+              <div className="flex items-center gap-6">
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="descriptionChoice"
+                    value="manual"
+                    checked={formData.descriptionChoice === 'manual'}
+                    onChange={handleChange}
+                    className="mr-2"
+                  />
+                  Written by Seller
+                </label>
+                <label className="flex items-center">
+                  <input
+                    type="radio"
+                    name="descriptionChoice"
+                    value="ai"
+                    checked={formData.descriptionChoice === 'ai'}
+                    onChange={handleChange}
+                    className="mr-2"
+                  />
+                  AI-Enhanced Version
+                </label>
+              </div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div>
+                <h4 className="font-semibold mb-1">Written by Seller:</h4>
+                <p className="text-gray-800 whitespace-pre-wrap border p-3 rounded bg-gray-50">
+                  {formData.businessDescription || 'No description provided.'}
+                </p>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">AI-Enhanced Version:</h4>
+                <p className="text-gray-800 whitespace-pre-wrap border p-3 rounded bg-gray-50">
+                  {formData.aiDescription || 'AI description not yet generated.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-8 space-y-4">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setPreviewMode(false)}
+              className="bg-gray-300 hover:bg-gray-400 text-black px-5 py-2 rounded"
+            >
+              Edit
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded disabled:opacity-50"
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit Listing'}
+            </button>
+          </div>
+          {isSubmitting && <p className="text-sm text-gray-600">⏳ Please wait while we submit your listing...</p>}
+          {submitSuccess && <p className="text-sm text-green-600">✅ Your listing has been submitted successfully!</p>}
+          {submitError && <p className="text-sm text-red-600">❌ {submitError}</p>}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <main className="bg-white min-h-screen p-6 font-sans">
@@ -411,7 +386,11 @@ if (isEditing && listingId) {
           ) : step === 2 ? (
             <div className="space-y-4">
               <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="location" placeholder="Location" value={formData.location} onChange={handleChange} className="w-full border p-3 rounded" />
+
+              {/* ✅ New City + State Dropdowns */}
+              <input name="location_city" placeholder="City" value={formData.location_city} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="location_state" placeholder="State/Province" value={formData.location_state} onChange={handleChange} className="w-full border p-3 rounded" />
+
               <input name="website" placeholder="Website" value={formData.website} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="annualRevenue" placeholder="Annual Revenue" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="annualProfit" placeholder="Annual Profit" value={formData.annualProfit} onChange={handleChange} className="w-full border p-3 rounded" />
@@ -460,3 +439,6 @@ if (isEditing && listingId) {
     </main>
   );
 }
+
+
+  
