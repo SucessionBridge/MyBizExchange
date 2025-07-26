@@ -35,59 +35,36 @@ export default function BuyerOnboarding() {
   const [existingId, setExistingId] = useState(null); // ✅ Track existing profile ID
 
 useEffect(() => {
-  let mounted = true;
+  console.log('🔄 BuyerOnboarding mounted');
 
   const checkExistingProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    console.log('🔍 Supabase user:', user);
+    const { data: { user }, error } = await supabase.auth.getUser();
+    console.log('👤 Supabase.getUser result:', user, error);
 
-    if (!user || !mounted) return;
+    if (!user) {
+      console.log('❌ No user returned from Supabase');
+      return;
+    }
 
-    // ✅ Only set email once
+    console.log('✅ User email detected:', user.email);
+
     setFormData(prev => {
-      if (!prev.email && user.email) {
-        console.log('✅ Setting email to:', user.email);
-        return { ...prev, email: user.email };
-      }
-      return prev;
+      console.log('📌 Before setFormData email:', prev.email);
+      const updated = { ...prev, email: user.email };
+      console.log('📌 After setFormData email:', updated.email);
+      return updated;
     });
 
-    const { data: existingProfile } = await supabase
+    const { data: existingProfile, error: profileError } = await supabase
       .from('buyers')
       .select('*')
       .eq('auth_id', user.id)
       .maybeSingle();
 
-    console.log('🔍 Existing profile:', existingProfile);
-
-    if (existingProfile && mounted) {
-      setAlreadySubmitted(true);
-      setExistingId(existingProfile.id);
-      setFormData(prev => ({
-        ...prev,
-        name: existingProfile.name || '',
-        email: user.email || prev.email,
-        financingType: existingProfile.financing_type || 'self-financing',
-        experience: existingProfile.experience || 3,
-        industryPreference: existingProfile.industry_preference || '',
-        capitalInvestment: existingProfile.capital_investment || '',
-        shortIntroduction: existingProfile.short_introduction || '',
-        priorIndustryExperience: existingProfile.prior_industry_experience || 'No',
-        willingToRelocate: existingProfile.willing_to_relocate || 'No',
-        city: existingProfile.city || '',
-        stateOrProvince: existingProfile.state_or_province || '',
-        video: null,
-        budgetForPurchase: existingProfile.budget_for_purchase || '',
-        priority_one: existingProfile.priority_one || '',
-        priority_two: existingProfile.priority_two || '',
-        priority_three: existingProfile.priority_three || ''
-      }));
-    }
+    console.log('📂 Existing profile data:', existingProfile, profileError);
   };
 
   checkExistingProfile();
-
-  return () => { mounted = false; };
 }, []);
 
 
