@@ -34,20 +34,21 @@ export default function BuyerOnboarding() {
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [existingId, setExistingId] = useState(null); // ✅ Track existing profile ID
 
-  useEffect(() => {
+useEffect(() => {
   const checkExistingProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (user?.email) {
-      // ✅ Immediately set email so it doesn't show "Loading..."
-      setFormData(prev => ({ ...prev, email: user.email }));
+    // ✅ Use session first for instant email
+    if (session?.user?.email) {
+      setFormData(prev => ({ ...prev, email: session.user.email }));
     }
 
-    if (user) {
+    const { data: { user } } = await supabase.auth.getUser();
+    const currentUser = user || session?.user;
+
+    if (currentUser) {
       const { data: existingProfile } = await supabase
         .from('buyers')
         .select('*')
-        .eq('auth_id', user.id)
+        .eq('auth_id', currentUser.id)
         .maybeSingle();
 
       if (existingProfile) {
@@ -57,7 +58,7 @@ export default function BuyerOnboarding() {
         setFormData(prev => ({
           ...prev,
           name: existingProfile.name || '',
-          email: user.email || prev.email,
+          email: currentUser.email || prev.email,
           financingType: existingProfile.financing_type || 'self-financing',
           experience: existingProfile.experience || 3,
           industryPreference: existingProfile.industry_preference || '',
@@ -78,9 +79,7 @@ export default function BuyerOnboarding() {
   };
 
   checkExistingProfile();
-}, []);
-
-  
+}, [session]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
