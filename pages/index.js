@@ -34,33 +34,39 @@ export default function Home() {
     <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937] font-sans">
       <div className="max-w-6xl mx-auto">
 
-        {/* ✅ Hero Section */}
-        <section
-          className="relative w-full bg-cover bg-center text-center mb-20"
-          style={{ backgroundImage: "url('/images/hero-city.jpg')" }}
-        >
-          <div className="bg-white/0 px-4 py-24">
-            <h1 className="text-4xl sm:text-5xl font-serif font-bold text-[#2E3A59] max-w-4xl mx-auto mb-4 leading-tight">
-              With millions of boomer‑owned businesses changing hands, many retiring owners risk closing without a buyer. SuccessionBridge helps you sell—with flexible financing options that secure your exit.
-            </h1>
-            <p className="text-lg text-[#1F2937] max-w-2xl mx-auto mb-6">
-              Connecting retiring business owners with qualified buyers and creative deal structures to protect your legacy.
-            </p>
+      {/* Hero Section */}
+<section
+  className="relative w-full bg-cover bg-center text-center mb-20 py-24"
+  style={{ backgroundImage: "url('/images/hero-city.jpg')" }}
+>
+  <div className="bg-white/40 p-6 rounded-xl inline-block max-w-4xl mx-auto">
+    <h1 
+      className="text-4xl sm:text-5xl font-serif font-bold text-[#2E3A59] leading-tight"
+      style={{ textShadow: "0 2px 8px rgba(255,255,255,0.6)" }}
+    >
+      With millions of boomer‑owned businesses changing hands, many retiring owners risk closing without a buyer. SuccessionBridge helps you sell—with flexible financing options that secure your exit.
+    </h1>
+    <p 
+      className="mt-4 text-lg text-[#2E3A59] max-w-2xl mx-auto"
+      style={{ textShadow: "0 1px 6px rgba(255,255,255,0.6)" }}
+    >
+      Connecting retiring business owners with qualified buyers and creative deal structures to protect your legacy.
+    </p>
+    <div className="mt-8 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0 items-center justify-center">
+      <Link href="/listings">
+        <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
+          Find a Business
+        </a>
+      </Link>
+      <Link href="/sellers">
+        <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
+          Sell My Business
+        </a>
+      </Link>
+    </div>
+  </div>
+</section>
 
-            <div className="mt-6 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0 items-center justify-center">
-              <Link href="/listings">
-                <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
-                  Find a Business
-                </a>
-              </Link>
-              <Link href="/sellers">
-                <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
-                  Sell My Business
-                </a>
-              </Link>
-            </div>
-          </div>
-        </section>
 
         {/* ✅ How It Works Section */}
         <section className="grid md:grid-cols-2 gap-8 items-center bg-white rounded-xl p-10 mb-16 shadow-md">
