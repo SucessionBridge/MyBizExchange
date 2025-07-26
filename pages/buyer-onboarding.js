@@ -1,6 +1,6 @@
 // pages/buyer-onboarding.js
 import { useRouter } from 'next/router';
-import supabase from "../lib/supabaseClient"; // ✅ correct
+import supabase from "../lib/supabaseClient";
 
 import React, { useState, useEffect } from 'react';
 import { useSession } from '@supabase/auth-helpers-react';
@@ -23,6 +23,10 @@ export default function BuyerOnboarding() {
     stateOrProvince: '',
     video: null,
     budgetForPurchase: '',
+    // ✅ New fields for priorities
+    priority_one: '',
+    priority_two: '',
+    priority_three: ''
   });
 
   const [errorMessage, setErrorMessage] = useState('');
@@ -32,9 +36,7 @@ export default function BuyerOnboarding() {
 
   useEffect(() => {
     const checkExistingProfile = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
         const { data } = await supabase
@@ -44,7 +46,7 @@ export default function BuyerOnboarding() {
           .maybeSingle();
 
         if (data) {
-          router.push('/buyer-dashboard'); // ✅ Fixed
+          router.push('/buyer-dashboard');
         } else {
           setFormData((prev) => ({ ...prev, email: user.email }));
         }
@@ -83,9 +85,7 @@ export default function BuyerOnboarding() {
     e.preventDefault();
     if (!validateForm() || alreadySubmitted) return;
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const { data: { user } } = await supabase.auth.getUser();
 
     const {
       name,
@@ -101,6 +101,9 @@ export default function BuyerOnboarding() {
       stateOrProvince,
       video,
       budgetForPurchase,
+      priority_one,
+      priority_two,
+      priority_three
     } = formData;
 
     let videoUrl = null;
@@ -137,6 +140,10 @@ export default function BuyerOnboarding() {
       state_or_province: stateOrProvince,
       video_introduction: videoUrl,
       budget_for_purchase: budgetForPurchase,
+      // ✅ Save priorities
+      priority_one,
+      priority_two,
+      priority_three
     }]);
 
     if (insertError) {
@@ -145,7 +152,7 @@ export default function BuyerOnboarding() {
     } else {
       setAlreadySubmitted(true);
       alert('Your buyer profile was submitted successfully!');
-      router.push('/buyer-dashboard'); // ✅ Fixed
+      router.push('/buyer-dashboard');
     }
   };
 
@@ -193,6 +200,31 @@ export default function BuyerOnboarding() {
           <input name="city" placeholder="City" value={formData.city} onChange={handleChange} className="w-full border p-3 rounded text-black" />
           <input name="stateOrProvince" placeholder="State/Province" value={formData.stateOrProvince} onChange={handleChange} className="w-full border p-3 rounded text-black" />
 
+          {/* ✅ Priority Selection */}
+          <div className="space-y-4">
+            <label className="block font-medium">Rank Your Top 3 Priorities</label>
+            <select name="priority_one" value={formData.priority_one} onChange={handleChange} className="w-full border p-3 rounded text-black">
+              <option value="">Select 1st Priority</option>
+              <option value="price">Price</option>
+              <option value="industry">Industry</option>
+              <option value="location">Location</option>
+            </select>
+
+            <select name="priority_two" value={formData.priority_two} onChange={handleChange} className="w-full border p-3 rounded text-black">
+              <option value="">Select 2nd Priority</option>
+              <option value="price">Price</option>
+              <option value="industry">Industry</option>
+              <option value="location">Location</option>
+            </select>
+
+            <select name="priority_three" value={formData.priority_three} onChange={handleChange} className="w-full border p-3 rounded text-black">
+              <option value="">Select 3rd Priority</option>
+              <option value="price">Price</option>
+              <option value="industry">Industry</option>
+              <option value="location">Location</option>
+            </select>
+          </div>
+
           <label>Upload a short intro video (.mp4/.mov/.webm)</label>
           <input type="file" accept="video/*" onChange={handleVideoUpload} className="w-full border p-3 rounded" />
 
@@ -210,5 +242,3 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
-
-
