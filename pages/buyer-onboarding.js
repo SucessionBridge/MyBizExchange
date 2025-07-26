@@ -35,25 +35,16 @@ export default function BuyerOnboarding() {
   const [existingId, setExistingId] = useState(null); // ✅ Track existing profile ID
 
 useEffect(() => {
-  console.log('🔄 BuyerOnboarding mounted');
-
-  const checkExistingProfile = async () => {
+  const debugAuth = async () => {
     const { data: { user }, error } = await supabase.auth.getUser();
-    console.log('👤 Supabase.getUser result:', user, error);
+    console.log('🔍 Supabase getUser:', user, error);
 
     if (!user) {
-      console.log('❌ No user returned from Supabase');
+      console.log('❌ No user session found.');
       return;
     }
 
-    console.log('✅ User email detected:', user.email);
-
-    setFormData(prev => {
-      console.log('📌 Before setFormData email:', prev.email);
-      const updated = { ...prev, email: user.email };
-      console.log('📌 After setFormData email:', updated.email);
-      return updated;
-    });
+    console.log('✅ User email from Supabase:', user.email);
 
     const { data: existingProfile, error: profileError } = await supabase
       .from('buyers')
@@ -61,10 +52,16 @@ useEffect(() => {
       .eq('auth_id', user.id)
       .maybeSingle();
 
-    console.log('📂 Existing profile data:', existingProfile, profileError);
+    console.log('🔍 Buyers query result:', existingProfile, profileError);
+
+    if (existingProfile) {
+      setFormData(prev => ({ ...prev, email: user.email }));
+    } else {
+      setFormData(prev => ({ ...prev, email: user.email }));
+    }
   };
 
-  checkExistingProfile();
+  debugAuth();
 }, []);
 
 
