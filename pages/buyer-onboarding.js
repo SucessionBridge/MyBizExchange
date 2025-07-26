@@ -218,9 +218,21 @@ export default function BuyerOnboarding() {
           {errorMessage && <p className="text-red-500 font-semibold">{errorMessage}</p>}
 
           <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded text-black" />
-          <p className="bg-gray-100 p-3 rounded text-sm text-gray-700">
-            Your email: <strong>{formData.email || 'Loading...'}</strong>
-          </p>
+         {/* ✅ If no session, show editable email input */}
+{session?.user ? (
+  <p className="bg-gray-100 p-3 rounded text-sm text-gray-700">
+    Your email: <strong>{formData.email}</strong>
+  </p>
+) : (
+  <input
+    name="email"
+    placeholder="Your Email"
+    value={formData.email}
+    onChange={handleChange}
+    className="w-full border p-3 rounded text-black"
+  />
+)}
+
 
           <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded text-black">
             <option value="self-financing">Self Financing</option>
