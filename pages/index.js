@@ -34,40 +34,36 @@ export default function Home() {
     <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937] font-sans">
       <div className="max-w-6xl mx-auto">
 
-      {/* Hero Section */}
-<section
-  className="relative w-full bg-cover bg-center text-center mb-20 py-24"
-  style={{ backgroundImage: "url('/images/hero-city.jpg')" }}
->
-  <div className="bg-white/60 p-6 rounded-xl inline-block max-w-3xl mx-auto">
-    <h1 
-      className="text-4xl sm:text-5xl font-serif font-bold text-[#2E3A59] leading-tight"
-    >
-      Millions of boomer‑owned businesses are changing hands. Many will close without a buyer.
-    </h1>
-    <p 
-    <p 
-  className="mt-4 text-xl font-semibold text-[#2E3A59] max-w-2xl mx-auto"
->
-  SuccessionBridge helps retiring owners sell with flexible financing options that secure your exit and protect your legacy.
-</p>
- 
-    <div className="mt-8 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0 items-center justify-center">
-      <Link href="/listings">
-        <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
-          Find a Business
-        </a>
-      </Link>
-      <Link href="/sellers">
-        <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
-          Sell My Business
-        </a>
-      </Link>
-    </div>
-  </div>
-</section>
-
-
+        {/* ✅ Hero Section */}
+        <section
+          className="relative w-full bg-cover bg-center text-center mb-20 py-24"
+          style={{ backgroundImage: "url('/images/hero-city.jpg')" }}
+        >
+          <div className="bg-white/60 p-6 rounded-xl inline-block max-w-3xl mx-auto">
+            <h1 
+              className="text-4xl sm:text-5xl font-serif font-bold text-[#2E3A59] leading-tight"
+            >
+              Millions of boomer‑owned businesses are changing hands. Many will close without a buyer.
+            </h1>
+            <p 
+              className="mt-4 text-xl font-semibold text-[#2E3A59] max-w-2xl mx-auto"
+            >
+              SuccessionBridge helps retiring owners sell with flexible financing options that secure your exit and protect your legacy.
+            </p>
+            <div className="mt-8 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0 items-center justify-center">
+              <Link href="/listings">
+                <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
+                  Find a Business
+                </a>
+              </Link>
+              <Link href="/sellers">
+                <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
+                  Sell My Business
+                </a>
+              </Link>
+            </div>
+          </div>
+        </section>
 
         {/* ✅ How It Works Section */}
         <section className="grid md:grid-cols-2 gap-8 items-center bg-white rounded-xl p-10 mb-16 shadow-md">
@@ -151,5 +147,3 @@ export default function Home() {
     </main>
   );
 }
-
-
