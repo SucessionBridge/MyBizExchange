@@ -39,18 +39,16 @@ export default function Home() {
   className="relative w-full bg-cover bg-center text-center mb-20 py-24"
   style={{ backgroundImage: "url('/images/hero-city.jpg')" }}
 >
-  <div className="bg-white/40 p-6 rounded-xl inline-block max-w-4xl mx-auto">
+  <div className="bg-white/60 p-6 rounded-xl inline-block max-w-3xl mx-auto">
     <h1 
       className="text-4xl sm:text-5xl font-serif font-bold text-[#2E3A59] leading-tight"
-      style={{ textShadow: "0 2px 8px rgba(255,255,255,0.6)" }}
     >
-      With millions of boomer‑owned businesses changing hands, many retiring owners risk closing without a buyer. SuccessionBridge helps you sell—with flexible financing options that secure your exit.
+      Millions of boomer‑owned businesses are changing hands. Many will close without a buyer.
     </h1>
     <p 
       className="mt-4 text-lg text-[#2E3A59] max-w-2xl mx-auto"
-      style={{ textShadow: "0 1px 6px rgba(255,255,255,0.6)" }}
     >
-      Connecting retiring business owners with qualified buyers and creative deal structures to protect your legacy.
+      SuccessionBridge helps retiring owners sell with flexible financing options that secure your exit and protect your legacy.
     </p>
     <div className="mt-8 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0 items-center justify-center">
       <Link href="/listings">
@@ -66,6 +64,7 @@ export default function Home() {
     </div>
   </div>
 </section>
+
 
 
         {/* ✅ How It Works Section */}
