@@ -3,14 +3,14 @@ import '../styles/globals.css';
 import Header from '../components/Header';
 import { useState, useEffect } from 'react';
 import { createBrowserSupabaseClient } from '@supabase/auth-helpers-nextjs';
-import { SessionContextProvider, useSession } from '@supabase/auth-helpers-react';
+import { SessionContextProvider, useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
-import supabase from '../lib/supabaseClient';
-import { Toaster } from 'react-hot-toast'; // ✅ Add this
+import { Toaster } from 'react-hot-toast';
 
 function AuthRedirector() {
   const session = useSession();
   const router = useRouter();
+  const supabase = useSupabaseClient(); // ✅ Use the session-aware client
 
   useEffect(() => {
     if (!session?.user || router.pathname !== '/') return;
@@ -32,7 +32,7 @@ function AuthRedirector() {
     };
 
     checkBuyerProfile();
-  }, [session, router]);
+  }, [session, router, supabase]);
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
@@ -57,7 +57,7 @@ function AuthRedirector() {
     return () => {
       authListener?.subscription?.unsubscribe();
     };
-  }, [router]);
+  }, [router, supabase]);
 
   return null;
 }
@@ -73,7 +73,7 @@ export default function App({ Component, pageProps }) {
         <main className="pt-20 px-4">
           <Component {...pageProps} />
         </main>
-        <Toaster // ✅ Add this anywhere inside the layout
+        <Toaster
           position="top-right"
           toastOptions={{
             duration: 3000,
