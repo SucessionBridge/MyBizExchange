@@ -36,50 +36,50 @@ export default function BuyerOnboarding() {
 
 useEffect(() => {
   const checkExistingProfile = async () => {
-    // ✅ Use session first for instant email
-    if (session?.user?.email) {
-      setFormData(prev => ({ ...prev, email: session.user.email }));
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return; // ✅ No user, stop here
+
+    // ✅ Only set email if it's empty to avoid looping
+    if (!formData.email && user.email) {
+      setFormData(prev => ({ ...prev, email: user.email }));
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    const currentUser = user || session?.user;
+    const { data: existingProfile } = await supabase
+      .from('buyers')
+      .select('*')
+      .eq('auth_id', user.id)
+      .maybeSingle();
 
-    if (currentUser) {
-      const { data: existingProfile } = await supabase
-        .from('buyers')
-        .select('*')
-        .eq('auth_id', currentUser.id)
-        .maybeSingle();
+    if (existingProfile) {
+      setAlreadySubmitted(true);
+      setExistingId(existingProfile.id); // ✅ For updates later
 
-      if (existingProfile) {
-        setAlreadySubmitted(true);
-        setExistingId(existingProfile.id);
-
-        setFormData(prev => ({
-          ...prev,
-          name: existingProfile.name || '',
-          email: currentUser.email || prev.email,
-          financingType: existingProfile.financing_type || 'self-financing',
-          experience: existingProfile.experience || 3,
-          industryPreference: existingProfile.industry_preference || '',
-          capitalInvestment: existingProfile.capital_investment || '',
-          shortIntroduction: existingProfile.short_introduction || '',
-          priorIndustryExperience: existingProfile.prior_industry_experience || 'No',
-          willingToRelocate: existingProfile.willing_to_relocate || 'No',
-          city: existingProfile.city || '',
-          stateOrProvince: existingProfile.state_or_province || '',
-          video: null,
-          budgetForPurchase: existingProfile.budget_for_purchase || '',
-          priority_one: existingProfile.priority_one || '',
-          priority_two: existingProfile.priority_two || '',
-          priority_three: existingProfile.priority_three || ''
-        }));
-      }
+      setFormData(prev => ({
+        ...prev,
+        name: existingProfile.name || '',
+        email: user.email || prev.email,
+        financingType: existingProfile.financing_type || 'self-financing',
+        experience: existingProfile.experience || 3,
+        industryPreference: existingProfile.industry_preference || '',
+        capitalInvestment: existingProfile.capital_investment || '',
+        shortIntroduction: existingProfile.short_introduction || '',
+        priorIndustryExperience: existingProfile.prior_industry_experience || 'No',
+        willingToRelocate: existingProfile.willing_to_relocate || 'No',
+        city: existingProfile.city || '',
+        stateOrProvince: existingProfile.state_or_province || '',
+        video: null,
+        budgetForPurchase: existingProfile.budget_for_purchase || '',
+        priority_one: existingProfile.priority_one || '',
+        priority_two: existingProfile.priority_two || '',
+        priority_three: existingProfile.priority_three || ''
+      }));
     }
   };
 
   checkExistingProfile();
-}, [session]);
+}, []); // ✅ Only run once when page mounts
+
 
   const handleChange = (e) => {
     const { name, value } = e.target;
