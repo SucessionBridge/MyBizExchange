@@ -46,10 +46,12 @@ export default function Home() {
       Millions of boomer‑owned businesses are changing hands. Many will close without a buyer.
     </h1>
     <p 
-      className="mt-4 text-lg text-[#2E3A59] max-w-2xl mx-auto"
-    >
-      SuccessionBridge helps retiring owners sell with flexible financing options that secure your exit and protect your legacy.
-    </p>
+    <p 
+  className="mt-4 text-xl font-semibold text-[#2E3A59] max-w-2xl mx-auto"
+>
+  SuccessionBridge helps retiring owners sell with flexible financing options that secure your exit and protect your legacy.
+</p>
+ 
     <div className="mt-8 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0 items-center justify-center">
       <Link href="/listings">
         <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
