@@ -34,20 +34,20 @@ export default function BuyerOnboarding() {
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [existingId, setExistingId] = useState(null); // ✅ Track existing profile ID
 
-  useEffect(() => {
-  let mounted = true;
-
+useEffect(() => {
   const checkExistingProfile = async () => {
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user || !mounted) return;
+    console.log('🔍 Supabase user:', user);
 
-    // ✅ Set email only if empty and once
-    setFormData(prev => {
-      if (!prev.email) {
-        return { ...prev, email: user.email };
-      }
-      return prev;
-    });
+    if (!user) {
+      console.log('❌ No user found');
+      return;
+    }
+
+    if (!formData.email && user.email) {
+      console.log('✅ Setting email to:', user.email);
+      setFormData(prev => ({ ...prev, email: user.email }));
+    }
 
     const { data: existingProfile } = await supabase
       .from('buyers')
@@ -55,10 +55,12 @@ export default function BuyerOnboarding() {
       .eq('auth_id', user.id)
       .maybeSingle();
 
-    if (existingProfile && mounted) {
+    console.log('🔍 Existing profile:', existingProfile);
+
+    if (existingProfile) {
+      console.log('✅ Pre-filling profile data');
       setAlreadySubmitted(true);
       setExistingId(existingProfile.id);
-
       setFormData(prev => ({
         ...prev,
         name: existingProfile.name || '',
@@ -82,10 +84,6 @@ export default function BuyerOnboarding() {
   };
 
   checkExistingProfile();
-
-  return () => {
-    mounted = false;
-  };
 }, []);
 
   const handleChange = (e) => {
