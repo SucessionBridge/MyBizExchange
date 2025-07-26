@@ -1,7 +1,6 @@
 // pages/buyer-onboarding.js
 import { useRouter } from 'next/router';
 import supabase from "../lib/supabaseClient";
-
 import React, { useState, useEffect } from 'react';
 import { useSession } from '@supabase/auth-helpers-react';
 
@@ -32,38 +31,61 @@ export default function BuyerOnboarding() {
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
-  const [existingId, setExistingId] = useState(null); // ✅ Track existing profile ID
+  const [existingId, setExistingId] = useState(null);
 
-useEffect(() => {
-  const debugAuth = async () => {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    console.log('🔍 Supabase getUser:', user, error);
+  useEffect(() => {
+    let mounted = true;
 
-    if (!user) {
-      console.log('❌ No user session found.');
-      return;
-    }
+    const checkExistingProfile = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      console.log('🔍 Supabase getUser:', user, error);
 
-    console.log('✅ User email from Supabase:', user.email);
+      if (!user || !mounted) {
+        console.log('❌ No user session found.');
+        return;
+      }
 
-    const { data: existingProfile, error: profileError } = await supabase
-      .from('buyers')
-      .select('*')
-      .eq('auth_id', user.id)
-      .maybeSingle();
-
-    console.log('🔍 Buyers query result:', existingProfile, profileError);
-
-    if (existingProfile) {
+      // ✅ Set email immediately
       setFormData(prev => ({ ...prev, email: user.email }));
-    } else {
-      setFormData(prev => ({ ...prev, email: user.email }));
-    }
-  };
 
-  debugAuth();
-}, []);
+      // ✅ Fallback: match by auth_id OR email to handle null auth_id rows
+      const { data: existingProfile, error: profileError } = await supabase
+        .from('buyers')
+        .select('*')
+        .or(`auth_id.eq.${user.id},email.eq.${user.email}`)
+        .maybeSingle();
 
+      console.log('🔍 Buyers query result:', existingProfile, profileError);
+
+      if (existingProfile && mounted) {
+        setAlreadySubmitted(true);
+        setExistingId(existingProfile.id);
+
+        setFormData(prev => ({
+          ...prev,
+          name: existingProfile.name || '',
+          email: user.email || prev.email,
+          financingType: existingProfile.financing_type || 'self-financing',
+          experience: existingProfile.experience || 3,
+          industryPreference: existingProfile.industry_preference || '',
+          capitalInvestment: existingProfile.capital_investment || '',
+          shortIntroduction: existingProfile.short_introduction || '',
+          priorIndustryExperience: existingProfile.prior_industry_experience || 'No',
+          willingToRelocate: existingProfile.willing_to_relocate || 'No',
+          city: existingProfile.city || '',
+          stateOrProvince: existingProfile.state_or_province || '',
+          video: null,
+          budgetForPurchase: existingProfile.budget_for_purchase || '',
+          priority_one: existingProfile.priority_one || '',
+          priority_two: existingProfile.priority_two || '',
+          priority_three: existingProfile.priority_three || ''
+        }));
+      }
+    };
+
+    checkExistingProfile();
+    return () => { mounted = false; };
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -95,6 +117,10 @@ useEffect(() => {
     if (!validateForm()) return;
 
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      alert('You must be logged in to submit.');
+      return;
+    }
 
     const {
       name,
@@ -156,14 +182,12 @@ useEffect(() => {
 
     let dbError;
     if (existingId) {
-      // ✅ Update existing profile
       const { error } = await supabase
         .from('buyers')
         .update(payload)
         .eq('id', existingId);
       dbError = error;
     } else {
-      // ✅ Insert new profile
       const { error } = await supabase.from('buyers').insert([payload]);
       dbError = error;
     }
@@ -224,7 +248,6 @@ useEffect(() => {
           <input name="city" placeholder="City" value={formData.city} onChange={handleChange} className="w-full border p-3 rounded text-black" />
           <input name="stateOrProvince" placeholder="State/Province" value={formData.stateOrProvince} onChange={handleChange} className="w-full border p-3 rounded text-black" />
 
-          {/* ✅ Priority Selection */}
           <div className="space-y-4">
             <label className="block font-medium">Rank Your Top 3 Priorities</label>
             <select name="priority_one" value={formData.priority_one} onChange={handleChange} className="w-full border p-3 rounded text-black">
@@ -266,3 +289,4 @@ useEffect(() => {
     </main>
   );
 }
+
