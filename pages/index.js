@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useRouter } from "next/router";
-import supabase from "../lib/supabaseClient"; // ✅ correct
-
+import supabase from "../lib/supabaseClient";
 import Link from "next/link";
 
 export default function Home() {
@@ -21,7 +20,7 @@ export default function Home() {
           .maybeSingle();
 
         if (buyerProfile) {
-          router.push("/buyer-dashboard"); // ✅ FIXED REDIRECT PATH
+          router.push("/buyer-dashboard");
         } else {
           router.push("/buyer-onboarding");
         }
@@ -32,33 +31,60 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937] px-4 py-12 font-sans">
+    <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937] font-sans">
       <div className="max-w-6xl mx-auto">
 
-        {/* Hero Section */}
-        <section className="text-center mb-20">
-          <h1 className="text-5xl font-serif font-bold text-[#2E3A59] mb-4">
-            Helping Business Owners Exit on Their Terms
-          </h1>
-          <p className="text-lg text-[#1F2937] max-w-2xl mx-auto">
-            SuccessionBridge supports entrepreneurs planning for retirement or transition — by connecting them with qualified buyers who value their legacy.
-          </p>
+        {/* ✅ Hero Section */}
+        <section
+          className="relative w-full bg-cover bg-center text-center mb-20"
+          style={{ backgroundImage: "url('/images/hero-city.jpg')" }}
+        >
+          <div className="bg-white/0 px-4 py-24">
+            <h1 className="text-4xl sm:text-5xl font-serif font-bold text-[#2E3A59] max-w-4xl mx-auto mb-4 leading-tight">
+              With millions of boomer‑owned businesses changing hands, many retiring owners risk closing without a buyer. SuccessionBridge helps you sell—with flexible financing options that secure your exit.
+            </h1>
+            <p className="text-lg text-[#1F2937] max-w-2xl mx-auto mb-6">
+              Connecting retiring business owners with qualified buyers and creative deal structures to protect your legacy.
+            </p>
 
-          <div className="mt-6 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0 items-center justify-center">
-            <Link href="/listings">
-              <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
-                Browse Businesses
-              </a>
-            </Link>
-            <Link href="/sellers">
-              <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
-                List Your Business
-              </a>
-            </Link>
+            <div className="mt-6 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0 items-center justify-center">
+              <Link href="/listings">
+                <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
+                  Find a Business
+                </a>
+              </Link>
+              <Link href="/sellers">
+                <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-6 py-3 rounded-xl font-semibold text-lg inline-block">
+                  Sell My Business
+                </a>
+              </Link>
+            </div>
           </div>
         </section>
 
-        {/* Valuation Tool Section */}
+        {/* ✅ How It Works Section */}
+        <section className="grid md:grid-cols-2 gap-8 items-center bg-white rounded-xl p-10 mb-16 shadow-md">
+          <div>
+            <img
+              src="/images/handshake.jpg"
+              alt="Handshake"
+              className="rounded-lg shadow-sm"
+            />
+          </div>
+          <div>
+            <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">How SuccessionBridge Works</h2>
+            <p className="text-lg text-gray-700 mb-6">
+              We make selling simple. From valuation to flexible financing, we connect business owners nearing retirement with serious buyers ready to carry on your legacy.
+            </p>
+            <ul className="space-y-3 text-lg">
+              <li><span className="font-bold text-[#F59E0B]">1️⃣</span> Get a Free Business Valuation</li>
+              <li><span className="font-bold text-[#F59E0B]">2️⃣</span> List Your Business Easily</li>
+              <li><span className="font-bold text-[#F59E0B]">3️⃣</span> Connect with Qualified Buyers & Secure Flexible Deals</li>
+            </ul>
+          </div>
+        </section>
+
+        {/* ✅ Existing Sections */}
         <section className="bg-white rounded-xl p-10 mb-12 shadow-md">
           <div className="text-center">
             <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">What is Your Business Worth?</h2>
@@ -73,7 +99,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Sellers Section */}
         <section className="bg-white rounded-xl p-10 mb-12 border border-gray-200 shadow-sm">
           <div className="text-center">
             <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">Are You a Seller?</h2>
@@ -88,7 +113,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Sellability Scorecard Section */}
         <section className="bg-[#E0F2FE] rounded-xl p-10 mb-12 border border-blue-100">
           <div className="text-center">
             <h2 className="text-2xl font-semibold text-blue-800 mb-4">
@@ -102,7 +126,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Buyers Section */}
         <section className="bg-white rounded-xl p-10 mb-12 border border-gray-200">
           <div className="text-center">
             <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">Are You a Buyer?</h2>
@@ -117,17 +140,9 @@ export default function Home() {
           </div>
         </section>
 
-        {/* How It Works Section */}
-        <section className="bg-gray-50 rounded-xl p-10 border border-gray-200">
-          <div className="text-center">
-            <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">How SuccessionBridge Works</h2>
-            <p className="text-lg text-gray-700 max-w-2xl mx-auto">
-              We connect business owners nearing retirement with serious buyers who are ready to take over. Our tools support seller-financed deals, help you value your business, and ensure a smooth handoff that honors your legacy.
-            </p>
-          </div>
-        </section>
-
       </div>
     </main>
   );
 }
+
+
