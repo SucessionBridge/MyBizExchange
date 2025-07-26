@@ -33,34 +33,36 @@ export default function BuyerOnboarding() {
   const [isUploading, setIsUploading] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [existingId, setExistingId] = useState(null); // ✅ Track existing profile ID
-useEffect(() => {
+
+  useEffect(() => {
+  let mounted = true;
+
   const checkExistingProfile = async () => {
-    // ✅ Use session immediately for instant email display
-    if (session?.user?.email && !formData.email) {
-      setFormData(prev => ({ ...prev, email: session.user.email }));
-    }
-
     const { data: { user } } = await supabase.auth.getUser();
-    const currentUser = user || session?.user;
+    if (!user || !mounted) return;
 
-    console.log("DEBUG currentUser:", currentUser);
-
-    if (!currentUser) return; // No user logged in
+    // ✅ Set email only if empty and once
+    setFormData(prev => {
+      if (!prev.email) {
+        return { ...prev, email: user.email };
+      }
+      return prev;
+    });
 
     const { data: existingProfile } = await supabase
       .from('buyers')
       .select('*')
-      .eq('auth_id', currentUser.id)
+      .eq('auth_id', user.id)
       .maybeSingle();
 
-    if (existingProfile) {
+    if (existingProfile && mounted) {
       setAlreadySubmitted(true);
       setExistingId(existingProfile.id);
 
       setFormData(prev => ({
         ...prev,
         name: existingProfile.name || '',
-        email: currentUser.email || prev.email,
+        email: user.email || prev.email,
         financingType: existingProfile.financing_type || 'self-financing',
         experience: existingProfile.experience || 3,
         industryPreference: existingProfile.industry_preference || '',
@@ -80,8 +82,11 @@ useEffect(() => {
   };
 
   checkExistingProfile();
-}, [session]);
 
+  return () => {
+    mounted = false;
+  };
+}, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
