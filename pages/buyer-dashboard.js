@@ -7,13 +7,12 @@ export default function BuyerDashboard() {
   const [buyerProfile, setBuyerProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [savedListings, setSavedListings] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [loadingMatches, setLoadingMatches] = useState(true);
 
   useEffect(() => {
     const fetchProfileAndListings = async () => {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser();
+      const { data: { user }, error } = await supabase.auth.getUser();
 
       if (error || !user) {
         router.push('/login');
@@ -32,6 +31,7 @@ export default function BuyerDashboard() {
       } else {
         setBuyerProfile(profileData);
         fetchSavedListings(profileData.email);
+        fetchMatches(user.id);
       }
 
       setLoading(false);
@@ -39,6 +39,19 @@ export default function BuyerDashboard() {
 
     fetchProfileAndListings();
   }, []);
+
+  async function fetchMatches(userId) {
+    setLoadingMatches(true);
+    try {
+      const res = await fetch(`/api/get-matches?userId=${userId}`);
+      const data = await res.json();
+      setMatches(data.matches || []);
+    } catch (err) {
+      console.error('Error fetching matches:', err);
+    } finally {
+      setLoadingMatches(false);
+    }
+  }
 
   async function fetchSavedListings(email) {
     const { data, error } = await supabase
@@ -75,11 +88,41 @@ export default function BuyerDashboard() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="max-w-5xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6 text-blue-900 text-center">
         {buyerProfile?.name ? `Welcome back, ${buyerProfile.name}` : 'Buyer Dashboard'}
       </h1>
 
+      {/* ✅ Matches Section */}
+      {buyerProfile && (
+        <div className="bg-white p-6 rounded-xl shadow mb-10">
+          <h2 className="text-xl font-semibold text-green-700 mb-4">Matching Businesses</h2>
+          {loadingMatches ? (
+            <p>Finding matches...</p>
+          ) : matches.length === 0 ? (
+            <p>No matches found yet. Try adjusting your preferences.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {matches.map((listing) => (
+                <div key={listing.id} className="border p-4 rounded bg-gray-50">
+                  <h3 className="text-lg font-bold">{listing.business_name || 'Business Listing'}</h3>
+                  <p><strong>Industry:</strong> {listing.industry}</p>
+                  <p><strong>Asking Price:</strong> ${listing.asking_price}</p>
+                  <p><strong>Location:</strong> {listing.city}, {listing.state_or_province}</p>
+                  <button
+                    onClick={() => router.push(`/listings/${listing.id}`)}
+                    className="mt-3 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+                  >
+                    View Listing
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ✅ Your existing profile card stays */}
       {!buyerProfile ? (
         <div className="text-center">
           <p className="text-gray-700 mb-4">
@@ -114,7 +157,6 @@ export default function BuyerDashboard() {
               </div>
             )}
 
-            {/* ✅ Fixed Edit My Profile button */}
             <button
               onClick={() => router.push('/buyer-onboarding?mode=edit')}
               className="mt-6 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
@@ -163,6 +205,4 @@ export default function BuyerDashboard() {
     </div>
   );
 }
-
-
 
