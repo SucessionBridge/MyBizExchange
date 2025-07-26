@@ -26,7 +26,7 @@ export default function BuyerDashboard() {
         .eq('auth_id', user.id)
         .maybeSingle();
 
-      if (profileError) {
+      if (profileError || !profileData) {
         console.warn('No buyer profile found.');
         setBuyerProfile(null);
       } else {
@@ -114,8 +114,9 @@ export default function BuyerDashboard() {
               </div>
             )}
 
+            {/* ✅ Fixed Edit My Profile button */}
             <button
-              onClick={() => router.push('/buyer-onboarding?redirect=/dashboard')}
+              onClick={() => router.push('/buyer-onboarding?mode=edit')}
               className="mt-6 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
             >
               Edit My Profile
@@ -162,5 +163,6 @@ export default function BuyerDashboard() {
     </div>
   );
 }
+
 
 
