@@ -117,13 +117,10 @@ export default function Listings() {
         .order('created_at', { ascending: false });
 
       if (debouncedTerm.trim() !== '') {
-        query = query.or(`
-          business_name.ilike.%${debouncedTerm}%,
-          industry.ilike.%${debouncedTerm}%,
-          location.ilike.%${debouncedTerm}%,
-          business_description.ilike.%${debouncedTerm}%,
-          ai_description.ilike.%${debouncedTerm}%
-        `);
+        console.log('🔍 Searching for:', debouncedTerm);
+        query = query.or(
+          `business_name.ilike.%${debouncedTerm}%,industry.ilike.%${debouncedTerm}%,location.ilike.%${debouncedTerm}%,business_description.ilike.%${debouncedTerm}%,ai_description.ilike.%${debouncedTerm}%`
+        );
       }
 
       const { data, error } = await query;
@@ -131,6 +128,7 @@ export default function Listings() {
       if (error) {
         console.error('❌ Error fetching listings:', error);
       } else {
+        console.log('✅ Listings fetched:', data);
         setListings(data);
       }
 
