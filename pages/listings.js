@@ -82,23 +82,13 @@ function ListingCard({ listing, index }) {
 export default function Listings() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-
-  // ✅ Log search keywords to Supabase
-  async function logSearch(term) {
-    if (!term.trim()) return; // skip empty
-    const { error } = await supabase.from('search_logs').insert([
-      {
-        keyword: term,
-        timestamp: new Date(),
-      },
-    ]);
-    if (error) console.error('❌ Error logging search:', error);
-  }
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     async function fetchListings() {
-      const { data, error } = await supabase
+      setLoading(true);
+
+      let query = supabase
         .from('sellers')
         .select(`
           id,
@@ -117,10 +107,21 @@ export default function Listings() {
         `)
         .order('created_at', { ascending: false });
 
+      if (searchTerm.trim() !== '') {
+        query = query.or(`
+          business_name.ilike.%${searchTerm}%,
+          industry.ilike.%${searchTerm}%,
+          location.ilike.%${searchTerm}%,
+          business_description.ilike.%${searchTerm}%,
+          ai_description.ilike.%${searchTerm}%
+        `);
+      }
+
+      const { data, error } = await query;
+
       if (error) {
         console.error('❌ Error fetching listings:', error);
       } else {
-        console.log('✅ Listings fetched:', data);
         setListings(data);
       }
 
@@ -128,21 +129,7 @@ export default function Listings() {
     }
 
     fetchListings();
-  }, []);
-
-  // ✅ Filter listings based on search term
-  const filteredListings = listings.filter((listing) => {
-    const name = listing.business_name?.toLowerCase() || '';
-    const industry = listing.industry?.toLowerCase() || '';
-    const location = listing.location?.toLowerCase() || '';
-    const keyword = search.toLowerCase();
-
-    return (
-      name.includes(keyword) ||
-      industry.includes(keyword) ||
-      location.includes(keyword)
-    );
-  });
+  }, [searchTerm]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 pt-6 pb-12">
@@ -150,27 +137,24 @@ export default function Listings() {
         Explore Available Businesses for Sale
       </h1>
 
-      {/* ✅ Search Bar */}
-      <div className="mb-8 max-w-xl mx-auto">
+      {/* 🔍 Search Bar */}
+      <div className="max-w-xl mx-auto mb-10">
         <input
           type="text"
-          placeholder="Search by name, industry, or location..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            logSearch(e.target.value); // ✅ log searches
-          }}
-          className="w-full border border-gray-300 rounded-lg px-4 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Search by name, industry, location..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         />
       </div>
 
       {loading ? (
         <p className="text-center text-gray-600">Loading listings...</p>
-      ) : filteredListings.length === 0 ? (
-        <p className="text-center text-gray-500">No businesses found matching your search.</p>
+      ) : listings.length === 0 ? (
+        <p className="text-center text-gray-500">No businesses found for your search.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {filteredListings.map((listing, index) => {
+          {listings.map((listing, index) => {
             try {
               return (
                 <ListingCard
