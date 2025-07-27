@@ -1,3 +1,78 @@
+// pages/buyer-onboarding.js
+import { useRouter } from 'next/router';
+import supabase from "../lib/supabaseClient";
+import React, { useState, useEffect } from 'react';
+import { useSession } from '@supabase/auth-helpers-react';
+
+export default function BuyerOnboarding() {
+  const router = useRouter();
+  const session = useSession();
+
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    financingType: 'self-financing',
+    experience: 3,
+    industryPreference: '',
+    capitalInvestment: '',
+    shortIntroduction: '',
+    priorIndustryExperience: 'No',
+    willingToRelocate: 'No',
+    city: '',
+    stateOrProvince: '',
+    video: null,
+    budgetForPurchase: '',
+    priority_one: '',
+    priority_two: '',
+    priority_three: ''
+  });
+
+  const [errorMessage, setErrorMessage] = useState('');
+  const [videoPreview, setVideoPreview] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
+  const [existingId, setExistingId] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    const checkExistingProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user || !mounted) return;
+      setFormData(prev => ({ ...prev, email: user.email }));
+
+      const { data: existingProfile } = await supabase
+        .from('buyers')
+        .select('*')
+        .or(`auth_id.eq.${user.id},email.eq.${user.email}`)
+        .maybeSingle();
+
+      if (existingProfile && mounted) {
+        setAlreadySubmitted(true);
+        setExistingId(existingProfile.id);
+        setFormData(prev => ({
+          ...prev,
+          name: existingProfile.name || '',
+          email: user.email,
+          financingType: existingProfile.financing_type || 'self-financing',
+          experience: existingProfile.experience || 3,
+          industryPreference: existingProfile.industry_preference || '',
+          capitalInvestment: existingProfile.capital_investment || '',
+          shortIntroduction: existingProfile.short_introduction || '',
+          priorIndustryExperience: existingProfile.prior_industry_experience || 'No',
+          willingToRelocate: existingProfile.willing_to_relocate || 'No',
+          city: existingProfile.city || '',
+          stateOrProvince: existingProfile.state_or_province || '',
+          budgetForPurchase: existingProfile.budget_for_purchase || '',
+          priority_one: existingProfile.priority_one || '',
+          priority_two: existingProfile.priority_two || '',
+          priority_three: existingProfile.priority_three || ''
+        }));
+      }
+    };
+    checkExistingProfile();
+    return () => { mounted = false; };
+  }, []);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value ?? '' }));
@@ -90,97 +165,6 @@
             </select>
           </div>
 
-           const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value ?? '' }));
-  };
-
-  const handleVideoUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFormData(prev => ({ ...prev, video: file }));
-      setVideoPreview(URL.createObjectURL(file));
-    }
-  };
-
-  const validateForm = () => {
-    const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
-    for (let field of requiredFields) {
-      if (!formData[field]) {
-        setErrorMessage('Please fill in all required fields.');
-        return false;
-      }
-    }
-    setErrorMessage('');
-    return true;
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert('You must be logged in to submit.');
-
-    const payload = {
-      auth_id: user.id,
-      name: formData.name,
-      email: formData.email,
-      financing_type: formData.financingType,
-      experience: formData.experience,
-      industry_preference: formData.industryPreference,
-      capital_investment: formData.capitalInvestment,
-      short_introduction: formData.shortIntroduction,
-      prior_industry_experience: formData.priorIndustryExperience,
-      willing_to_relocate: formData.willingToRelocate,
-      city: formData.city,
-      state_or_province: formData.stateOrProvince,
-      budget_for_purchase: formData.budgetForPurchase,
-      priority_one: formData.priority_one,
-      priority_two: formData.priority_two,
-      priority_three: formData.priority_three
-    };
-
-    if (existingId) {
-      await supabase.from('buyers').update(payload).eq('id', existingId);
-    } else {
-      await supabase.from('buyers').insert([payload]);
-    }
-    router.push('/buyer-dashboard');
-  };
-
-  return (
-    <main className="min-h-screen bg-blue-50 p-8">
-      <div className="max-w-2xl mx-auto bg-white p-6 rounded shadow">
-        <h1 className="text-3xl font-bold mb-6 text-center">
-          {existingId ? 'Edit Buyer Profile' : 'Buyer Onboarding'}
-        </h1>
-
-        {errorMessage && <p className="text-red-500 mb-4">{errorMessage}</p>}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block text-sm font-medium mb-1">Name</label>
-            <input name="name" value={formData.name} onChange={handleChange}
-              className="w-full border p-3 rounded text-black" />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <p className="bg-gray-100 p-3 rounded text-sm text-gray-700">
-              {formData.email}
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Financing Type</label>
-            <select name="financingType" value={formData.financingType} onChange={handleChange}
-              className="w-full border p-3 rounded text-black">
-              <option value="self-financing">Self Financing</option>
-              <option value="seller-financing">Seller Financing</option>
-              <option value="rent-to-own">Rent-to-Own</option>
-              <option value="third-party">3rd-Party Financing</option>
-            </select>
-          </div>
           <div>
             <label className="block text-sm font-medium mb-1">Experience in Business Ownership (1–5)</label>
             <input type="number" name="experience" min="1" max="5" value={formData.experience}
@@ -257,5 +241,4 @@
     </main>
   );
 }
-
-
+ 
