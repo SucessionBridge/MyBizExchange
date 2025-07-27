@@ -248,6 +248,16 @@ async function handleSubmit(e) {
               >
                 Send Message
               </button>
+                      {/* ✅ AI Deal Maker Button */}
+        {listing && (
+          <button
+            type="button"
+            onClick={() => router.push(`/deal-maker?listingId=${listing.id}`)}
+            className="bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded"
+          >
+            Use AI Deal Maker
+          </button>
+        )}
             </form>
           )}
         </div>
