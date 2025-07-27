@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import supabase from '../lib/supabaseClient';
 import Link from 'next/link';
-import { useSession } from '@supabase/auth-helpers-react'; // ✅ For user tracking
 
 function ListingCard({ listing, index }) {
   const imageUrl =
@@ -81,13 +80,12 @@ function ListingCard({ listing, index }) {
 }
 
 export default function Listings() {
-  const session = useSession(); // ✅ Grab current user session
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
 
-  // ✅ Debounce search input
+  // ✅ Debounce search input (500ms)
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedTerm(searchTerm);
@@ -119,13 +117,19 @@ export default function Listings() {
         .order('created_at', { ascending: false });
 
       if (debouncedTerm.trim() !== '') {
-        query = query.or(`
-          business_name.ilike.%${debouncedTerm}%,
-          industry.ilike.%${debouncedTerm}%,
-          location.ilike.%${debouncedTerm}%,
-          business_description.ilike.%${debouncedTerm}%,
-          ai_description.ilike.%${debouncedTerm}%
-        `);
+        console.log('🔍 Searching for:', debouncedTerm);
+
+        // ✅ Partial match search
+        query = query.or(
+          `business_name.ilike.%${debouncedTerm}%,industry.ilike.%${debouncedTerm}%,location.ilike.%${debouncedTerm}%,business_description.ilike.%${debouncedTerm}%,ai_description.ilike.%${debouncedTerm}%`
+        );
+
+        // ✅ Log search term
+        await supabase.from('search_logs').insert([
+          {
+            keyword: debouncedTerm,
+          },
+        ]);
       }
 
       const { data, error } = await query;
@@ -133,28 +137,8 @@ export default function Listings() {
       if (error) {
         console.error('❌ Error fetching listings:', error);
       } else {
+        console.log('✅ Listings fetched:', data);
         setListings(data);
-
-        // ✅ Log search to Supabase if there was a term entered
-        if (debouncedTerm.trim() !== '') {
-          const user_id = session?.user?.id || null;
-          let matchedIndustry = null;
-          let matchedLocation = null;
-
-          if (data.length > 0) {
-            matchedIndustry = data[0].industry || null;
-            matchedLocation = data[0].location || null;
-          }
-
-          await supabase.from('search_logs').insert([
-            {
-              user_id,
-              keyword: debouncedTerm,
-              industry: matchedIndustry,
-              location: matchedLocation,
-            },
-          ]);
-        }
       }
 
       setLoading(false);
