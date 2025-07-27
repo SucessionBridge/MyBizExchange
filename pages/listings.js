@@ -84,6 +84,8 @@ export default function Listings() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
+  const [user, setUser] = useState(null);
+  const [hasBuyerProfile, setHasBuyerProfile] = useState(false);
 
   // ✅ Debounce search input (500ms)
   useEffect(() => {
@@ -93,6 +95,25 @@ export default function Listings() {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
+  // ✅ Fetch user & buyer profile
+  useEffect(() => {
+    async function checkUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+
+      if (user) {
+        const { data } = await supabase
+          .from('buyers')
+          .select('id')
+          .eq('auth_id', user.id)
+          .maybeSingle();
+        if (data) setHasBuyerProfile(true);
+      }
+    }
+    checkUser();
+  }, []);
+
+  // ✅ Fetch listings with search
   useEffect(() => {
     async function fetchListings() {
       setLoading(true);
@@ -117,19 +138,9 @@ export default function Listings() {
         .order('created_at', { ascending: false });
 
       if (debouncedTerm.trim() !== '') {
-        console.log('🔍 Searching for:', debouncedTerm);
-
-        // ✅ Partial match search
         query = query.or(
           `business_name.ilike.%${debouncedTerm}%,industry.ilike.%${debouncedTerm}%,location.ilike.%${debouncedTerm}%,business_description.ilike.%${debouncedTerm}%,ai_description.ilike.%${debouncedTerm}%`
         );
-
-        // ✅ Log search term
-        await supabase.from('search_logs').insert([
-          {
-            keyword: debouncedTerm,
-          },
-        ]);
       }
 
       const { data, error } = await query;
@@ -137,7 +148,6 @@ export default function Listings() {
       if (error) {
         console.error('❌ Error fetching listings:', error);
       } else {
-        console.log('✅ Listings fetched:', data);
         setListings(data);
       }
 
@@ -152,6 +162,41 @@ export default function Listings() {
       <h1 className="text-4xl font-bold text-blue-900 mb-6 text-center">
         Explore Available Businesses for Sale
       </h1>
+
+      {/* 🔑 Info Box for Buyer Profile */}
+      {!hasBuyerProfile && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-900 rounded-lg p-4 mb-8 text-center max-w-3xl mx-auto">
+          <p className="font-semibold text-lg">
+            Want full access to listings?
+          </p>
+          <p className="text-sm mt-1">
+            {user
+              ? 'Complete your free buyer profile to unlock:'
+              : 'Login or create a buyer profile to unlock:'}
+          </p>
+          <ul className="mt-2 text-sm">
+            <li>✅ Detailed financial info on listings</li>
+            <li>✅ Save listings to your dashboard</li>
+            <li>✅ Email listings to yourself</li>
+            <li>✅ Message sellers directly</li>
+          </ul>
+          <div className="mt-3">
+            {user ? (
+              <Link href="/buyer-onboarding">
+                <a className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                  Complete Buyer Profile →
+                </a>
+              </Link>
+            ) : (
+              <Link href="/login">
+                <a className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                  Login / Sign Up →
+                </a>
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 🔍 Search Bar */}
       <div className="max-w-xl mx-auto mb-10">
@@ -196,3 +241,4 @@ export default function Listings() {
     </div>
   );
 }
+
