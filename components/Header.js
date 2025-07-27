@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Menu, X, Landmark } from 'lucide-react'; // ✅ Added Landmark icon
+import { Menu, X } from 'lucide-react';
 import supabase from '../lib/supabaseClient';
 import { toast } from 'react-hot-toast';
 
@@ -43,8 +43,18 @@ export default function Header() {
         <Link href="/">
           <a className="flex items-center text-2xl font-serif font-bold">
             <span className="text-[#2E3A59]">Succession</span>
-            <span className="text-[#F59E0B] flex items-center">
-              Bridge <Landmark className="w-6 h-6 ml-1 text-[#F59E0B]" />
+            <span className="text-[#F59E0B] flex items-center relative">
+              Bridge
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 200 100"
+                className="w-12 h-8 ml-1 fill-[#F59E0B]"
+              >
+                <path d="M0 80h200v5H0z" /> 
+                <path d="M40 80V40h5v40zM160 80V40h-5v40z" /> 
+                <path d="M0 40 C50 10 150 10 200 40" fill="none" stroke="#F59E0B" strokeWidth="4"/>
+                <path d="M100 80V20h3v60z" />
+              </svg>
             </span>
           </a>
         </Link>
@@ -158,4 +168,3 @@ export default function Header() {
     </header>
   );
 }
-
