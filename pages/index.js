@@ -102,19 +102,25 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="bg-white rounded-xl p-10 mb-12 border border-gray-200 shadow-sm">
-          <div className="text-center">
-            <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">Are You a Seller?</h2>
-            <p className="text-lg text-gray-700 mb-6">
-              Maximize your legacy. Find a trusted buyer who’ll carry on what you’ve built — on your terms.
-            </p>
-            <Link href="/sellers">
-              <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white py-3 px-6 rounded-lg text-lg font-semibold inline-block">
-                List Your Business
-              </a>
-            </Link>
-          </div>
-        </section>
+       {/* Sellers Section */}
+<section className="bg-white rounded-xl p-10 mb-12 border border-gray-200 shadow-sm">
+  <div className="text-center">
+    <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">
+      Are You a Seller?
+    </h2>
+    <p className="text-lg text-gray-700 mb-6">
+      Maximize your legacy and attract the right buyer with the power of our 
+      <span className="font-semibold text-blue-600"> AI Business Broker</span>. 
+      Get AI-enhanced listings, accurate valuations, and intelligent buyer matching — all without paying high broker fees.
+    </p>
+    <Link href="/sellers">
+      <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white py-3 px-6 rounded-lg text-lg font-semibold inline-block">
+        List Your Business
+      </a>
+    </Link>
+  </div>
+</section>
+
 
         <section className="bg-[#E0F2FE] rounded-xl p-10 mb-12 border border-blue-100">
           <div className="text-center">
@@ -129,19 +135,22 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="bg-white rounded-xl p-10 mb-12 border border-gray-200">
-          <div className="text-center">
-            <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">Are You a Buyer?</h2>
-            <p className="text-lg text-gray-700 mb-6">
-              Discover stable businesses ready for transition. Get in with creative financing and zero bank stress.
-            </p>
-            <Link href="/listings">
-              <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white py-3 px-6 rounded-lg text-lg font-semibold inline-block">
-                Browse Businesses
-              </a>
-            </Link>
-          </div>
-        </section>
+       {/* Buyer Section */}
+<section className="bg-white rounded-xl p-10 mb-12 border border-gray-200">
+  <div className="text-center">
+    <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">Are You a Buyer?</h2>
+    <p className="text-lg text-gray-700 mb-6">
+      Unlock <span className="font-semibold text-blue-600">AI-powered tools</span> to find the perfect business. 
+      Use our <strong>Deal Maker</strong> to structure creative offers and get <strong>AI-matched</strong> with opportunities tailored to you.
+    </p>
+    <Link href="/listings">
+      <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white py-3 px-6 rounded-lg text-lg font-semibold inline-block">
+        Browse Businesses
+      </a>
+    </Link>
+  </div>
+</section>
+
 
       </div>
     </main>
