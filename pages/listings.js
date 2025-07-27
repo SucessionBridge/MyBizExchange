@@ -83,6 +83,15 @@ export default function Listings() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedTerm, setDebouncedTerm] = useState('');
+
+  // ✅ Debounce search input (500ms)
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedTerm(searchTerm);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
   useEffect(() => {
     async function fetchListings() {
@@ -107,13 +116,13 @@ export default function Listings() {
         `)
         .order('created_at', { ascending: false });
 
-      if (searchTerm.trim() !== '') {
+      if (debouncedTerm.trim() !== '') {
         query = query.or(`
-          business_name.ilike.%${searchTerm}%,
-          industry.ilike.%${searchTerm}%,
-          location.ilike.%${searchTerm}%,
-          business_description.ilike.%${searchTerm}%,
-          ai_description.ilike.%${searchTerm}%
+          business_name.ilike.%${debouncedTerm}%,
+          industry.ilike.%${debouncedTerm}%,
+          location.ilike.%${debouncedTerm}%,
+          business_description.ilike.%${debouncedTerm}%,
+          ai_description.ilike.%${debouncedTerm}%
         `);
       }
 
@@ -129,7 +138,7 @@ export default function Listings() {
     }
 
     fetchListings();
-  }, [searchTerm]);
+  }, [debouncedTerm]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 pt-6 pb-12">
@@ -180,4 +189,3 @@ export default function Listings() {
     </div>
   );
 }
-
