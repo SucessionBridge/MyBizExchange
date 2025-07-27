@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Menu, X } from 'lucide-react';
 import supabase from '../lib/supabaseClient';
-import { toast } from 'react-hot-toast'; // ✅ NEW
+import { toast } from 'react-hot-toast';
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
@@ -49,11 +49,11 @@ export default function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex space-x-6 text-sm font-medium items-center">
-          <Link href="/business-valuation"><a className="hover:text-blue-600">Valuation</a></Link>
-          <Link href="/sellers"><a className="hover:text-blue-600">Sell</a></Link>
-          <Link href="/buyer-onboarding"><a className="hover:text-blue-600">Buy</a></Link>
-          <Link href="/scorecard"><a className="hover:text-blue-600">Prepare to Sell</a></Link>
-          <Link href="/listings"><a className="hover:text-blue-600">Marketplace</a></Link>
+          <Link href="/listings"><a className="hover:text-blue-600">Buy a Business</a></Link>
+          <Link href="/sellers"><a className="hover:text-blue-600">Sell a Business</a></Link>
+          <Link href="/business-valuation"><a className="hover:text-blue-600">Value Your Business</a></Link>
+          <Link href="/scorecard"><a className="hover:text-blue-600">Sellability Scorecard</a></Link>
+          <Link href="/resources"><a className="hover:text-blue-600">Resources</a></Link>
 
           {user && (
             <div className="relative">
@@ -101,7 +101,7 @@ export default function Header() {
           )}
         </nav>
 
-        {/* Mobile Hamburger Button */}
+        {/* Mobile Hamburger */}
         <div className="md:hidden">
           <button onClick={toggleMenu} aria-label="Toggle menu" className="text-gray-800">
             {isOpen ? <X size={24} /> : <Menu size={24} />}
@@ -109,15 +109,15 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Mobile Dropdown Menu */}
+      {/* Mobile Dropdown */}
       {isOpen && (
         <div className="md:hidden bg-white border-t">
           <nav className="flex flex-col px-4 py-2 space-y-2 text-sm font-medium">
-            <Link href="/business-valuation"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Valuation</a></Link>
-            <Link href="/sellers"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Sell</a></Link>
-            <Link href="/buyer-onboarding"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Buy</a></Link>
-            <Link href="/scorecard"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Prepare to Sell</a></Link>
-            <Link href="/listings"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Marketplace</a></Link>
+            <Link href="/listings"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Buy a Business</a></Link>
+            <Link href="/sellers"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Sell a Business</a></Link>
+            <Link href="/business-valuation"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Value Your Business</a></Link>
+            <Link href="/scorecard"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Sellability Scorecard</a></Link>
+            <Link href="/resources"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Resources</a></Link>
 
             {user && (
               <>
@@ -156,3 +156,4 @@ export default function Header() {
     </header>
   );
 }
+
