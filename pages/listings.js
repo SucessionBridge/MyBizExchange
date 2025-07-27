@@ -14,7 +14,6 @@ function ListingCard({ listing, index }) {
   const displayName = listing.hide_business_name
     ? 'Confidential Business Listing'
     : listing.business_name?.trim() ||
-      listing.businessName?.trim() ||
       `${listing.industry || 'Unnamed'} Business`;
 
   const description =
@@ -95,7 +94,6 @@ export default function Listings() {
         .select(`
           id,
           business_name,
-          businessName,
           hide_business_name,
           business_description,
           ai_description,
