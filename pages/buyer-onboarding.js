@@ -221,16 +221,42 @@ export default function BuyerOnboarding() {
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Upload Intro Video or Photo</label>
-            <input type="file" accept="video/*,image/*" onChange={handleVideoUpload} className="w-full border p-3 rounded" />
-            <p className="text-xs text-gray-500 mt-1">Record a 30–60s video OR upload a clear photo. Sellers are more likely to trust buyers who show their face.</p>
-            {videoPreview && (
-              <video width="200" controls className="mt-3 rounded">
-                <source src={videoPreview} />
-              </video>
-            )}
-          </div>
+         <div>
+  <label className="block text-sm font-medium mb-1">Upload Intro Video or Photo</label>
+  <input
+    type="file"
+    accept="video/*,image/*"
+    onChange={handleVideoUpload}
+    className="w-full border p-3 rounded"
+  />
+  <p className="text-xs text-gray-500 mt-1">
+    Record a 30–60s video OR upload a clear photo. Sellers are more likely to trust buyers who show their face.
+  </p>
+
+  {videoPreview && (
+    <div className="mt-3">
+      {formData.video?.type?.startsWith('image') ? (
+        <img src={videoPreview} alt="Preview" className="w-48 rounded border" />
+      ) : (
+        <video width="200" controls className="rounded border">
+          <source src={videoPreview} />
+        </video>
+      )}
+
+      <button
+        type="button"
+        onClick={() => {
+          setFormData(prev => ({ ...prev, video: null }));
+          setVideoPreview(null);
+        }}
+        className="mt-2 text-sm text-red-600 hover:underline block"
+      >
+        Remove file
+      </button>
+    </div>
+  )}
+</div>
+
 
           <button type="submit"
             className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold">
