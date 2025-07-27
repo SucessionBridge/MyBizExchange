@@ -45,15 +45,20 @@ export default function Header() {
             <span className="text-[#2E3A59]">Succession</span>
             <span className="text-[#F59E0B] flex items-center relative">
               Bridge
+              {/* ✅ Inline traced SVG */}
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 200 100"
-                className="w-12 h-8 ml-1 fill-[#F59E0B]"
+                viewBox="0 0 200 80"
+                className="w-12 h-6 ml-1"
+                style={{ transform: 'translateY(-2px)' }}
               >
-                <path d="M0 80h200v5H0z" /> 
-                <path d="M40 80V40h5v40zM160 80V40h-5v40z" /> 
-                <path d="M0 40 C50 10 150 10 200 40" fill="none" stroke="#F59E0B" strokeWidth="4"/>
-                <path d="M100 80V20h3v60z" />
+                <path
+                  d="M0 60h200v4H0z M20 60V30h4v30z M180 60V30h-4v30z M0 30 C60 0 140 0 200 30"
+                  fill="none"
+                  stroke="#F59E0B"
+                  strokeWidth="4"
+                />
+                <path d="M95 60V20h4v40z" fill="#F59E0B" />
               </svg>
             </span>
           </a>
