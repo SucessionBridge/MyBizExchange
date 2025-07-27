@@ -126,12 +126,6 @@ const handleSubmit = async (e) => {
         return;
       }
 
-      const { data: urlData } = supabase.storage
-        .from('seller-images')
-        .getPublicUrl(filePath);
-      uploadedImageUrls.push(urlData.publicUrl);
-    }
-
     // ✅ Combine city + state into one field
     const combinedLocation = formData.location_city && formData.location_state
       ? `${formData.location_city}, ${formData.location_state}`
