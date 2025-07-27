@@ -79,18 +79,15 @@ export default function Listings() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
 
-  // ✅ Debounce search input (500ms)
+  // ✅ Debounce search input
   useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedTerm(searchTerm);
-    }, 500);
+    const handler = setTimeout(() => setDebouncedTerm(searchTerm), 500);
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
   useEffect(() => {
     async function fetchListings() {
       setLoading(true);
-
       let query = supabase
         .from('sellers')
         .select(`
@@ -117,11 +114,8 @@ export default function Listings() {
       }
 
       const { data, error } = await query;
-      if (error) {
-        console.error('❌ Error fetching listings:', error);
-      } else {
-        setListings(data);
-      }
+      if (error) console.error('❌ Error fetching listings:', error);
+      else setListings(data);
       setLoading(false);
     }
 
@@ -149,7 +143,7 @@ export default function Listings() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-10 text-center">
         <h2 className="text-2xl font-bold text-blue-900 mb-2">Unlock Full Buyer Access</h2>
         <p className="text-blue-700 mb-3 font-medium">
-          Get AI-powered tools to find the perfect business and craft smarter offers.
+          Unlock AI-powered tools to make smarter offers and match with the right businesses.
         </p>
         <ul className="text-gray-700 mb-4 space-y-1">
           <li>✅ Access detailed financials and seller info</li>
