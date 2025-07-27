@@ -53,7 +53,7 @@ export default function Header() {
           <Link href="/sellers"><a className="hover:text-blue-600">Sell a Business</a></Link>
           <Link href="/business-valuation"><a className="hover:text-blue-600">Value Your Business</a></Link>
           <Link href="/scorecard"><a className="hover:text-blue-600">Sellability Scorecard</a></Link>
-          <Link href="/resources"><a className="hover:text-blue-600">Resources</a></Link>
+          <Link href="/guides"><a className="hover:text-blue-600">Guides & Tools</a></Link>
 
           {user && (
             <div className="relative">
@@ -117,7 +117,7 @@ export default function Header() {
             <Link href="/sellers"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Sell a Business</a></Link>
             <Link href="/business-valuation"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Value Your Business</a></Link>
             <Link href="/scorecard"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Sellability Scorecard</a></Link>
-            <Link href="/resources"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Resources</a></Link>
+            <Link href="/guides"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Guides & Tools</a></Link>
 
             {user && (
               <>
@@ -156,4 +156,5 @@ export default function Header() {
     </header>
   );
 }
+
 
