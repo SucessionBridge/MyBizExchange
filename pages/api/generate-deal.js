@@ -1,36 +1,37 @@
 // pages/api/generate-deal.js
-
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { valuation, jobRevenue, jobCost, buyerSplit } = req.body;
+  const { listing, buyer } = req.body;
 
-  if (
-    typeof valuation !== "number" ||
-    typeof jobRevenue !== "number" ||
-    typeof jobCost !== "number" ||
-    typeof buyerSplit !== "number"
-  ) {
-    return res.status(400).json({ error: "Invalid input types" });
+  if (!listing || !buyer) {
+    return res.status(400).json({ error: "Missing listing or buyer data" });
   }
 
-  const profit = jobRevenue - jobCost;
-  const buyerProfit = (profit * buyerSplit) / 100;
-  const sellerProfit = profit - buyerProfit;
-
   const prompt = `
-A buyer and seller are structuring a subcontractor-style business acquisition deal. 
-Here are the deal details:
+Create 3 creative acquisition deal structures for this business that benefit both buyer and seller.
 
-- Business Valuation: $${valuation.toLocaleString()}
-- Example Job Revenue: $${jobRevenue.toLocaleString()}
-- Job Cost: $${jobCost.toLocaleString()}
-- Profit Split: ${buyerSplit}% to buyer, ${100 - buyerSplit}% to seller
+Business: ${listing.business_name}
+Asking Price: $${listing.asking_price}
+Industry: ${listing.industry}
+City: ${listing.city}
 
-Please write a clear and persuasive deal summary from the buyer’s point of view that explains how the buyer will earn income as a subcontractor and how those payments contribute toward ownership transfer. Use simple, business-friendly language.
-  `;
+Buyer:
+Name: ${buyer.name}
+Experience: ${buyer.experience}/5
+Financing Type: ${buyer.financing_type}
+Available Capital: $${buyer.capital_investment}
+Budget: $${buyer.budget_for_purchase}
+
+For each deal, include:
+- A short title
+- Down payment or terms
+- Payment structure
+- A short explanation of why it benefits BOTH buyer and seller.
+Return all 3 deals clearly separated.
+`;
 
   try {
     const openaiRes = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -42,7 +43,7 @@ Please write a clear and persuasive deal summary from the buyer’s point of vie
       body: JSON.stringify({
         model: "gpt-4",
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 400,
+        max_tokens: 500,
       }),
     });
 
