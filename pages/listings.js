@@ -11,10 +11,11 @@ function ListingCard({ listing, index }) {
       ? listing.image_urls[0]
       : null;
 
-  const displayName = listing.hide_business_name
-    ? 'Confidential Business Listing'
-    : listing.business_name?.trim() ||
-      `${listing.industry || 'Unnamed'} Business`;
+ const displayName = listing.hide_business_name
+  ? 'Confidential Business Listing'
+  : (listing.business_name && listing.business_name.trim()) ||
+    (listing.businessName && listing.businessName.trim()) ||
+    `${listing.industry || 'Unnamed'} Business`;
 
   const description =
     listing.description_choice === 'ai'
