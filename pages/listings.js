@@ -145,31 +145,36 @@ export default function Listings() {
         />
       </div>
 
-      {/* 🔓 Unlock Section */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-10 text-center">
-        <h2 className="text-xl font-semibold text-blue-900 mb-2">Unlock Full Buyer Access</h2>
-        <p className="text-gray-700 mb-4">
-          Create a free buyer profile or log in to:
-        </p>
-        <ul className="text-gray-700 mb-4 space-y-1">
-          <li>✅ Access detailed financials and seller info</li>
-          <li>✅ Message sellers directly</li>
-          <li>✅ Save and track listings in your dashboard</li>
-          <li>✅ Use our <strong>AI-powered Deal Maker</strong> to craft offers</li>
-        </ul>
-        <div className="flex justify-center space-x-4">
-          <Link href="/buyer-onboarding">
-            <a className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium">
-              Create Buyer Profile
-            </a>
-          </Link>
-          <Link href="/login">
-            <a className="bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 px-5 py-2 rounded-lg font-medium">
-              Login
-            </a>
-          </Link>
-        </div>
-      </div>
+   {/* 🔓 Unlock Section */}
+<div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-10 text-center">
+  <h2 className="text-xl font-semibold text-blue-900 mb-2">Unlock Full Buyer Access</h2>
+  <p className="text-sm text-blue-700 mb-3 font-medium">
+    Unlock AI-powered tools to make better offers and find the perfect business faster.
+  </p>
+  <p className="text-gray-700 mb-4">
+    Create a free buyer profile or log in to:
+  </p>
+  <ul className="text-gray-700 mb-4 space-y-1">
+    <li>✅ Access detailed financials and seller info</li>
+    <li>✅ Message sellers directly</li>
+    <li>✅ Save and track listings in your dashboard</li>
+    <li>✅ Use our <strong>AI-powered Deal Maker</strong> to craft offers</li>
+    <li>✅ Get <strong>AI-matched</strong> with businesses that fit your goals</li>
+  </ul>
+  <div className="flex justify-center space-x-4">
+    <Link href="/buyer-onboarding">
+      <a className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium">
+        Create Buyer Profile
+      </a>
+    </Link>
+    <Link href="/login">
+      <a className="bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 px-5 py-2 rounded-lg font-medium">
+        Login
+      </a>
+    </Link>
+  </div>
+</div>
+
 
       {loading ? (
         <p className="text-center text-gray-600">Loading listings...</p>
