@@ -50,15 +50,9 @@ function ListingCard({ listing, index }) {
         </p>
 
         <div className="text-sm text-gray-800 mt-2 space-y-1">
-          <p>
-            <strong>Revenue:</strong> ${Number(listing.annual_revenue || 0).toLocaleString()}
-          </p>
-          <p>
-            <strong>Profit:</strong> ${Number(listing.annual_profit || 0).toLocaleString()}
-          </p>
-          <p>
-            <strong>Price:</strong> ${Number(listing.asking_price || 0).toLocaleString()}
-          </p>
+          <p><strong>Revenue:</strong> ${Number(listing.annual_revenue || 0).toLocaleString()}</p>
+          <p><strong>Profit:</strong> ${Number(listing.annual_profit || 0).toLocaleString()}</p>
+          <p><strong>Price:</strong> ${Number(listing.asking_price || 0).toLocaleString()}</p>
         </div>
 
         {listing.financing_type?.toLowerCase().includes('seller') && (
@@ -84,8 +78,6 @@ export default function Listings() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
-  const [user, setUser] = useState(null);
-  const [hasBuyerProfile, setHasBuyerProfile] = useState(false);
 
   // ✅ Debounce search input (500ms)
   useEffect(() => {
@@ -95,25 +87,6 @@ export default function Listings() {
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
-  // ✅ Fetch user & buyer profile
-  useEffect(() => {
-    async function checkUser() {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-
-      if (user) {
-        const { data } = await supabase
-          .from('buyers')
-          .select('id')
-          .eq('auth_id', user.id)
-          .maybeSingle();
-        if (data) setHasBuyerProfile(true);
-      }
-    }
-    checkUser();
-  }, []);
-
-  // ✅ Fetch listings with search
   useEffect(() => {
     async function fetchListings() {
       setLoading(true);
@@ -144,13 +117,11 @@ export default function Listings() {
       }
 
       const { data, error } = await query;
-
       if (error) {
         console.error('❌ Error fetching listings:', error);
       } else {
         setListings(data);
       }
-
       setLoading(false);
     }
 
@@ -159,47 +130,12 @@ export default function Listings() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 pt-6 pb-12">
-      <h1 className="text-4xl font-bold text-blue-900 mb-6 text-center">
+      <h1 className="text-4xl font-bold text-blue-900 mb-4 text-center">
         Explore Available Businesses for Sale
       </h1>
 
-      {/* 🔑 Info Box for Buyer Profile */}
-      {!hasBuyerProfile && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-900 rounded-lg p-4 mb-8 text-center max-w-3xl mx-auto">
-          <p className="font-semibold text-lg">
-            Want full access to listings?
-          </p>
-          <p className="text-sm mt-1">
-            {user
-              ? 'Complete your free buyer profile to unlock:'
-              : 'Login or create a buyer profile to unlock:'}
-          </p>
-          <ul className="mt-2 text-sm">
-            <li>✅ Detailed financial info on listings</li>
-            <li>✅ Save listings to your dashboard</li>
-            <li>✅ Email listings to yourself</li>
-            <li>✅ Message sellers directly</li>
-          </ul>
-          <div className="mt-3">
-            {user ? (
-              <Link href="/buyer-onboarding">
-                <a className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                  Complete Buyer Profile →
-                </a>
-              </Link>
-            ) : (
-              <Link href="/login">
-                <a className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                  Login / Sign Up →
-                </a>
-              </Link>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* 🔍 Search Bar */}
-      <div className="max-w-xl mx-auto mb-10">
+      <div className="max-w-xl mx-auto mb-6">
         <input
           type="text"
           placeholder="Search by name, industry, location..."
@@ -209,36 +145,43 @@ export default function Listings() {
         />
       </div>
 
+      {/* 🔓 Unlock Section */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-10 text-center">
+        <h2 className="text-xl font-semibold text-blue-900 mb-2">Unlock Full Buyer Access</h2>
+        <p className="text-gray-700 mb-4">
+          Create a free buyer profile or log in to:
+        </p>
+        <ul className="text-gray-700 mb-4 space-y-1">
+          <li>✅ Access detailed financials and seller info</li>
+          <li>✅ Message sellers directly</li>
+          <li>✅ Save and track listings in your dashboard</li>
+          <li>✅ Use our <strong>AI-powered Deal Maker</strong> to craft offers</li>
+        </ul>
+        <div className="flex justify-center space-x-4">
+          <Link href="/buyer-onboarding">
+            <a className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium">
+              Create Buyer Profile
+            </a>
+          </Link>
+          <Link href="/login">
+            <a className="bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 px-5 py-2 rounded-lg font-medium">
+              Login
+            </a>
+          </Link>
+        </div>
+      </div>
+
       {loading ? (
         <p className="text-center text-gray-600">Loading listings...</p>
       ) : listings.length === 0 ? (
         <p className="text-center text-gray-500">No businesses found for your search.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {listings.map((listing, index) => {
-            try {
-              return (
-                <ListingCard
-                  key={`${listing.id}-${index}`}
-                  listing={listing}
-                  index={index}
-                />
-              );
-            } catch (err) {
-              console.error(`🔥 Error rendering listing #${index} (${listing?.id}):`, err);
-              return (
-                <div
-                  key={`error-${index}`}
-                  className="p-4 bg-red-100 border border-red-300 text-red-800"
-                >
-                  ⚠️ Failed to render listing #{index}. Check console for details.
-                </div>
-              );
-            }
-          })}
+          {listings.map((listing, index) => (
+            <ListingCard key={`${listing.id}-${index}`} listing={listing} index={index} />
+          ))}
         </div>
       )}
     </div>
   );
 }
-
