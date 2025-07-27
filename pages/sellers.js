@@ -206,9 +206,6 @@ export default function SellerWizard() {
   };
 
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
-
-
-  const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
   const renderBackButton = () => (
     <button onClick={() => setStep(s => Math.max(1, s - 1))} className="text-sm text-blue-600 underline mt-2">Back</button>
   );
