@@ -148,6 +148,44 @@ export default function Listings() {
           />
         </div>
 
+        {/* 🔓 Unlock Section */}
+        <div className="bg-white rounded-2xl shadow-lg p-8 mb-10 max-w-3xl mx-auto text-center border border-gray-100">
+          <h2 className="text-3xl font-bold text-gray-900 mb-3">Unlock Full Buyer Access</h2>
+          <p className="text-gray-600 mb-6 text-lg">
+            Unlock AI-powered tools to make smarter offers and match with the right businesses.
+          </p>
+
+          <div className="text-left max-w-md mx-auto space-y-3 mb-6">
+            {[
+              'Access detailed financials and seller info',
+              'Message sellers directly',
+              'Save and track listings in your dashboard',
+              'Use our AI-powered Deal Maker to structure offers',
+              'Get AI-matched with businesses that fit your goals'
+            ].map((text, idx) => (
+              <div className="flex items-start" key={idx}>
+                <svg className="w-5 h-5 text-green-500 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <p className="ml-3 text-gray-700">{text}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex justify-center space-x-4">
+            <Link href="/buyer-onboarding">
+              <a className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow">
+                Create Buyer Profile
+              </a>
+            </Link>
+            <Link href="/login">
+              <a className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold border">
+                Login
+              </a>
+            </Link>
+          </div>
+        </div>
+
         {loading ? (
           <p className="text-center text-gray-600">Loading listings...</p>
         ) : listings.length === 0 ? (
