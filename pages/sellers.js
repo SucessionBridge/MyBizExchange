@@ -194,14 +194,7 @@ const handleSubmit = async (e) => {
     setSubmitError(err.message || 'Submission failed');
     setIsSubmitting(false);
   }
-};
-
-
-        const { data: urlData } = supabase.storage
-          .from('seller-images')
-          .getPublicUrl(filePath);
-        uploadedImageUrls.push(urlData.publicUrl);
-      }
+};       
 
       // ✅ Auto-combine city + state into location
       const combinedLocation = formData.location_city && formData.location_state
