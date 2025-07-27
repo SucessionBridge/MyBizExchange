@@ -150,12 +150,24 @@ export default function BuyerDashboard() {
             <p><strong>City/State:</strong> {buyerProfile.city}, {buyerProfile.state_or_province}</p>
             <p><strong>Short Introduction:</strong> {buyerProfile.short_introduction}</p>
 
-            {buyerProfile.video_introduction && (
-              <div>
-                <p className="font-semibold mt-4 mb-2">Intro Video:</p>
-                <video src={buyerProfile.video_introduction} controls className="w-full max-w-md rounded-lg" />
-              </div>
-            )}
+           {buyerProfile.video_introduction && (
+  <div className="mt-4">
+    <p className="font-semibold mb-2">Intro Video / Photo:</p>
+    {buyerProfile.video_introduction.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+      <img
+        src={buyerProfile.video_introduction}
+        alt="Buyer"
+        className="w-48 rounded-lg border"
+      />
+    ) : (
+      <video
+        src={buyerProfile.video_introduction}
+        controls
+        className="w-full max-w-md rounded-lg border"
+      />
+    )}
+  </div>
+)}
 
             <button
               onClick={() => router.push('/buyer-onboarding?mode=edit')}
