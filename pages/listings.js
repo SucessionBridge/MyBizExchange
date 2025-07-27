@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import supabase from '../lib/supabaseClient';
 import Link from 'next/link';
+import Head from 'next/head';
 
 function ListingCard({ listing, index }) {
   const imageUrl =
@@ -10,7 +11,11 @@ function ListingCard({ listing, index }) {
       ? listing.image_urls[0]
       : null;
 
-  const name = listing.business_name?.trim() || '';
+  const displayName = listing.hide_business_name
+    ? 'Confidential Business Listing'
+    : listing.business_name?.trim() ||
+      listing.businessName?.trim() ||
+      `${listing.industry || 'Unnamed'} Business`;
 
   const description =
     listing.description_choice === 'ai'
@@ -20,12 +25,12 @@ function ListingCard({ listing, index }) {
   return (
     <div
       key={`${listing.id}-${index}`}
-      className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition duration-300 overflow-hidden border border-gray-100"
+      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100"
     >
       {imageUrl ? (
         <img
           src={imageUrl}
-          alt={`${name || 'Business'} image`}
+          alt={`${displayName} image`}
           className="w-full h-48 object-cover"
           onError={(e) => {
             e.target.onerror = null;
@@ -33,37 +38,35 @@ function ListingCard({ listing, index }) {
           }}
         />
       ) : (
-        <div className="w-full h-48 bg-gray-100 flex items-center justify-center text-gray-400">
+        <div className="w-full h-48 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center text-blue-400 font-semibold text-lg">
           No Image Available
         </div>
       )}
 
-      <div className="p-5 space-y-2">
-        <h2 className="text-lg font-bold text-blue-800">
-          {name || `${listing.industry || 'Unnamed'} Business`}
-        </h2>
-        <p className="text-sm text-gray-500">
+      <div className="p-5 space-y-3">
+        <h2 className="text-xl font-bold text-gray-900">{displayName}</h2>
+        <p className="text-sm text-gray-500 font-medium">
           {(listing.location || 'Unknown')} • {(listing.industry || 'Unspecified')}
         </p>
-        <p className="text-sm text-gray-700 line-clamp-3">
+        <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed">
           {description || 'No description provided.'}
         </p>
 
-        <div className="text-sm text-gray-800 mt-2 space-y-1">
-          <p><strong>Revenue:</strong> ${Number(listing.annual_revenue || 0).toLocaleString()}</p>
-          <p><strong>Profit:</strong> ${Number(listing.annual_profit || 0).toLocaleString()}</p>
-          <p><strong>Price:</strong> ${Number(listing.asking_price || 0).toLocaleString()}</p>
+        <div className="text-sm text-gray-800 mt-3 grid grid-cols-3 gap-2">
+          <p><strong>Revenue:</strong><br />${Number(listing.annual_revenue || 0).toLocaleString()}</p>
+          <p><strong>Profit:</strong><br />${Number(listing.annual_profit || 0).toLocaleString()}</p>
+          <p><strong>Price:</strong><br />${Number(listing.asking_price || 0).toLocaleString()}</p>
         </div>
 
         {listing.financing_type?.toLowerCase().includes('seller') && (
-          <span className="inline-block mt-2 bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">
+          <span className="inline-block mt-2 bg-green-50 text-green-700 text-xs font-semibold px-2 py-1 rounded border border-green-200">
             Seller Financing Available
           </span>
         )}
 
         <div className="pt-3">
           <Link href={`/listings/${listing.id}`}>
-            <a className="inline-block text-blue-600 hover:text-blue-800 font-medium text-sm">
+            <a className="inline-block text-blue-600 hover:text-blue-800 font-medium text-sm transition-colors">
               View Details →
             </a>
           </Link>
@@ -79,7 +82,6 @@ export default function Listings() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
 
-  // ✅ Debounce search input
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedTerm(searchTerm), 500);
     return () => clearTimeout(handler);
@@ -93,6 +95,8 @@ export default function Listings() {
         .select(`
           id,
           business_name,
+          businessName,
+          hide_business_name,
           business_description,
           ai_description,
           description_choice,
@@ -123,60 +127,41 @@ export default function Listings() {
   }, [debouncedTerm]);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 pt-6 pb-12">
-      <h1 className="text-4xl font-bold text-blue-900 mb-4 text-center">
-        Explore Available Businesses for Sale
-      </h1>
+    <div className="bg-gray-50 min-h-screen">
+      <Head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+      </Head>
 
-      {/* 🔍 Search Bar */}
-      <div className="max-w-xl mx-auto mb-6">
-        <input
-          type="text"
-          placeholder="Search by name, industry, location..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-        />
-      </div>
+      <div className="max-w-7xl mx-auto px-4 pt-10 pb-12">
+        <h1 className="text-4xl font-bold text-gray-900 mb-6 text-center">
+          Explore Available Businesses for Sale
+        </h1>
 
-      {/* 🔓 Unlock Section */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-10 text-center">
-        <h2 className="text-2xl font-bold text-blue-900 mb-2">Unlock Full Buyer Access</h2>
-        <p className="text-blue-700 mb-3 font-medium">
-          Unlock AI-powered tools to make smarter offers and match with the right businesses.
-        </p>
-        <ul className="text-gray-700 mb-4 space-y-1">
-          <li>✅ Access detailed financials and seller info</li>
-          <li>✅ Message sellers directly</li>
-          <li>✅ Save and track listings in your dashboard</li>
-          <li>✅ Use our <strong>AI-powered Deal Maker</strong> to structure offers</li>
-          <li>✅ Get <strong>AI-matched</strong> with businesses that fit your goals</li>
-        </ul>
-        <div className="flex justify-center space-x-4">
-          <Link href="/buyer-onboarding">
-            <a className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-medium">
-              Create Buyer Profile
-            </a>
-          </Link>
-          <Link href="/login">
-            <a className="bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 px-5 py-2 rounded-lg font-medium">
-              Login
-            </a>
-          </Link>
+        {/* 🔍 Search */}
+        <div className="max-w-xl mx-auto mb-8">
+          <input
+            type="text"
+            placeholder="Search by name, industry, location..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
         </div>
-      </div>
 
-      {loading ? (
-        <p className="text-center text-gray-600">Loading listings...</p>
-      ) : listings.length === 0 ? (
-        <p className="text-center text-gray-500">No businesses found for your search.</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {listings.map((listing, index) => (
-            <ListingCard key={`${listing.id}-${index}`} listing={listing} index={index} />
-          ))}
-        </div>
-      )}
+        {loading ? (
+          <p className="text-center text-gray-600">Loading listings...</p>
+        ) : listings.length === 0 ? (
+          <p className="text-center text-gray-500">No businesses found for your search.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {listings.map((listing, index) => (
+              <ListingCard key={`${listing.id}-${index}`} listing={listing} index={index} />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
