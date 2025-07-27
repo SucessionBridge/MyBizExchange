@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Landmark } from 'lucide-react'; // ✅ Added Landmark icon
 import supabase from '../lib/supabaseClient';
 import { toast } from 'react-hot-toast';
 
@@ -41,9 +41,11 @@ export default function Header() {
     <header className="bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
         <Link href="/">
-          <a className="text-2xl font-serif font-bold">
+          <a className="flex items-center text-2xl font-serif font-bold">
             <span className="text-[#2E3A59]">Succession</span>
-            <span className="text-[#F59E0B]">Bridge</span>
+            <span className="text-[#F59E0B] flex items-center">
+              Bridge <Landmark className="w-6 h-6 ml-1 text-[#F59E0B]" />
+            </span>
           </a>
         </Link>
 
@@ -156,5 +158,4 @@ export default function Header() {
     </header>
   );
 }
-
 
