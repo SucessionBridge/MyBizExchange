@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import supabase from '../lib/supabaseClient'; // ✅ correct
+import FloatingInput from '../components/FloatingInput';
 
 export default function SellerWizard() {
 
@@ -379,7 +380,13 @@ export default function SellerWizard() {
             <div className="space-y-4">
               <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="email" placeholder="Email" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" />
+              <FloatingInput 
+  label="Business Name"
+  name="businessName"
+  value={formData.businessName}
+  onChange={handleChange}
+/>
+
               <label className="flex items-center"><input name="hideBusinessName" type="checkbox" checked={formData.hideBusinessName} onChange={handleChange} className="mr-2" />Hide Business Name</label>
               <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
             </div>
