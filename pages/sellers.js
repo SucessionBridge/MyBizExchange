@@ -418,35 +418,7 @@ seller_financing_considered: formData.seller_financing_considered,
   value={formData.location_state} 
   onChange={handleChange} 
   className="w-full border p-3 rounded"
-   <input 
-  name="years_in_business" 
-  placeholder="Years in Business" 
-  value={formData.years_in_business} 
-  onChange={handleChange} 
-  className="w-full border p-3 rounded" 
-/>
 
-<input 
-  name="owner_hours_per_week" 
-  placeholder="Owner Hours per Week" 
-  value={formData.owner_hours_per_week} 
-  onChange={handleChange} 
-  className="w-full border p-3 rounded" 
-/>
-
-<label className="block font-medium text-gray-700">Would you consider seller financing if terms were favorable?</label>
-<select 
-  name="seller_financing_considered" 
-  value={formData.seller_financing_considered} 
-  onChange={handleChange} 
-  className="w-full border p-3 rounded"
->
-  <option value="">Select</option>
-  <option value="yes">Yes</option>
-  <option value="no">No</option>
-  <option value="maybe">Maybe</option>
-</select>
- 
 >
   <option value="">Select State/Province</option>
 
@@ -516,6 +488,34 @@ seller_financing_considered: formData.seller_financing_considered,
   <option value="West Virginia">West Virginia</option>
   <option value="Wisconsin">Wisconsin</option>
   <option value="Wyoming">Wyoming</option>
+</select>
+<input 
+  name="years_in_business" 
+  placeholder="Years in Business" 
+  value={formData.years_in_business} 
+  onChange={handleChange} 
+  className="w-full border p-3 rounded" 
+/>
+
+<input 
+  name="owner_hours_per_week" 
+  placeholder="Owner Hours per Week" 
+  value={formData.owner_hours_per_week} 
+  onChange={handleChange} 
+  className="w-full border p-3 rounded" 
+/>
+
+<label className="block font-medium text-gray-700">Would you consider seller financing if terms were favorable?</label>
+<select 
+  name="seller_financing_considered" 
+  value={formData.seller_financing_considered} 
+  onChange={handleChange} 
+  className="w-full border p-3 rounded"
+>
+  <option value="">Select</option>
+  <option value="yes">Yes</option>
+  <option value="no">No</option>
+  <option value="maybe">Maybe</option>
 </select>
 
               <input name="website" placeholder="Website" value={formData.website} onChange={handleChange} className="w-full border p-3 rounded" />
