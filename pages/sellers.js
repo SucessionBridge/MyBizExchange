@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import supabase from '../lib/supabaseClient'; // ✅ correct
 import FloatingInput from '../components/FloatingInput';
+import EditDescriptionModal from '../components/EditDescriptionModal'; // ✅ NEW
 
 export default function SellerWizard() {
 
@@ -16,7 +17,12 @@ export default function SellerWizard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
-
+  const [editTarget, setEditTarget] = useState(null); // ✅ NEW for modal target
+  const [showModal, setShowModal] = useState(false);
+const [currentEditType, setCurrentEditType] = useState('manual'); // 'manual' or 'ai'
+const [tempDescription, setTempDescription] = useState('');
+const [tempAIDescription, setTempAIDescription] = useState('');
+ 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -100,6 +106,30 @@ seller_financing_considered: '',
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
+// ✅ Modal controls for editing descriptions
+const openModal = (type) => {
+  setEditTarget(type);
+  if (type === 'manual') {
+    setTempDescription(formData.businessDescription || '');
+  } else {
+    setTempAIDescription(formData.aiDescription || '');
+  }
+  setShowModal(true);
+};
+
+const closeModal = () => {
+  setShowModal(false);
+  setEditTarget(null);
+};
+
+const saveModalChanges = () => {
+  if (editTarget === 'manual') {
+    setFormData(prev => ({ ...prev, businessDescription: tempDescription }));
+  } else if (editTarget === 'ai') {
+    setFormData(prev => ({ ...prev, aiDescription: tempAIDescription }));
+  }
+  closeModal();
+};
 
    const handleImageUpload = (e) => {
     const files = Array.from(e.target.files);
@@ -311,53 +341,73 @@ seller_financing_considered: formData.seller_financing_considered,
           </div>
         </div>
 
-        {/* Description Section */}
-        {(formData.aiDescription || formData.businessDescription) && (
-          <div>
-            <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Description</h3>
-            <div className="mb-4">
-              <label className="block font-medium mb-1">Choose which description to publish:</label>
-              <div className="flex items-center gap-6">
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="descriptionChoice"
-                    value="manual"
-                    checked={formData.descriptionChoice === 'manual'}
-                    onChange={handleChange}
-                    className="mr-2"
-                  />
-                  Written by Seller
-                </label>
-                <label className="flex items-center">
-                  <input
-                    type="radio"
-                    name="descriptionChoice"
-                    value="ai"
-                    checked={formData.descriptionChoice === 'ai'}
-                    onChange={handleChange}
-                    className="mr-2"
-                  />
-                  AI-Enhanced Version
-                </label>
-              </div>
-            </div>
-            <div className="grid md:grid-cols-2 gap-6">
-              <div>
-                <h4 className="font-semibold mb-1">Written by Seller:</h4>
-                <p className="text-gray-800 whitespace-pre-wrap border p-3 rounded bg-gray-50">
-                  {formData.businessDescription || 'No description provided.'}
-                </p>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-1">AI-Enhanced Version:</h4>
-                <p className="text-gray-800 whitespace-pre-wrap border p-3 rounded bg-gray-50">
-                  {formData.aiDescription || 'AI description not yet generated.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+     {/* Description Section */}
+{(formData.aiDescription || formData.businessDescription) && (
+  <div>
+    <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Description</h3>
+    <div className="mb-4">
+      <label className="block font-medium mb-1">Choose which description to publish:</label>
+      <div className="flex items-center gap-6">
+        <label className="flex items-center">
+          <input
+            type="radio"
+            name="descriptionChoice"
+            value="manual"
+            checked={formData.descriptionChoice === 'manual'}
+            onChange={handleChange}
+            className="mr-2"
+          />
+          Written by Seller
+        </label>
+        <label className="flex items-center">
+          <input
+            type="radio"
+            name="descriptionChoice"
+            value="ai"
+            checked={formData.descriptionChoice === 'ai'}
+            onChange={handleChange}
+            className="mr-2"
+          />
+          AI-Enhanced Version
+        </label>
+      </div>
+    </div>
+
+    <div className="grid md:grid-cols-2 gap-6">
+      <div>
+        <h4 className="font-semibold mb-1 flex justify-between items-center">
+          Written by Seller:
+          <button
+            type="button"
+            onClick={() => openEditModal('manual')}
+            className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded"
+          >
+            ✏️ Edit
+          </button>
+        </h4>
+        <p className="text-gray-800 whitespace-pre-wrap border p-3 rounded bg-gray-50">
+          {formData.businessDescription || 'No description provided.'}
+        </p>
+      </div>
+
+      <div>
+        <h4 className="font-semibold mb-1 flex justify-between items-center">
+          AI-Enhanced Version:
+          <button
+            type="button"
+            onClick={() => openEditModal('ai')}
+            className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded"
+          >
+            ✏️ Edit
+          </button>
+        </h4>
+        <p className="text-gray-800 whitespace-pre-wrap border p-3 rounded bg-gray-50">
+          {formData.aiDescription || 'AI description not yet generated.'}
+        </p>
+      </div>
+    </div>
+  </div>
+)}
 
         <div className="mt-8 space-y-4">
           <div className="flex gap-4">
@@ -379,6 +429,40 @@ seller_financing_considered: formData.seller_financing_considered,
           {submitSuccess && <p className="text-sm text-green-600">✅ Your listing has been submitted successfully!</p>}
           {submitError && <p className="text-sm text-red-600">❌ {submitError}</p>}
         </div>
+         {/* ✨ Edit Description Modal */}
+{showModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
+      <h3 className="text-xl font-bold mb-4">
+        Edit {currentEditType === 'manual' ? 'Seller-Written' : 'AI-Enhanced'} Description
+      </h3>
+      <textarea
+        className="w-full border p-3 rounded mb-4 min-h-[150px]"
+        value={currentEditType === 'manual' ? tempDescription : tempAIDescription}
+        onChange={(e) =>
+          currentEditType === 'manual'
+            ? setTempDescription(e.target.value)
+            : setTempAIDescription(e.target.value)
+        }
+      />
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={closeModal}
+          className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={saveModalChanges}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+   
       </div>
     );
   };
