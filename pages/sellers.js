@@ -26,6 +26,9 @@ export default function SellerWizard() {
     location: '',
     location_city: '',
     location_state: '',
+    years_in_business: '',
+owner_hours_per_week: '',
+seller_financing_considered: '',
     website: '',
     annualRevenue: '',
     sde: '',
@@ -161,6 +164,10 @@ export default function SellerWizard() {
         annual_profit: parseFloat(annualProfit) || 0,
         sde: parseFloat(sde) || 0,
         asking_price: parseFloat(askingPrice) || 0,
+        years_in_business: parseInt(formData.years_in_business) || null,
+owner_hours_per_week: parseInt(formData.owner_hours_per_week) || null,
+seller_financing_considered: formData.seller_financing_considered,
+
         employees: parseInt(employees) || 0,
         monthly_lease: parseFloat(monthly_lease) || 0,
         inventory_value: parseFloat(inventory_value) || 0,
@@ -281,6 +288,14 @@ export default function SellerWizard() {
             <p><strong>Includes Inventory:</strong> {formData.includesInventory ? 'Yes' : 'No'}</p>
             <p><strong>Includes Building:</strong> {formData.includesBuilding ? 'Yes' : 'No'}</p>
             <p><strong>Real Estate Included:</strong> {formData.real_estate_included ? 'Yes' : 'No'}</p>
+          <p><strong>Years in Business:</strong> {formData.years_in_business || 'Undisclosed'}</p>
+<p><strong>Owner Hours/Week:</strong> {formData.owner_hours_per_week || 'Undisclosed'}</p>
+<p><strong>Seller Financing Considered:</strong> 
+  {formData.seller_financing_considered 
+    ? formData.seller_financing_considered.charAt(0).toUpperCase() + formData.seller_financing_considered.slice(1) 
+    : 'Undisclosed'}
+</p>
+
           </div>
           <div>
             <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Details</h3>
@@ -403,6 +418,35 @@ export default function SellerWizard() {
   value={formData.location_state} 
   onChange={handleChange} 
   className="w-full border p-3 rounded"
+   <input 
+  name="years_in_business" 
+  placeholder="Years in Business" 
+  value={formData.years_in_business} 
+  onChange={handleChange} 
+  className="w-full border p-3 rounded" 
+/>
+
+<input 
+  name="owner_hours_per_week" 
+  placeholder="Owner Hours per Week" 
+  value={formData.owner_hours_per_week} 
+  onChange={handleChange} 
+  className="w-full border p-3 rounded" 
+/>
+
+<label className="block font-medium text-gray-700">Would you consider seller financing if terms were favorable?</label>
+<select 
+  name="seller_financing_considered" 
+  value={formData.seller_financing_considered} 
+  onChange={handleChange} 
+  className="w-full border p-3 rounded"
+>
+  <option value="">Select</option>
+  <option value="yes">Yes</option>
+  <option value="no">No</option>
+  <option value="maybe">Maybe</option>
+</select>
+ 
 >
   <option value="">Select State/Province</option>
 
