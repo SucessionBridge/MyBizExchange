@@ -10,10 +10,11 @@ import { Toaster } from 'react-hot-toast';
 function AuthRedirector() {
   const session = useSession();
   const router = useRouter();
-  const supabase = useSupabaseClient(); // ✅ Use the session-aware client
+  const supabase = useSupabaseClient();
 
   useEffect(() => {
-    if (!session?.user || router.pathname !== '/') return;
+    // ✅ Skip redirect if user intentionally clicked the home logo with ?force=true
+    if (!session?.user || router.pathname !== '/' || router.query.force === 'true') return;
 
     const checkBuyerProfile = async () => {
       const { data: profile } = await supabase
