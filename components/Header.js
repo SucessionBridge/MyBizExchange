@@ -40,12 +40,12 @@ export default function Header() {
   return (
     <header className="bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-        <Link href="/">
+        {/* ✅ Force homepage bypass with ?force=true */}
+        <Link href="/?force=true">
           <a className="flex items-center text-2xl font-serif font-bold">
             <span className="text-[#2E3A59]">Succession</span>
             <span className="text-[#F59E0B] flex items-center relative">
               Bridge
-              {/* ✅ Inline traced SVG */}
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 200 80"
