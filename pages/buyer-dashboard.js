@@ -10,6 +10,9 @@ export default function BuyerDashboard() {
   const [matches, setMatches] = useState([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
 
+  const [buyerMessages, setBuyerMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(true);
+
   useEffect(() => {
     const fetchProfileAndListings = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
@@ -32,6 +35,7 @@ export default function BuyerDashboard() {
         setBuyerProfile(profileData);
         fetchSavedListings(profileData.email);
         fetchMatches(user.id);
+        fetchBuyerMessages(profileData.email); // ✅ Fetch messages here
       }
 
       setLoading(false);
@@ -64,6 +68,22 @@ export default function BuyerDashboard() {
     } else {
       setSavedListings(data);
     }
+  }
+
+  async function fetchBuyerMessages(email) {
+    setLoadingMessages(true);
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('buyer_email', email)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching buyer messages:', error);
+    } else {
+      setBuyerMessages(data);
+    }
+    setLoadingMessages(false);
   }
 
   async function handleUnsave(listingId) {
@@ -194,7 +214,7 @@ export default function BuyerDashboard() {
           </div>
 
           {savedListings.length > 0 && (
-            <div className="bg-white p-6 rounded-xl shadow">
+            <div className="bg-white p-6 rounded-xl shadow mb-10">
               <h2 className="text-xl font-semibold text-blue-800 mb-4">Saved Listings</h2>
               <ul className="space-y-4">
                 {savedListings.map((entry) => (
@@ -228,8 +248,30 @@ export default function BuyerDashboard() {
               </ul>
             </div>
           )}
+
+          {/* ✅ My Messages Section */}
+          {buyerMessages.length > 0 && (
+            <div className="bg-white p-6 rounded-xl shadow mt-8">
+              <h2 className="text-xl font-semibold text-blue-800 mb-4">My Messages</h2>
+              {loadingMessages ? (
+                <p>Loading your messages...</p>
+              ) : (
+                <ul className="space-y-4">
+                  {buyerMessages.map((msg) => (
+                    <li key={msg.id} className="border p-4 rounded">
+                      <p className="text-gray-800"><strong>Message:</strong> {msg.message}</p>
+                      <p className="text-sm text-gray-600">
+                        Listing ID: {msg.listing_id} • Sent: {new Date(msg.created_at).toLocaleString()}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
   );
 }
+
