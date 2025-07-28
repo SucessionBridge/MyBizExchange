@@ -13,28 +13,21 @@ function AuthRedirector() {
   const supabase = useSupabaseClient();
 
   useEffect(() => {
-    console.log('🔍 AuthRedirector running. Path:', router.pathname, 'Force:', router.query.force, 'User:', session?.user?.id);
+    console.log('🔍 AuthRedirector Path:', router.pathname, 'Force:', router.query.force, 'User:', session?.user?.id);
 
-    // ✅ Skip redirect if user clicked home logo with ?force=true
+    // ✅ Only run redirect on homepage `/` (not on dashboard or other routes)
     if (!session?.user || router.pathname !== '/' || router.query.force === 'true') {
-      if (router.query.force === 'true') {
-        console.log('✅ Force=true detected. Skipping redirect to allow homepage view.');
-      }
+      if (router.query.force === 'true') console.log('✅ Force=true detected. Skipping redirect.');
       return;
     }
 
     const checkBuyerProfile = async () => {
       console.log('📡 Checking buyer profile for user:', session.user.id);
-
-      const { data: profile, error } = await supabase
+      const { data: profile } = await supabase
         .from('buyers')
         .select('id')
         .eq('auth_id', session.user.id)
         .maybeSingle();
-
-      if (error) {
-        console.error('❌ Error fetching buyer profile:', error.message);
-      }
 
       if (profile) {
         console.log('✅ Buyer found — redirecting to dashboard');
@@ -48,48 +41,11 @@ function AuthRedirector() {
     checkBuyerProfile();
   }, [session, router, supabase]);
 
-  useEffect(() => {
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🔔 Auth event detected:', event, 'Path:', router.pathname, 'Force:', router.query.force);
-
-        if (
-          event === 'SIGNED_IN' &&
-          session?.user &&
-          router.pathname === '/' &&
-          router.query.force !== 'true'
-        ) {
-          console.log('🔁 Auth SIGNED_IN event triggered redirect check for user:', session.user.id);
-
-          const { data: profile } = await supabase
-            .from('buyers')
-            .select('id')
-            .eq('auth_id', session.user.id)
-            .maybeSingle();
-
-          if (profile) {
-            console.log('✅ Buyer found after SIGNED_IN — redirecting to dashboard');
-            router.replace('/buyer-dashboard');
-          } else {
-            console.log('🆕 No profile after SIGNED_IN — redirecting to onboarding');
-            router.replace('/buyer-onboarding');
-          }
-        } else if (router.query.force === 'true') {
-          console.log('✅ Auth event fired but Force=true is active. No redirect.');
-        }
-      }
-    );
-
-    return () => {
-      authListener?.subscription?.unsubscribe();
-    };
-  }, [router, supabase]);
-
   return null;
 }
 
 export default function App({ Component, pageProps }) {
-  const [supabaseClient] = useState(() => createBrowserSupabaseClient());
+  const [supabaseClient] = useState(() => createBrowserSupabaseClient()); // ✅ Single instance
 
   return (
     <SessionContextProvider supabaseClient={supabaseClient} initialSession={pageProps.initialSession}>
@@ -103,10 +59,7 @@ export default function App({ Component, pageProps }) {
           position="top-right"
           toastOptions={{
             duration: 3000,
-            style: {
-              background: '#333',
-              color: '#fff',
-            },
+            style: { background: '#333', color: '#fff' },
           }}
         />
       </div>
