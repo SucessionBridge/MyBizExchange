@@ -12,6 +12,7 @@ export default function BuyerDashboard() {
 
   const [buyerMessages, setBuyerMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
+  const [replyText, setReplyText] = useState({});
 
   useEffect(() => {
     const fetchProfileAndListings = async () => {
@@ -35,7 +36,7 @@ export default function BuyerDashboard() {
         setBuyerProfile(profileData);
         fetchSavedListings(profileData.email);
         fetchMatches(user.id);
-        fetchBuyerMessages(profileData.email); // ✅ Fetch messages here
+        fetchBuyerMessages(profileData.email);
       }
 
       setLoading(false);
@@ -75,8 +76,8 @@ export default function BuyerDashboard() {
     const { data, error } = await supabase
       .from('messages')
       .select('*')
-      .eq('buyer_email', email)
-      .order('created_at', { ascending: false });
+      .or(`buyer_email.eq.${email},seller_email.eq.${email}`)
+      .order('created_at', { ascending: true });
 
     if (error) {
       console.error('Error fetching buyer messages:', error);
@@ -84,6 +85,28 @@ export default function BuyerDashboard() {
       setBuyerMessages(data);
     }
     setLoadingMessages(false);
+  }
+
+  async function sendReply(listingId, sellerId) {
+    if (!replyText[listingId]) return;
+    const { error } = await supabase.from('messages').insert([
+      {
+        buyer_name: buyerProfile.name,
+        buyer_email: buyerProfile.email,
+        message: replyText[listingId],
+        seller_id: sellerId,
+        listing_id: listingId,
+        topic: 'business-inquiry',
+        is_deal_proposal: false,
+      }
+    ]);
+    if (error) {
+      console.error('Error sending reply:', error);
+      alert('❌ Failed to send message.');
+    } else {
+      setReplyText(prev => ({ ...prev, [listingId]: '' }));
+      fetchBuyerMessages(buyerProfile.email);
+    }
   }
 
   async function handleUnsave(listingId) {
@@ -158,7 +181,7 @@ export default function BuyerDashboard() {
         </div>
       )}
 
-      {/* ✅ Your existing profile card stays */}
+      {/* ✅ Profile Section */}
       {!buyerProfile ? (
         <div className="text-center">
           <p className="text-gray-700 mb-4">
@@ -213,6 +236,7 @@ export default function BuyerDashboard() {
             </button>
           </div>
 
+          {/* ✅ Saved Listings */}
           {savedListings.length > 0 && (
             <div className="bg-white p-6 rounded-xl shadow mb-10">
               <h2 className="text-xl font-semibold text-blue-800 mb-4">Saved Listings</h2>
@@ -249,29 +273,41 @@ export default function BuyerDashboard() {
             </div>
           )}
 
-          {/* ✅ My Messages Section */}
-          {buyerMessages.length > 0 && (
-            <div className="bg-white p-6 rounded-xl shadow mt-8">
-              <h2 className="text-xl font-semibold text-blue-800 mb-4">My Messages</h2>
-              {loadingMessages ? (
-                <p>Loading your messages...</p>
-              ) : (
-                <ul className="space-y-4">
-                  {buyerMessages.map((msg) => (
-                    <li key={msg.id} className="border p-4 rounded">
-                      <p className="text-gray-800"><strong>Message:</strong> {msg.message}</p>
-                      <p className="text-sm text-gray-600">
-                        Listing ID: {msg.listing_id} • Sent: {new Date(msg.created_at).toLocaleString()}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+          {/* ✅ Conversations Section */}
+          <div className="bg-white p-6 rounded-xl shadow mt-8">
+            <h2 className="text-xl font-semibold text-blue-800 mb-4">Your Conversations</h2>
+            {loadingMessages ? (
+              <p>Loading conversations...</p>
+            ) : buyerMessages.length === 0 ? (
+              <p className="text-gray-600">You haven't sent or received any messages yet.</p>
+            ) : (
+              buyerMessages.map((msg) => (
+                <div key={msg.id} className="border rounded p-3 mb-3">
+                  <p className={msg.buyer_email === buyerProfile.email ? "text-blue-700" : "text-green-700"}>
+                    <strong>{msg.buyer_email === buyerProfile.email ? "You" : "Seller"}:</strong> {msg.message}
+                  </p>
+                  <p className="text-xs text-gray-500">{new Date(msg.created_at).toLocaleString()}</p>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Reply..."
+                      value={replyText[msg.listing_id] || ""}
+                      onChange={(e) => setReplyText(prev => ({ ...prev, [msg.listing_id]: e.target.value }))}
+                      className="border p-1 rounded flex-1"
+                    />
+                    <button
+                      onClick={() => sendReply(msg.listing_id, msg.seller_id)}
+                      className="bg-blue-600 text-white px-3 py-1 rounded"
+                    >
+                      Send
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </>
       )}
     </div>
   );
 }
-
