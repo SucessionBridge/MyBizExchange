@@ -28,18 +28,22 @@ export default function SellerDashboard() {
   const [deletionTargetId, setDeletionTargetId] = useState(null);
   const [deleteReason, setDeleteReason] = useState('');
 
+  const [messages, setMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [replyText, setReplyText] = useState({});
+  const [sellerId, setSellerId] = useState(null);
+
   useEffect(() => {
     const fetchListings = async () => {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
 
       if (authError || !user) {
         setError("You must be logged in to view your listings.");
         setLoading(false);
         return;
       }
+
+      setSellerId(user.id);
 
       const { data, error } = await supabase
         .from('sellers')
@@ -51,6 +55,7 @@ export default function SellerDashboard() {
         setError("There was an issue loading your listings.");
       } else {
         setListings(data);
+        fetchSellerMessages(user.id);
       }
 
       setLoading(false);
@@ -58,6 +63,45 @@ export default function SellerDashboard() {
 
     fetchListings();
   }, []);
+
+  async function fetchSellerMessages(id) {
+    setLoadingMessages(true);
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('seller_id', id)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching messages:', error);
+    } else {
+      setMessages(data);
+    }
+    setLoadingMessages(false);
+  }
+
+  async function sendReply(listingId, buyerEmail, buyerName) {
+    if (!replyText[listingId]) return;
+    const { error } = await supabase.from('messages').insert([
+      {
+        buyer_name: buyerName,
+        buyer_email: buyerEmail,
+        message: replyText[listingId],
+        seller_id: sellerId,
+        listing_id: listingId,
+        topic: 'business-inquiry',
+        is_deal_proposal: false,
+        seller_email: buyerEmail // optional if you store it
+      }
+    ]);
+    if (error) {
+      console.error('Error sending reply:', error);
+      alert('❌ Failed to send message.');
+    } else {
+      setReplyText(prev => ({ ...prev, [listingId]: '' }));
+      fetchSellerMessages(sellerId);
+    }
+  }
 
   const handleDeleteClick = (id) => {
     setDeletionTargetId(id);
@@ -71,7 +115,6 @@ export default function SellerDashboard() {
 
   const handleConfirmDelete = async () => {
     if (!deletionTargetId) return;
-
     const confirmed = window.confirm(
       `Are you sure you want to delete this listing for reason: "${deleteReason || 'No reason provided'}"?`
     );
@@ -119,8 +162,6 @@ export default function SellerDashboard() {
   return (
     <main className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-3xl mx-auto">
-
-        {/* ✅ Top header with homepage button */}
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Seller Dashboard</h1>
           <button
@@ -137,66 +178,25 @@ export default function SellerDashboard() {
           <div className="space-y-6">
             {listings.map((listing) => (
               <div key={listing.id} className="bg-white p-6 rounded-xl shadow relative">
-                {deletionTargetId === listing.id && showReasonDropdown && (
-                  <div className="mt-4 space-y-2">
-                    <label className="block font-medium text-gray-700">
-                      Why are you deleting this listing?
-                    </label>
-                    <select
-                      className="w-full border p-2 rounded"
-                      value={deleteReason}
-                      onChange={(e) => setDeleteReason(e.target.value)}
-                    >
-                      <option value="">Select a reason</option>
-                      <option value="Business Sold">Business Sold</option>
-                      <option value="No Longer for Sale">No Longer for Sale</option>
-                      <option value="Created by Mistake">Created by Mistake</option>
-                      <option value="Other">Other</option>
-                    </select>
-
-                    <button
-                      onClick={handleConfirmDelete}
-                      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-                    >
-                      ✅ Confirm Delete
-                    </button>
-                  </div>
-                )}
-
+                {/* Listing details */}
                 <h2 className="text-xl font-semibold mb-1">{listing.business_name}</h2>
                 <p className="text-gray-700 mb-2">
                   {listing.industry} • {listing.location}
                 </p>
+                <p><strong>Asking Price:</strong> {formatCurrency(listing.asking_price)}</p>
+                <p><strong>Annual Revenue:</strong> {formatCurrency(listing.annual_revenue)}</p>
+                <p><strong>Annual Profit:</strong> {formatCurrency(listing.annual_profit)}</p>
+                <p><strong>Financing:</strong> {listing.financing_type}</p>
+                <p className="mt-2"><strong>Description:</strong><br />{listing.business_description}</p>
 
-                <p>
-                  <strong>Asking Price:</strong> {formatCurrency(listing.asking_price)}
-                </p>
-                <p>
-                  <strong>Annual Revenue:</strong> {formatCurrency(listing.annual_revenue)}
-                </p>
-                <p>
-                  <strong>Annual Profit:</strong> {formatCurrency(listing.annual_profit)}
-                </p>
-                <p>
-                  <strong>Financing:</strong> {listing.financing_type}
-                </p>
-                <p className="mt-2">
-                  <strong>Description:</strong>
-                  <br />
-                  {listing.business_description}
-                </p>
-
+                {/* Delete photo UI */}
                 {listing.images?.length > 0 && (
                   <div className="mt-4">
                     <h3 className="font-medium mb-2">Uploaded Photos</h3>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {listing.images.map((url, i) => (
                         <div key={i} className="relative">
-                          <img
-                            src={url}
-                            alt={`Image ${i + 1}`}
-                            className="rounded-md border h-32 w-full object-cover"
-                          />
+                          <img src={url} alt={`Image ${i + 1}`} className="rounded-md border h-32 w-full object-cover" />
                           <button
                             onClick={() => handleDeletePhoto(listing.id, url)}
                             className="absolute top-1 right-1 bg-red-600 text-white text-xs rounded-full px-2 py-1 hover:bg-red-700"
@@ -223,14 +223,12 @@ export default function SellerDashboard() {
                   >
                     📋 Copy Listing Link
                   </button>
-
                   <button
                     onClick={() => router.push(`/edit-listing/${listing.id}`)}
                     className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
                   >
                     ✏️ Edit Listing
                   </button>
-
                   {deletionTargetId !== listing.id && (
                     <button
                       onClick={() => handleDeleteClick(listing.id)}
@@ -245,7 +243,40 @@ export default function SellerDashboard() {
           </div>
         )}
 
-        {/* ✅ Bottom homepage button */}
+        {/* ✅ Conversations */}
+        <div className="bg-white p-6 rounded-xl shadow mt-8">
+          <h2 className="text-xl font-semibold text-blue-800 mb-4">Your Conversations</h2>
+          {loadingMessages ? (
+            <p>Loading messages...</p>
+          ) : messages.length === 0 ? (
+            <p className="text-gray-600">No messages yet.</p>
+          ) : (
+            messages.map((msg) => (
+              <div key={msg.id} className="border rounded p-3 mb-3">
+                <p className={msg.buyer_email ? "text-blue-700" : "text-green-700"}>
+                  <strong>{msg.buyer_email ? msg.buyer_name : "You"}:</strong> {msg.message}
+                </p>
+                <p className="text-xs text-gray-500">{new Date(msg.created_at).toLocaleString()}</p>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Reply..."
+                    value={replyText[msg.listing_id] || ""}
+                    onChange={(e) => setReplyText(prev => ({ ...prev, [msg.listing_id]: e.target.value }))}
+                    className="border p-1 rounded flex-1"
+                  />
+                  <button
+                    onClick={() => sendReply(msg.listing_id, msg.buyer_email, msg.buyer_name)}
+                    className="bg-blue-600 text-white px-3 py-1 rounded"
+                  >
+                    Send
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
         <div className="text-center mt-8">
           <button
             onClick={() => router.push('/?force=true')}
