@@ -132,9 +132,24 @@ export default function BuyerDashboard() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6 text-blue-900 text-center">
-        {buyerProfile?.name ? `Welcome back, ${buyerProfile.name}` : 'Buyer Dashboard'}
-      </h1>
+      {/* ✅ Header bar */}
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-blue-900">Buyer Dashboard</h1>
+        <div className="flex gap-3">
+          <button
+            onClick={() => router.push('/?force=true')}
+            className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
+          >
+            🏠 Home
+          </button>
+          <button
+            onClick={() => router.push('/deal-builder')}
+            className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
+          >
+            🤝 AI Deal Maker
+          </button>
+        </div>
+      </div>
 
       {/* ✅ Matches Section */}
       {buyerProfile && (
@@ -150,13 +165,13 @@ export default function BuyerDashboard() {
                   onClick={() => router.push('/listings')}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
                 >
-                  🔍 Browse All Marketplace Listings
+                  🔍 Browse Listings
                 </button>
                 <button
                   onClick={() => router.push('/?force=true')}
                   className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
                 >
-                  🏠 Go to Homepage
+                  🏠 Homepage
                 </button>
               </div>
             </div>
@@ -311,3 +326,4 @@ export default function BuyerDashboard() {
     </div>
   );
 }
+
