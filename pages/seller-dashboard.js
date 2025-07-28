@@ -28,14 +28,17 @@ export default function SellerDashboard() {
   const [deletionTargetId, setDeletionTargetId] = useState(null);
   const [deleteReason, setDeleteReason] = useState('');
 
+  // ✅ New state for conversations
   const [messages, setMessages] = useState([]);
-  const [loadingMessages, setLoadingMessages] = useState(true);
-  const [replyText, setReplyText] = useState({});
-  const [sellerId, setSellerId] = useState(null);
+  const [replyInput, setReplyInput] = useState({});
+  const [sending, setSending] = useState(false);
 
   useEffect(() => {
     const fetchListings = async () => {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
 
       if (authError || !user) {
         setError("You must be logged in to view your listings.");
@@ -43,65 +46,65 @@ export default function SellerDashboard() {
         return;
       }
 
-      setSellerId(user.id);
-
-      const { data, error } = await supabase
+      const { data: sellerListings, error: listingError } = await supabase
         .from('sellers')
         .select('*')
         .eq('email', user.email);
 
-      if (error) {
-        console.error('Error loading listings:', error);
+      if (listingError) {
+        console.error('Error loading listings:', listingError);
         setError("There was an issue loading your listings.");
       } else {
-        setListings(data);
-        fetchSellerMessages(user.id);
+        setListings(sellerListings);
+        fetchMessages(sellerListings.map(l => l.id));
       }
 
       setLoading(false);
     };
 
     fetchListings();
+    const interval = setInterval(() => {
+      if (listings.length > 0) {
+        fetchMessages(listings.map(l => l.id));
+      }
+    }, 5000); // auto-refresh messages every 5s
+    return () => clearInterval(interval);
   }, []);
 
-  async function fetchSellerMessages(id) {
-    setLoadingMessages(true);
+  const fetchMessages = async (listingIds) => {
+    if (!listingIds || listingIds.length === 0) return;
+
     const { data, error } = await supabase
       .from('messages')
       .select('*')
-      .eq('seller_id', id)
+      .in('listing_id', listingIds)
       .order('created_at', { ascending: true });
 
-    if (error) {
-      console.error('Error fetching messages:', error);
-    } else {
-      setMessages(data);
-    }
-    setLoadingMessages(false);
-  }
+    if (!error) setMessages(data || []);
+  };
 
-  async function sendReply(listingId, buyerEmail, buyerName) {
-    if (!replyText[listingId]) return;
+  const handleSendReply = async (listingId, buyerEmail) => {
+    if (!replyInput[listingId]?.trim()) return;
+    setSending(true);
+
     const { error } = await supabase.from('messages').insert([
       {
-        buyer_name: buyerName,
+        message: replyInput[listingId],
+        seller_id: listingId,
         buyer_email: buyerEmail,
-        message: replyText[listingId],
-        seller_id: sellerId,
-        listing_id: listingId,
-        topic: 'business-inquiry',
+        topic: 'reply',
         is_deal_proposal: false,
-        seller_email: buyerEmail // optional if you store it
-      }
+        extension: 'successionbridge',
+        listing_id: listingId,
+      },
     ]);
-    if (error) {
-      console.error('Error sending reply:', error);
-      alert('❌ Failed to send message.');
-    } else {
-      setReplyText(prev => ({ ...prev, [listingId]: '' }));
-      fetchSellerMessages(sellerId);
+
+    if (!error) {
+      setReplyInput((prev) => ({ ...prev, [listingId]: '' }));
+      fetchMessages([listingId]);
     }
-  }
+    setSending(false);
+  };
 
   const handleDeleteClick = (id) => {
     setDeletionTargetId(id);
@@ -115,6 +118,7 @@ export default function SellerDashboard() {
 
   const handleConfirmDelete = async () => {
     if (!deletionTargetId) return;
+
     const confirmed = window.confirm(
       `Are you sure you want to delete this listing for reason: "${deleteReason || 'No reason provided'}"?`
     );
@@ -162,6 +166,7 @@ export default function SellerDashboard() {
   return (
     <main className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-3xl mx-auto">
+
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold">Seller Dashboard</h1>
           <button
@@ -178,18 +183,17 @@ export default function SellerDashboard() {
           <div className="space-y-6">
             {listings.map((listing) => (
               <div key={listing.id} className="bg-white p-6 rounded-xl shadow relative">
-                {/* Listing details */}
                 <h2 className="text-xl font-semibold mb-1">{listing.business_name}</h2>
                 <p className="text-gray-700 mb-2">
                   {listing.industry} • {listing.location}
                 </p>
+
                 <p><strong>Asking Price:</strong> {formatCurrency(listing.asking_price)}</p>
                 <p><strong>Annual Revenue:</strong> {formatCurrency(listing.annual_revenue)}</p>
                 <p><strong>Annual Profit:</strong> {formatCurrency(listing.annual_profit)}</p>
                 <p><strong>Financing:</strong> {listing.financing_type}</p>
                 <p className="mt-2"><strong>Description:</strong><br />{listing.business_description}</p>
 
-                {/* Delete photo UI */}
                 {listing.images?.length > 0 && (
                   <div className="mt-4">
                     <h3 className="font-medium mb-2">Uploaded Photos</h3>
@@ -223,12 +227,14 @@ export default function SellerDashboard() {
                   >
                     📋 Copy Listing Link
                   </button>
+
                   <button
                     onClick={() => router.push(`/edit-listing/${listing.id}`)}
                     className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
                   >
                     ✏️ Edit Listing
                   </button>
+
                   {deletionTargetId !== listing.id && (
                     <button
                       onClick={() => handleDeleteClick(listing.id)}
@@ -238,54 +244,58 @@ export default function SellerDashboard() {
                     </button>
                   )}
                 </div>
+
+                {/* ✅ Conversations */}
+                <div className="mt-6 bg-gray-50 border rounded-lg p-4">
+                  <h3 className="font-semibold text-blue-800 mb-2">Messages for this Listing</h3>
+                  {messages.filter(m => m.listing_id === listing.id).length === 0 ? (
+                    <p className="text-gray-600 text-sm">No messages yet.</p>
+                  ) : (
+                    <ul className="space-y-2 max-h-60 overflow-y-auto">
+                      {messages
+                        .filter(m => m.listing_id === listing.id)
+                        .map((msg) => (
+                          <li
+                            key={msg.id}
+                            className={`p-2 rounded ${
+                              msg.buyer_email ? 'bg-blue-100 text-blue-900' : 'bg-green-100 text-green-900'
+                            }`}
+                          >
+                            <p>{msg.message}</p>
+                            <span className="block text-xs text-gray-500 mt-1">
+                              {new Date(msg.created_at).toLocaleString()}
+                            </span>
+                          </li>
+                        ))}
+                    </ul>
+                  )}
+
+                  <div className="flex mt-3 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Type a reply..."
+                      value={replyInput[listing.id] || ''}
+                      onChange={(e) =>
+                        setReplyInput((prev) => ({ ...prev, [listing.id]: e.target.value }))
+                      }
+                      className="flex-1 border rounded px-3 py-2"
+                    />
+                    <button
+                      onClick={() => handleSendReply(listing.id, messages.find(m => m.listing_id === listing.id)?.buyer_email)}
+                      disabled={sending}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+                    >
+                      Send
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         )}
-
-        {/* ✅ Conversations */}
-        <div className="bg-white p-6 rounded-xl shadow mt-8">
-          <h2 className="text-xl font-semibold text-blue-800 mb-4">Your Conversations</h2>
-          {loadingMessages ? (
-            <p>Loading messages...</p>
-          ) : messages.length === 0 ? (
-            <p className="text-gray-600">No messages yet.</p>
-          ) : (
-            messages.map((msg) => (
-              <div key={msg.id} className="border rounded p-3 mb-3">
-                <p className={msg.buyer_email ? "text-blue-700" : "text-green-700"}>
-                  <strong>{msg.buyer_email ? msg.buyer_name : "You"}:</strong> {msg.message}
-                </p>
-                <p className="text-xs text-gray-500">{new Date(msg.created_at).toLocaleString()}</p>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Reply..."
-                    value={replyText[msg.listing_id] || ""}
-                    onChange={(e) => setReplyText(prev => ({ ...prev, [msg.listing_id]: e.target.value }))}
-                    className="border p-1 rounded flex-1"
-                  />
-                  <button
-                    onClick={() => sendReply(msg.listing_id, msg.buyer_email, msg.buyer_name)}
-                    className="bg-blue-600 text-white px-3 py-1 rounded"
-                  >
-                    Send
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="text-center mt-8">
-          <button
-            onClick={() => router.push('/?force=true')}
-            className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
-          >
-            🏠 Go to Homepage
-          </button>
-        </div>
       </div>
     </main>
   );
 }
+
+
