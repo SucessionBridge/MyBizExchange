@@ -13,15 +13,28 @@ function AuthRedirector() {
   const supabase = useSupabaseClient();
 
   useEffect(() => {
+    console.log('🔍 AuthRedirector running. Path:', router.pathname, 'Force:', router.query.force, 'User:', session?.user?.id);
+
     // ✅ Skip redirect if user clicked home logo with ?force=true
-    if (!session?.user || router.pathname !== '/' || router.query.force === 'true') return;
+    if (!session?.user || router.pathname !== '/' || router.query.force === 'true') {
+      if (router.query.force === 'true') {
+        console.log('✅ Force=true detected. Skipping redirect to allow homepage view.');
+      }
+      return;
+    }
 
     const checkBuyerProfile = async () => {
-      const { data: profile } = await supabase
+      console.log('📡 Checking buyer profile for user:', session.user.id);
+
+      const { data: profile, error } = await supabase
         .from('buyers')
         .select('id')
         .eq('auth_id', session.user.id)
         .maybeSingle();
+
+      if (error) {
+        console.error('❌ Error fetching buyer profile:', error.message);
+      }
 
       if (profile) {
         console.log('✅ Buyer found — redirecting to dashboard');
@@ -38,13 +51,16 @@ function AuthRedirector() {
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('🔔 Auth event detected:', event, 'Path:', router.pathname, 'Force:', router.query.force);
+
         if (
           event === 'SIGNED_IN' &&
           session?.user &&
           router.pathname === '/' &&
-          router.query.force !== 'true' // ✅ Added same bypass here
+          router.query.force !== 'true'
         ) {
-          console.log('🔁 Auth SIGNED_IN event detected');
+          console.log('🔁 Auth SIGNED_IN event triggered redirect check for user:', session.user.id);
+
           const { data: profile } = await supabase
             .from('buyers')
             .select('id')
@@ -52,10 +68,14 @@ function AuthRedirector() {
             .maybeSingle();
 
           if (profile) {
+            console.log('✅ Buyer found after SIGNED_IN — redirecting to dashboard');
             router.replace('/buyer-dashboard');
           } else {
+            console.log('🆕 No profile after SIGNED_IN — redirecting to onboarding');
             router.replace('/buyer-onboarding');
           }
+        } else if (router.query.force === 'true') {
+          console.log('✅ Auth event fired but Force=true is active. No redirect.');
         }
       }
     );
@@ -93,4 +113,5 @@ export default function App({ Component, pageProps }) {
     </SessionContextProvider>
   );
 }
+
 
