@@ -13,7 +13,7 @@ function AuthRedirector() {
   const supabase = useSupabaseClient();
 
   useEffect(() => {
-    // ✅ Skip redirect if user intentionally clicked the home logo with ?force=true
+    // ✅ Skip redirect if user clicked home logo with ?force=true
     if (!session?.user || router.pathname !== '/' || router.query.force === 'true') return;
 
     const checkBuyerProfile = async () => {
@@ -38,7 +38,12 @@ function AuthRedirector() {
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user && router.pathname === '/') {
+        if (
+          event === 'SIGNED_IN' &&
+          session?.user &&
+          router.pathname === '/' &&
+          router.query.force !== 'true' // ✅ Added same bypass here
+        ) {
           console.log('🔁 Auth SIGNED_IN event detected');
           const { data: profile } = await supabase
             .from('buyers')
@@ -88,3 +93,4 @@ export default function App({ Component, pageProps }) {
     </SessionContextProvider>
   );
 }
+
