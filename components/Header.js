@@ -7,7 +7,6 @@ import { toast } from 'react-hot-toast';
 
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasBuyerProfile, setHasBuyerProfile] = useState(false);
   const [user, setUser] = useState(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const router = useRouter();
@@ -16,20 +15,11 @@ export default function Header() {
   const toggleDropdown = () => setDropdownOpen(!dropdownOpen);
 
   useEffect(() => {
-    const checkProfile = async () => {
+    const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
-
-      if (user) {
-        const { data } = await supabase
-          .from('buyers')
-          .select('*')
-          .eq('auth_id', user.id)
-          .maybeSingle();
-        if (data) setHasBuyerProfile(true);
-      }
     };
-    checkProfile();
+    checkUser();
   }, []);
 
   const handleLogout = async () => {
@@ -40,9 +30,9 @@ export default function Header() {
   return (
     <header className="bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-        {/* ✅ Force homepage bypass with ?force=true */}
+        {/* ✅ Homepage logo bypass redirect */}
         <Link href="/?force=true">
-          <a className="flex items-center text-2xl font-serif font-bold">
+          <span className="flex items-center text-2xl font-serif font-bold cursor-pointer">
             <span className="text-[#2E3A59]">Succession</span>
             <span className="text-[#F59E0B] flex items-center relative">
               Bridge
@@ -61,16 +51,16 @@ export default function Header() {
                 <path d="M95 60V20h4v40z" fill="#F59E0B" />
               </svg>
             </span>
-          </a>
+          </span>
         </Link>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex space-x-6 text-sm font-medium items-center">
-          <Link href="/listings"><a className="hover:text-blue-600">Buy a Business</a></Link>
-          <Link href="/sellers"><a className="hover:text-blue-600">Sell a Business</a></Link>
-          <Link href="/business-valuation"><a className="hover:text-blue-600">Value Your Business</a></Link>
-          <Link href="/scorecard"><a className="hover:text-blue-600">Sellability Scorecard</a></Link>
-          <Link href="/guides"><a className="hover:text-blue-600">Guides & Tools</a></Link>
+          <Link href="/listings"><span className="hover:text-blue-600 cursor-pointer">Buy a Business</span></Link>
+          <Link href="/sellers"><span className="hover:text-blue-600 cursor-pointer">Sell a Business</span></Link>
+          <Link href="/business-valuation"><span className="hover:text-blue-600 cursor-pointer">Value Your Business</span></Link>
+          <Link href="/scorecard"><span className="hover:text-blue-600 cursor-pointer">Sellability Scorecard</span></Link>
+          <Link href="/guides"><span className="hover:text-blue-600 cursor-pointer">Guides & Tools</span></Link>
 
           {user && (
             <div className="relative">
@@ -114,7 +104,7 @@ export default function Header() {
           )}
 
           {!user && (
-            <Link href="/login"><a className="hover:text-blue-600">Login</a></Link>
+            <Link href="/login"><span className="hover:text-blue-600 cursor-pointer">Login</span></Link>
           )}
         </nav>
 
@@ -130,11 +120,11 @@ export default function Header() {
       {isOpen && (
         <div className="md:hidden bg-white border-t">
           <nav className="flex flex-col px-4 py-2 space-y-2 text-sm font-medium">
-            <Link href="/listings"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Buy a Business</a></Link>
-            <Link href="/sellers"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Sell a Business</a></Link>
-            <Link href="/business-valuation"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Value Your Business</a></Link>
-            <Link href="/scorecard"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Sellability Scorecard</a></Link>
-            <Link href="/guides"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Guides & Tools</a></Link>
+            <Link href="/listings"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Buy a Business</span></Link>
+            <Link href="/sellers"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Sell a Business</span></Link>
+            <Link href="/business-valuation"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Value Your Business</span></Link>
+            <Link href="/scorecard"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Sellability Scorecard</span></Link>
+            <Link href="/guides"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Guides & Tools</span></Link>
 
             {user && (
               <>
@@ -165,7 +155,7 @@ export default function Header() {
             )}
 
             {!user && (
-              <Link href="/login"><a onClick={() => setIsOpen(false)} className="hover:text-blue-600">Login</a></Link>
+              <Link href="/login"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Login</span></Link>
             )}
           </nav>
         </div>
@@ -173,3 +163,4 @@ export default function Header() {
     </header>
   );
 }
+
