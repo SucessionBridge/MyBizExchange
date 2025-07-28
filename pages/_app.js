@@ -4,7 +4,7 @@ import Header from '../components/Header';
 import { useEffect } from 'react';
 import { SessionContextProvider, useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
-import supabase from '../lib/supabaseClient'; // ✅ Use the single shared instance
+import supabase from '../lib/supabaseClient'; // ✅ Use single shared instance
 import { Toaster } from 'react-hot-toast';
 
 function AuthRedirector() {
@@ -15,7 +15,7 @@ function AuthRedirector() {
   useEffect(() => {
     console.log('🔍 AuthRedirector Path:', router.pathname, 'Force:', router.query.force, 'User:', session?.user?.id);
 
-    // ✅ Skip redirect if user clicked home with ?force=true
+    // ✅ Skip redirect if no user or clicked home with ?force=true
     if (!session?.user || router.pathname !== '/' || router.query.force === 'true') {
       if (router.query.force === 'true') {
         console.log('✅ Force=true detected. Skipping redirect to allow homepage view.');
@@ -26,13 +26,11 @@ function AuthRedirector() {
     const checkBuyerProfile = async () => {
       console.log('📡 Checking buyer profile for user:', session.user.id);
 
-      const { data: profile, error } = await sb
+      const { data: profile } = await sb
         .from('buyers')
         .select('id')
         .eq('auth_id', session.user.id)
         .maybeSingle();
-
-      if (error) console.error('❌ Error fetching buyer profile:', error.message);
 
       if (profile) {
         console.log('✅ Buyer found — redirecting to dashboard');
@@ -48,7 +46,7 @@ function AuthRedirector() {
 
   useEffect(() => {
     const { data: authListener } = sb.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔔 Auth event detected:', event, 'Path:', router.pathname, 'Force:', router.query.force);
+      console.log('🔔 Auth event:', event, 'Path:', router.pathname);
 
       if (
         event === 'SIGNED_IN' &&
@@ -56,8 +54,6 @@ function AuthRedirector() {
         router.pathname === '/' &&
         router.query.force !== 'true'
       ) {
-        console.log('🔁 Auth SIGNED_IN event triggered for user:', session.user.id);
-
         const { data: profile } = await sb
           .from('buyers')
           .select('id')
@@ -65,20 +61,14 @@ function AuthRedirector() {
           .maybeSingle();
 
         if (profile) {
-          console.log('✅ Buyer found after SIGNED_IN — redirecting to dashboard');
           router.replace('/buyer-dashboard');
         } else {
-          console.log('🆕 No profile after SIGNED_IN — redirecting to onboarding');
           router.replace('/buyer-onboarding');
         }
-      } else if (router.query.force === 'true') {
-        console.log('✅ Auth event fired but Force=true active. No redirect.');
       }
     });
 
-    return () => {
-      authListener?.subscription?.unsubscribe();
-    };
+    return () => authListener?.subscription?.unsubscribe();
   }, [router, sb]);
 
   return null;
@@ -107,6 +97,7 @@ export default function App({ Component, pageProps }) {
     </SessionContextProvider>
   );
 }
+
 
 
 
