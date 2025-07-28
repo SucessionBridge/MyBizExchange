@@ -8,6 +8,12 @@ export default function Home() {
 
   useEffect(() => {
     const checkUserAndRedirect = async () => {
+      // ✅ Skip redirect if user clicked logo with ?force=true
+      if (router.query.force === 'true') {
+        console.log("✅ Force=true detected on index.js. Skipping redirect.");
+        return;
+      }
+
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -20,15 +26,17 @@ export default function Home() {
           .maybeSingle();
 
         if (buyerProfile) {
+          console.log("✅ Buyer profile found. Redirecting to dashboard.");
           router.push("/buyer-dashboard");
         } else {
+          console.log("🆕 No buyer profile. Redirecting to onboarding.");
           router.push("/buyer-onboarding");
         }
       }
     };
 
     checkUserAndRedirect();
-  }, []);
+  }, [router]);
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937] font-sans">
@@ -102,25 +110,24 @@ export default function Home() {
           </div>
         </section>
 
-       {/* Sellers Section */}
-<section className="bg-white rounded-xl p-10 mb-12 border border-gray-200 shadow-sm">
-  <div className="text-center">
-    <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">
-      Are You a Seller?
-    </h2>
-    <p className="text-lg text-gray-700 mb-6">
-      Maximize your legacy and attract the right buyer with the power of our 
-      <span className="font-semibold text-blue-600"> AI Business Broker</span>. 
-      Get AI-enhanced listings, accurate valuations, and intelligent buyer matching — all without paying high broker fees.
-    </p>
-    <Link href="/sellers">
-      <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white py-3 px-6 rounded-lg text-lg font-semibold inline-block">
-        List Your Business
-      </a>
-    </Link>
-  </div>
-</section>
-
+        {/* Sellers Section */}
+        <section className="bg-white rounded-xl p-10 mb-12 border border-gray-200 shadow-sm">
+          <div className="text-center">
+            <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">
+              Are You a Seller?
+            </h2>
+            <p className="text-lg text-gray-700 mb-6">
+              Maximize your legacy and attract the right buyer with the power of our 
+              <span className="font-semibold text-blue-600"> AI Business Broker</span>. 
+              Get AI-enhanced listings, accurate valuations, and intelligent buyer matching — all without paying high broker fees.
+            </p>
+            <Link href="/sellers">
+              <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white py-3 px-6 rounded-lg text-lg font-semibold inline-block">
+                List Your Business
+              </a>
+            </Link>
+          </div>
+        </section>
 
         <section className="bg-[#E0F2FE] rounded-xl p-10 mb-12 border border-blue-100">
           <div className="text-center">
@@ -135,22 +142,21 @@ export default function Home() {
           </div>
         </section>
 
-       {/* Buyer Section */}
-<section className="bg-white rounded-xl p-10 mb-12 border border-gray-200">
-  <div className="text-center">
-    <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">Are You a Buyer?</h2>
-    <p className="text-lg text-gray-700 mb-6">
-      Unlock <span className="font-semibold text-blue-600">AI-powered tools</span> to find the perfect business. 
-      Use our <strong>Deal Maker</strong> to structure creative offers and get <strong>AI-matched</strong> with opportunities tailored to you.
-    </p>
-    <Link href="/listings">
-      <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white py-3 px-6 rounded-lg text-lg font-semibold inline-block">
-        Browse Businesses
-      </a>
-    </Link>
-  </div>
-</section>
-
+        {/* Buyer Section */}
+        <section className="bg-white rounded-xl p-10 mb-12 border border-gray-200">
+          <div className="text-center">
+            <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">Are You a Buyer?</h2>
+            <p className="text-lg text-gray-700 mb-6">
+              Unlock <span className="font-semibold text-blue-600">AI-powered tools</span> to find the perfect business. 
+              Use our <strong>Deal Maker</strong> to structure creative offers and get <strong>AI-matched</strong> with opportunities tailored to you.
+            </p>
+            <Link href="/listings">
+              <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white py-3 px-6 rounded-lg text-lg font-semibold inline-block">
+                Browse Businesses
+              </a>
+            </Link>
+          </div>
+        </section>
 
       </div>
     </main>
