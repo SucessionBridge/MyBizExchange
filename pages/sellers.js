@@ -379,7 +379,7 @@ seller_financing_considered: formData.seller_financing_considered,
           Written by Seller:
           <button
             type="button"
-            onClick={() => openEditModal('manual')}
+            onClick={() => openModal('manual')}
             className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded"
           >
             ✏️ Edit
@@ -395,7 +395,7 @@ seller_financing_considered: formData.seller_financing_considered,
           AI-Enhanced Version:
           <button
             type="button"
-            onClick={() => openEditModal('ai')}
+            onClick={() => openModal('ai')}
             className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded"
           >
             ✏️ Edit
