@@ -1,13 +1,13 @@
 // pages/seller-dashboard.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import supabase from "../lib/supabaseClient"; // ✅ correct
+import supabase from "../lib/supabaseClient";
 
 const deleteImageFromStorage = async (imageUrl) => {
   try {
     const url = new URL(imageUrl);
     const pathParts = url.pathname.split('/');
-    const filePath = pathParts.slice(3).join('/'); // removes '/storage/v1/object/public/seller-images/'
+    const filePath = pathParts.slice(3).join('/');
 
     const { error } = await supabase.storage
       .from('seller-images')
@@ -22,13 +22,11 @@ const deleteImageFromStorage = async (imageUrl) => {
 export default function SellerDashboard() {
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [sellerEmail, setSellerEmail] = useState('');
   const [error, setError] = useState('');
   const router = useRouter();
-    const [showReasonDropdown, setShowReasonDropdown] = useState(false);
+  const [showReasonDropdown, setShowReasonDropdown] = useState(false);
   const [deletionTargetId, setDeletionTargetId] = useState(null);
-  const [selectedReason, setSelectedReason] = useState('');
-
+  const [deleteReason, setDeleteReason] = useState('');
 
   useEffect(() => {
     const fetchListings = async () => {
@@ -42,8 +40,6 @@ export default function SellerDashboard() {
         setLoading(false);
         return;
       }
-
-      setSellerEmail(user.email);
 
       const { data, error } = await supabase
         .from('sellers')
@@ -63,79 +59,59 @@ export default function SellerDashboard() {
     fetchListings();
   }, []);
 
-const handleDeleteClick = (id) => {
-  setDeletionTargetId(id);
-  setShowReasonDropdown(true);
-};
+  const handleDeleteClick = (id) => {
+    setDeletionTargetId(id);
+    setShowReasonDropdown(true);
+  };
 
-const formatCurrency = (val) =>
-  val ? `$${parseFloat(val).toLocaleString()}` : 'N/A';
+  const formatCurrency = (val) =>
+    val ? `$${parseFloat(val).toLocaleString()}` : 'N/A';
 
-const getPublicListingUrl = (id) => `${window.location.origin}/listings/${id}`;
+  const getPublicListingUrl = (id) => `${window.location.origin}/listings/${id}`;
 
-// ✅ FULL handleConfirmDelete
-const handleConfirmDelete = async () => {
-  if (!deletionTargetId) return;
+  const handleConfirmDelete = async () => {
+    if (!deletionTargetId) return;
 
-  const confirmed = window.confirm(
-    `Are you sure you want to delete this listing for reason: "${deleteReason || 'No reason provided'}"?`
-  );
-  if (!confirmed) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete this listing for reason: "${deleteReason || 'No reason provided'}"?`
+    );
+    if (!confirmed) return;
 
-  const { error: updateError } = await supabase
-    .from('sellers')
-    .update({ delete_reason: deleteReason || 'No reason provided' })
-    .eq('id', deletionTargetId);
+    await supabase
+      .from('sellers')
+      .update({ delete_reason: deleteReason || 'No reason provided' })
+      .eq('id', deletionTargetId);
 
-  if (updateError) {
-    alert('❌ Failed to record delete reason.');
-    console.error(updateError);
-    return;
-  }
+    await supabase
+      .from('sellers')
+      .delete()
+      .eq('id', deletionTargetId);
 
-  const { error: deleteError } = await supabase
-    .from('sellers')
-    .delete()
-    .eq('id', deletionTargetId);
-
-  if (deleteError) {
-    alert('❌ Error deleting listing.');
-    console.error(deleteError);
-  } else {
     setListings((prev) => prev.filter((l) => l.id !== deletionTargetId));
     setShowReasonDropdown(false);
     setDeleteReason('');
     setDeletionTargetId(null);
     alert('✅ Listing deleted successfully.');
-  }
-};
+  };
 
-// ✅ Now define handleDeletePhoto AFTER ^ is complete
-const handleDeletePhoto = async (listingId, imageUrl) => {
-  const confirmed = window.confirm('Are you sure you want to delete this photo?');
-  if (!confirmed) return;
+  const handleDeletePhoto = async (listingId, imageUrl) => {
+    const confirmed = window.confirm('Are you sure you want to delete this photo?');
+    if (!confirmed) return;
 
-  await deleteImageFromStorage(imageUrl);
+    await deleteImageFromStorage(imageUrl);
 
-  const listing = listings.find((l) => l.id === listingId);
-  const updatedImages = listing.images.filter((url) => url !== imageUrl);
+    const listing = listings.find((l) => l.id === listingId);
+    const updatedImages = listing.images.filter((url) => url !== imageUrl);
 
-  const { error } = await supabase
-    .from('sellers')
-    .update({ images: updatedImages })
-    .eq('id', listingId);
+    await supabase
+      .from('sellers')
+      .update({ images: updatedImages })
+      .eq('id', listingId);
 
-  if (error) {
-    alert('❌ Failed to update listing after deleting image.');
-    console.error(error);
-    return;
-  }
-
-  setListings((prev) =>
-    prev.map((l) => (l.id === listingId ? { ...l, images: updatedImages } : l))
-  );
-};
-
+    setListings((prev) =>
+      prev.map((l) => (l.id === listingId ? { ...l, images: updatedImages } : l))
+    );
+  };
 
   if (loading) return <div className="p-6">Loading your listings...</div>;
   if (error) return <div className="p-6 text-red-600">{error}</div>;
@@ -143,7 +119,17 @@ const handleDeletePhoto = async (listingId, imageUrl) => {
   return (
     <main className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-3xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-center">Seller Dashboard</h1>
+
+        {/* ✅ Top header with homepage button */}
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Seller Dashboard</h1>
+          <button
+            onClick={() => router.push('/?force=true')}
+            className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
+          >
+            🏠 Go to Homepage
+          </button>
+        </div>
 
         {listings.length === 0 ? (
           <p className="text-center text-gray-600">You have no listings yet.</p>
@@ -151,31 +137,31 @@ const handleDeletePhoto = async (listingId, imageUrl) => {
           <div className="space-y-6">
             {listings.map((listing) => (
               <div key={listing.id} className="bg-white p-6 rounded-xl shadow relative">
-          {deletionTargetId === listing.id && showReasonDropdown && (
-  <div className="mt-4 space-y-2">
-    <label className="block font-medium text-gray-700">
-      Why are you deleting this listing?
-    </label>
-    <select
-      className="w-full border p-2 rounded"
-      value={deleteReason}
-      onChange={(e) => setDeleteReason(e.target.value)}
-    >
-      <option value="">Select a reason</option>
-      <option value="Business Sold">Business Sold</option>
-      <option value="No Longer for Sale">No Longer for Sale</option>
-      <option value="Created by Mistake">Created by Mistake</option>
-      <option value="Other">Other</option>
-    </select>
+                {deletionTargetId === listing.id && showReasonDropdown && (
+                  <div className="mt-4 space-y-2">
+                    <label className="block font-medium text-gray-700">
+                      Why are you deleting this listing?
+                    </label>
+                    <select
+                      className="w-full border p-2 rounded"
+                      value={deleteReason}
+                      onChange={(e) => setDeleteReason(e.target.value)}
+                    >
+                      <option value="">Select a reason</option>
+                      <option value="Business Sold">Business Sold</option>
+                      <option value="No Longer for Sale">No Longer for Sale</option>
+                      <option value="Created by Mistake">Created by Mistake</option>
+                      <option value="Other">Other</option>
+                    </select>
 
-    <button
-      onClick={handleConfirmDelete}
-      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-    >
-      ✅ Confirm Delete
-    </button>
-  </div>
-)}
+                    <button
+                      onClick={handleConfirmDelete}
+                      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                    >
+                      ✅ Confirm Delete
+                    </button>
+                  </div>
+                )}
 
                 <h2 className="text-xl font-semibold mb-1">{listing.business_name}</h2>
                 <p className="text-gray-700 mb-2">
@@ -200,67 +186,74 @@ const handleDeletePhoto = async (listingId, imageUrl) => {
                   {listing.business_description}
                 </p>
 
-{listing.images?.length > 0 && (
-  <div className="mt-4">
-    <h3 className="font-medium mb-2">Uploaded Photos</h3>
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-      {listing.images.map((url, i) => (
-        <div key={i} className="relative">
-          <img
-            src={url}
-            alt={`Image ${i + 1}`}
-            className="rounded-md border h-32 w-full object-cover"
-          />
-          <button
-            onClick={() => handleDeletePhoto(listing.id, url)}
-            className="absolute top-1 right-1 bg-red-600 text-white text-xs rounded-full px-2 py-1 hover:bg-red-700"
-          >
-            ❌
-          </button>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-
-                
+                {listing.images?.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="font-medium mb-2">Uploaded Photos</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {listing.images.map((url, i) => (
+                        <div key={i} className="relative">
+                          <img
+                            src={url}
+                            alt={`Image ${i + 1}`}
+                            className="rounded-md border h-32 w-full object-cover"
+                          />
+                          <button
+                            onClick={() => handleDeletePhoto(listing.id, url)}
+                            className="absolute top-1 right-1 bg-red-600 text-white text-xs rounded-full px-2 py-1 hover:bg-red-700"
+                          >
+                            ❌
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <p className="mt-4 text-sm text-gray-500">
                   Submitted: {new Date(listing.created_at).toLocaleDateString()}
                 </p>
-<div className="mt-4 flex flex-wrap gap-3">
-  <button
-    onClick={() => {
-      navigator.clipboard.writeText(getPublicListingUrl(listing.id));
-      alert('✅ Link copied to clipboard!');
-    }}
-    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-  >
-    📋 Copy Listing Link
-  </button>
 
-  <button
-    onClick={() => router.push(`/edit-listing/${listing.id}`)}
-    className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
-  >
-    ✏️ Edit Listing
-  </button>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(getPublicListingUrl(listing.id));
+                      alert('✅ Link copied to clipboard!');
+                    }}
+                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                  >
+                    📋 Copy Listing Link
+                  </button>
 
-  {deletionTargetId !== listing.id && (
-    <button
-      onClick={() => handleDeleteClick(listing.id)}
-      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-    >
-      🗑️ Delete Listing
-    </button>
-  )}
-</div>
+                  <button
+                    onClick={() => router.push(`/edit-listing/${listing.id}`)}
+                    className="bg-yellow-500 text-white px-4 py-2 rounded hover:bg-yellow-600"
+                  >
+                    ✏️ Edit Listing
+                  </button>
 
-               
+                  {deletionTargetId !== listing.id && (
+                    <button
+                      onClick={() => handleDeleteClick(listing.id)}
+                      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                    >
+                      🗑️ Delete Listing
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
         )}
+
+        {/* ✅ Bottom homepage button */}
+        <div className="text-center mt-8">
+          <button
+            onClick={() => router.push('/?force=true')}
+            className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
+          >
+            🏠 Go to Homepage
+          </button>
+        </div>
       </div>
     </main>
   );
