@@ -521,7 +521,19 @@ seller_financing_considered: formData.seller_financing_considered,
               <input name="website" placeholder="Website" value={formData.website} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="annualRevenue" placeholder="Annual Revenue" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="annualProfit" placeholder="Annual Profit" value={formData.annualProfit} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="sde" placeholder="SDE" value={formData.sde} onChange={handleChange} className="w-full border p-3 rounded" />
+             <input 
+  name="sde" 
+  placeholder="SDE" 
+  value={formData.sde} 
+  onChange={handleChange} 
+  className="w-full border p-3 rounded" 
+/>
+<p className="text-sm text-gray-500 mt-1">
+  Seller’s Discretionary Earnings (SDE) is the total financial benefit to a single owner-operator in a year. 
+  Includes net profit <strong>before taxes</strong>, owner’s salary, discretionary expenses, interest, depreciation, 
+  and one-time expenses. Commonly used to value small businesses.
+</p>
+
               <input name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="employees" placeholder="Number of Employees" value={formData.employees} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="monthly_lease" placeholder="Monthly Lease Amount" value={formData.monthly_lease} onChange={handleChange} className="w-full border p-3 rounded" />
