@@ -3,75 +3,59 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../../lib/supabaseClient';
 
-
 export default function AuthCallback() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
-
     const handleRedirect = async () => {
       console.log('📍 Entered /auth/callback');
 
-      try {
-        // ✅ Complete magic link or OAuth login flow
-        const { error: sessionError } = await supabase.auth.exchangeCodeForSession();
-        if (sessionError) {
-          console.error('❌ Session parsing failed:', sessionError);
-          router.replace('/');
-          return;
-        }
+      // ✅ Exchange code for session
+      const { error: sessionError } = await supabase.auth.exchangeCodeForSession();
+      if (sessionError) {
+        console.error('❌ Session error:', sessionError);
+        router.replace('/login');
+        return;
+      }
 
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('❌ No user found');
+        router.replace('/login');
+        return;
+      }
 
-        if (!isMounted) return;
-        if (userError || !user) {
-          console.error('❌ No user found:', userError);
-          router.replace('/');
-          return;
-        }
+      console.log('🔐 Logged in user:', user.email);
 
-        console.log('🔐 Logged in user ID:', user.id);
+      // ✅ Check for seller profile
+      const { data: seller } = await supabase
+        .from('sellers')
+        .select('id')
+        .eq('auth_id', user.id)
+        .maybeSingle();
 
-        const { data: profile, error: profileError } = await supabase
-          .from('buyers')
-          .select('name')
-          .eq('auth_id', user.id)
-          .maybeSingle();
+      if (seller) {
+        router.replace('/seller-dashboard');
+        return;
+      }
 
-        if (!isMounted) return;
+      // ✅ Check for buyer profile
+      const { data: buyer } = await supabase
+        .from('buyers')
+        .select('name')
+        .eq('auth_id', user.id)
+        .maybeSingle();
 
-        if (profileError) {
-          console.error('❌ Error fetching buyer profile:', profileError);
-          router.replace('/');
-          return;
-        }
-
-        if (profile && profile.name) {
-          // ✅ Redirect to dashboard with name
-          const nameParam = encodeURIComponent(profile.name);
-          router.replace(`/buyer-dashboard?name=${nameParam}`); // ✅ FIXED
-        } else {
-          // 🚧 Redirect to onboarding
-          router.replace('/buyer-onboarding');
-        }
-      } catch (err) {
-        console.error('🔥 Unexpected error:', err);
-        router.replace('/');
-      } finally {
-        if (isMounted) setLoading(false);
+      if (buyer) {
+        const nameParam = encodeURIComponent(buyer.name || '');
+        router.replace(`/buyer-dashboard?name=${nameParam}`);
+      } else {
+        router.replace('/buyer-onboarding');
       }
     };
 
     handleRedirect();
-
-    return () => {
-      isMounted = false;
-    };
   }, [router]);
 
   return (
@@ -80,3 +64,4 @@ export default function AuthCallback() {
     </div>
   );
 }
+
