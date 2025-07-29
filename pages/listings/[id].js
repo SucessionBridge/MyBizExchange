@@ -52,13 +52,24 @@ async function fetchBuyerProfile() {
     return;
   }
 
-  const { data, error } = await supabase
+  // ✅ Try auth_id first
+  let { data: buyerData } = await supabase
     .from('buyers')
     .select('*')
-    .eq('auth_id', user.id)   // ✅ Match using auth_id, not email
-    .single();
+    .eq('auth_id', user.id)
+    .maybeSingle();
 
-  if (!error) setBuyer(data);
+  // ✅ Fallback to email if no auth_id match
+  if (!buyerData) {
+    const { data: emailMatch } = await supabase
+      .from('buyers')
+      .select('*')
+      .eq('email', user.email)
+      .maybeSingle();
+    buyerData = emailMatch;
+  }
+
+  if (buyerData) setBuyer(buyerData);
   setLoading(false);
 }
 
