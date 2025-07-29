@@ -272,8 +272,8 @@ export default function ListingDetail() {
       Use AI to structure a creative offer (seller financing, rent-to-own, profit share, etc.) based on this business’s details.
     </p>
     <button
-      onClick={() => router.push(`/deal-builder?listing=${id}`)}
-      className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-medium"
+    onClick={() => router.push(`/deal-maker?listingId=${id}`)}
+     className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-medium"
     >
       Launch Deal Builder
     </button>
