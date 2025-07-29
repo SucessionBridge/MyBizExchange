@@ -4,8 +4,14 @@ import Header from '../components/Header';
 import { useEffect } from 'react';
 import { SessionContextProvider, useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
-import supabase from '../lib/supabaseClient'; // ✅ Use single shared instance
+import supabase from '../lib/supabaseClient';
 import { Toaster } from 'react-hot-toast';
+
+// ✅ Import Google Fonts using next/font
+import { Inter, Merriweather } from 'next/font/google';
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const merriweather = Merriweather({ subsets: ['latin'], weight: ['400', '700'], variable: '--font-merriweather' });
 
 function AuthRedirector() {
   const session = useSession();
@@ -15,7 +21,6 @@ function AuthRedirector() {
   useEffect(() => {
     console.log('🔍 AuthRedirector Path:', router.pathname, 'Force:', router.query.force, 'User:', session?.user?.id);
 
-    // ✅ Skip redirect if no user or clicked home with ?force=true
     if (!session?.user || router.pathname !== '/' || router.query.force === 'true') {
       if (router.query.force === 'true') {
         console.log('✅ Force=true detected. Skipping redirect to allow homepage view.');
@@ -78,7 +83,7 @@ export default function App({ Component, pageProps }) {
   return (
     <SessionContextProvider supabaseClient={supabase} initialSession={pageProps.initialSession}>
       <AuthRedirector />
-      <div className="min-h-screen bg-white text-gray-800">
+      <div className={`${inter.variable} ${merriweather.variable} min-h-screen bg-white text-gray-800`}>
         <Header />
         <main className="pt-20 px-4">
           <Component {...pageProps} />
@@ -97,7 +102,3 @@ export default function App({ Component, pageProps }) {
     </SessionContextProvider>
   );
 }
-
-
-
-
