@@ -142,12 +142,6 @@ export default function BuyerDashboard() {
           >
             🏠 Home
           </button>
-          <button
-            onClick={() => router.push('/deal-builder')}
-            className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
-          >
-            🤝 AI Deal Maker
-          </button>
         </div>
       </div>
 
@@ -326,4 +320,3 @@ export default function BuyerDashboard() {
     </div>
   );
 }
-
