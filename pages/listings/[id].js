@@ -41,26 +41,26 @@ export default function ListingDetail() {
     }
   }
 
-  async function fetchBuyerProfile() {
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+async function fetchBuyerProfile() {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
-    if (authError || !user) {
-      setLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('buyers')
-      .select('*')
-      .eq('email', user.email)
-      .single();
-
-    if (!error) setBuyer(data);
+  if (authError || !user) {
     setLoading(false);
+    return;
   }
+
+  const { data, error } = await supabase
+    .from('buyers')
+    .select('*')
+    .eq('auth_id', user.id)   // ✅ Match using auth_id, not email
+    .single();
+
+  if (!error) setBuyer(data);
+  setLoading(false);
+}
 
   async function handleSubmit(e) {
     e.preventDefault();
