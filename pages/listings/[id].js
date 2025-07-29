@@ -1,6 +1,6 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import supabase from '../../lib/supabaseClient'; // ✅ FIXED
+import supabase from '../../lib/supabaseClient';
 
 export default function ListingDetail() {
   const router = useRouter();
@@ -12,7 +12,6 @@ export default function ListingDetail() {
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
 
-  // ✅ Title Case helper
   const toTitleCase = (str) =>
     str
       ? str
@@ -169,14 +168,14 @@ export default function ListingDetail() {
         <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
           <h2 className="text-2xl font-semibold text-blue-900 mb-4">Financial Highlights</h2>
           <div className="text-3xl font-bold text-green-700 mb-4">
-            Asking Price: ${listing.asking_price?.toLocaleString()}
+            Asking Price: {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire for Price'}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-gray-800">
-            <p><strong>Annual Revenue:</strong> ${listing.annual_revenue?.toLocaleString()}</p>
-            <p><strong>SDE:</strong> ${listing.sde?.toLocaleString()}</p>
-            <p><strong>Annual Profit:</strong> ${listing.annual_profit?.toLocaleString()}</p>
-            <p><strong>Inventory Value:</strong> ${listing.inventory_value?.toLocaleString()}</p>
-            <p><strong>Equipment Value:</strong> ${listing.equipment_value?.toLocaleString()}</p>
+            <p><strong>Annual Revenue:</strong> {listing.annual_revenue ? `$${listing.annual_revenue.toLocaleString()}` : 'N/A'}</p>
+            <p><strong>SDE:</strong> {listing.sde ? `$${listing.sde.toLocaleString()}` : 'N/A'}</p>
+            <p><strong>Annual Profit:</strong> {listing.annual_profit ? `$${listing.annual_profit.toLocaleString()}` : 'N/A'}</p>
+            <p><strong>Inventory Value:</strong> {listing.inventory_value ? `$${listing.inventory_value.toLocaleString()}` : 'N/A'}</p>
+            <p><strong>Equipment Value:</strong> {listing.equipment_value ? `$${listing.equipment_value.toLocaleString()}` : 'N/A'}</p>
             <p><strong>Employees:</strong> {listing.employees || 'N/A'}</p>
           </div>
         </div>
@@ -191,17 +190,55 @@ export default function ListingDetail() {
           </p>
         </div>
 
+        {/* ✅ Additional Detail Sections (New) */}
+        <div className="bg-white rounded-2xl shadow-md p-6 mt-8 space-y-6">
+          {listing.customer_type && (
+            <div>
+              <h3 className="text-xl font-semibold text-blue-800 mb-1">Customer Type</h3>
+              <p className="text-gray-700">{listing.customer_type}</p>
+            </div>
+          )}
+
+          {listing.owner_involvement && (
+            <div>
+              <h3 className="text-xl font-semibold text-blue-800 mb-1">Owner Involvement</h3>
+              <p className="text-gray-700">{listing.owner_involvement}</p>
+            </div>
+          )}
+
+          {listing.growth_potential && (
+            <div>
+              <h3 className="text-xl font-semibold text-blue-800 mb-1">Growth Potential</h3>
+              <p className="text-gray-700">{listing.growth_potential}</p>
+            </div>
+          )}
+
+          {listing.training_offered && (
+            <div>
+              <h3 className="text-xl font-semibold text-blue-800 mb-1">Training & Support</h3>
+              <p className="text-gray-700">{listing.training_offered}</p>
+            </div>
+          )}
+
+          {listing.reason_for_selling && (
+            <div>
+              <h3 className="text-xl font-semibold text-blue-800 mb-1">Reason for Selling</h3>
+              <p className="text-gray-700">{listing.reason_for_selling}</p>
+            </div>
+          )}
+        </div>
+
         {/* ✅ Business Details */}
         <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
           <h2 className="text-2xl font-semibold text-blue-900 mb-3">Business Details</h2>
           <div className="grid md:grid-cols-2 gap-4 text-gray-800">
-            <p><strong>Monthly Lease:</strong> ${listing.monthly_lease?.toLocaleString()}</p>
+            <p><strong>Monthly Lease:</strong> {listing.monthly_lease ? `$${listing.monthly_lease.toLocaleString()}` : 'N/A'}</p>
             <p><strong>Home-Based:</strong> {listing.home_based ? 'Yes' : 'No'}</p>
             <p><strong>Relocatable:</strong> {listing.relocatable ? 'Yes' : 'No'}</p>
             <p><strong>Includes Inventory:</strong> {listing.includes_inventory ? 'Yes' : 'No'}</p>
             <p><strong>Includes Building:</strong> {listing.includes_building ? 'Yes' : 'No'}</p>
             <p><strong>Real Estate Included:</strong> {listing.real_estate_included ? 'Yes' : 'No'}</p>
-            <p><strong>Financing Type:</strong> {listing.financing_type?.replace(/-/g, ' ')}</p>
+            <p><strong>Financing Type:</strong> {listing.financing_type?.replace(/-/g, ' ') || 'N/A'}</p>
             <p><strong>Years in Business:</strong> {listing.years_in_business || 'N/A'}</p>
           </div>
         </div>
@@ -291,4 +328,5 @@ export default function ListingDetail() {
     </main>
   );
 }
+
 
