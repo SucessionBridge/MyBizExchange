@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ✅ Global Font Variables */
+:root {
+  --font-inter: 'Inter', sans-serif;
+  --font-merriweather: 'Merriweather', serif;
+}
+
+/* ✅ Apply Inter to body text */
+body {
+  font-family: var(--font-inter);
+  background-color: #F8FAFC;
+  color: #1F2937;
+}
+
+/* ✅ Use Merriweather for all headings */
+h1, h2, h3, h4 {
+  font-family: var(--font-merriweather);
+}
+
