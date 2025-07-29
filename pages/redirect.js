@@ -1,15 +1,19 @@
 // pages/redirect.js
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
-import supabase from "../lib/supabaseClient"; // ✅ correct
-
+import supabase from "../lib/supabaseClient";
 
 export default function RedirectPage() {
   const router = useRouter();
 
   useEffect(() => {
+    // ✅ Only run this redirect if we explicitly call /redirect?manual=true
+    if (!router.query.manual) {
+      console.log("⏸️ RedirectPage skipped (manual mode not enabled)");
+      return;
+    }
+
     const redirectWithSession = async () => {
-      // ✅ Wait for Supabase to restore session
       const { data: sessionData } = await supabase.auth.getSession();
 
       if (!sessionData?.session) {
@@ -55,7 +59,6 @@ export default function RedirectPage() {
         return;
       }
 
-      // 🚨 Default fallback if user type is unknown
       router.push('/login');
     };
 
@@ -68,3 +71,4 @@ export default function RedirectPage() {
     </main>
   );
 }
+
