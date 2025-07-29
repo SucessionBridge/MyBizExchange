@@ -65,20 +65,7 @@ export default function ListingDetail() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-
-    if (!message || !buyer || !listing) {
-      console.warn('⚠️ Missing message, buyer, or listing.');
-      return;
-    }
-
-    console.log('🔎 FULL LISTING OBJECT:', listing);
-    console.log('📤 Sending message with data:', {
-      message,
-      seller_id: listing.auth_id,
-      listing_id: listing.id,
-      buyer_name: buyer.name || buyer.full_name || buyer.email,
-      buyer_email: buyer.email,
-    });
+    if (!message || !buyer || !listing) return;
 
     try {
       const response = await fetch('/api/send-message', {
@@ -96,13 +83,11 @@ export default function ListingDetail() {
       });
 
       const result = await response.json();
-
       if (!response.ok) {
         console.error('❌ Message failed:', result.error);
         alert('Message failed to send.');
       } else {
-        console.log('✅ Message sent successfully!');
-        alert('Message sent to the seller!');
+        alert('✅ Message sent to the seller!');
         setMessage('');
         setSuccess(true);
       }
@@ -119,10 +104,7 @@ export default function ListingDetail() {
     }
 
     const { error } = await supabase.from('saved_listings').insert([
-      {
-        buyer_email: buyer.email,
-        listing_id: id,
-      },
+      { buyer_email: buyer.email, listing_id: id }
     ]);
 
     if (error) {
@@ -140,10 +122,7 @@ export default function ListingDetail() {
     }
 
     const { error } = await supabase.from('email_requests').insert([
-      {
-        buyer_email: buyer.email,
-        listing_id: id,
-      },
+      { buyer_email: buyer.email, listing_id: id }
     ]);
 
     if (error) {
@@ -154,8 +133,8 @@ export default function ListingDetail() {
     }
   }
 
-  if (!id || loading) return <div className="p-6">Loading...</div>;
-  if (!listing) return <div className="p-6">Listing not found.</div>;
+  if (!id || loading) return <div className="p-8 text-center text-gray-600">Loading...</div>;
+  if (!listing) return <div className="p-8 text-center text-gray-600">Listing not found.</div>;
 
   const mainImage =
     listing.image_urls?.length > 0 ? listing.image_urls[0] : '/placeholder.png';
@@ -163,19 +142,19 @@ export default function ListingDetail() {
 
   return (
     <main className="bg-gray-50 min-h-screen pb-12 font-sans">
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-5xl mx-auto px-4">
         <a
           href="/listings"
-          className="inline-block mt-4 mb-4 text-sm text-blue-600 hover:underline"
+          className="inline-block mt-4 mb-6 text-sm text-blue-600 hover:underline"
         >
           ← Back to Marketplace
         </a>
 
         {/* ✅ Hero Section */}
-        <div className="relative w-full h-72 md:h-96 rounded-lg overflow-hidden shadow">
+        <div className="relative w-full h-72 md:h-96 rounded-2xl overflow-hidden shadow-lg">
           <img src={mainImage} alt="Business" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-end p-6">
-            <h1 className="text-3xl md:text-4xl font-bold text-white">
+            <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">
               {toTitleCase(
                 listing.hide_business_name
                   ? 'Confidential Business Listing'
@@ -187,8 +166,8 @@ export default function ListingDetail() {
         </div>
 
         {/* ✅ Financial Highlights */}
-        <div className="bg-white rounded-xl shadow-md p-6 mt-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Financial Highlights</h2>
+        <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
+          <h2 className="text-2xl font-semibold text-blue-900 mb-4">Financial Highlights</h2>
           <div className="text-3xl font-bold text-green-700 mb-4">
             Asking Price: ${listing.asking_price?.toLocaleString()}
           </div>
@@ -203,8 +182,8 @@ export default function ListingDetail() {
         </div>
 
         {/* ✅ Business Description */}
-        <div className="bg-white rounded-xl shadow-md p-6 mt-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">Business Description</h2>
+        <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
+          <h2 className="text-2xl font-semibold text-blue-900 mb-3">Business Description</h2>
           <p className="text-gray-800 leading-relaxed">
             {listing.description_choice === 'ai'
               ? listing.ai_description
@@ -213,8 +192,8 @@ export default function ListingDetail() {
         </div>
 
         {/* ✅ Business Details */}
-        <div className="bg-white rounded-xl shadow-md p-6 mt-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">Business Details</h2>
+        <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
+          <h2 className="text-2xl font-semibold text-blue-900 mb-3">Business Details</h2>
           <div className="grid md:grid-cols-2 gap-4 text-gray-800">
             <p><strong>Monthly Lease:</strong> ${listing.monthly_lease?.toLocaleString()}</p>
             <p><strong>Home-Based:</strong> {listing.home_based ? 'Yes' : 'No'}</p>
@@ -229,15 +208,15 @@ export default function ListingDetail() {
 
         {/* ✅ Additional Photos */}
         {otherImages.length > 0 && (
-          <div className="bg-white rounded-xl shadow-md p-6 mt-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">Additional Photos</h2>
+          <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
+            <h2 className="text-2xl font-semibold text-blue-900 mb-3">Additional Photos</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {otherImages.map((url, idx) => (
                 <img
                   key={idx}
                   src={url}
                   alt={`Business ${idx + 2}`}
-                  className="w-full h-40 object-cover rounded"
+                  className="w-full h-40 object-cover rounded-lg"
                 />
               ))}
             </div>
@@ -246,14 +225,14 @@ export default function ListingDetail() {
 
         {/* ✅ Buyer Actions */}
         {buyer ? (
-          <div className="bg-white rounded-xl shadow-md p-6 mt-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">Contact Seller</h2>
+          <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
+            <h2 className="text-2xl font-semibold text-blue-900 mb-3">Contact Seller</h2>
             {success ? (
               <p className="text-green-600">✅ Your message was sent!</p>
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <textarea
-                  className="w-full p-3 border rounded"
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-400"
                   rows="5"
                   placeholder="Write your message to the seller..."
                   value={message}
@@ -263,21 +242,21 @@ export default function ListingDetail() {
                 <div className="flex flex-wrap gap-3">
                   <button
                     type="submit"
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg"
                   >
                     Send Message
                   </button>
                   <button
                     onClick={handleSaveListing}
                     type="button"
-                    className="bg-gray-100 hover:bg-gray-200 px-5 py-2 rounded border"
+                    className="bg-gray-100 hover:bg-gray-200 px-5 py-2 rounded-lg border"
                   >
                     Save Listing
                   </button>
                   <button
                     onClick={handleEmailMe}
                     type="button"
-                    className="bg-gray-100 hover:bg-gray-200 px-5 py-2 rounded border"
+                    className="bg-gray-100 hover:bg-gray-200 px-5 py-2 rounded-lg border"
                   >
                     Email Me This Listing
                   </button>
@@ -285,7 +264,7 @@ export default function ListingDetail() {
                     <button
                       type="button"
                       onClick={() => router.push(`/deal-maker?listingId=${listing.id}`)}
-                      className="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 rounded"
+                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2 rounded-lg font-semibold"
                     >
                       Use AI Deal Maker
                     </button>
@@ -295,7 +274,7 @@ export default function ListingDetail() {
             )}
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-md p-6 mt-8">
+          <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
             <p className="text-red-600">
               You must{' '}
               <a
