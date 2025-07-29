@@ -140,130 +140,130 @@ export default function ListingDetail() {
   const otherImages = listing.image_urls?.slice(1) || [];
 
   return (
-    <main className="bg-gray-50 min-h-screen pb-12 font-sans">
+    <main className="bg-gray-50 min-h-screen pb-16 font-sans">
       <div className="max-w-5xl mx-auto px-4">
         <a
           href="/listings"
-          className="inline-block mt-4 mb-6 text-sm text-blue-600 hover:underline"
+          className="inline-block mt-6 mb-8 text-sm text-blue-600 hover:underline"
         >
           ← Back to Marketplace
         </a>
 
-        {/* ✅ Hero Section */}
+        {/* ✅ Hero */}
         <div className="relative w-full h-72 md:h-96 rounded-2xl overflow-hidden shadow-lg">
           <img src={mainImage} alt="Business" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-end p-6">
-            <h1 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">
+          <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-end p-8">
+            <h1 className="text-4xl md:text-5xl font-serif font-bold text-white drop-shadow-lg">
               {toTitleCase(
                 listing.hide_business_name
                   ? 'Confidential Business Listing'
                   : listing.business_name || `${listing.industry} Business`
               )}
             </h1>
-            <p className="text-gray-100 text-lg">{toTitleCase(listing.location)}</p>
+            <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
           </div>
         </div>
 
         {/* ✅ Financial Highlights */}
-        <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
-          <h2 className="text-2xl font-semibold text-blue-900 mb-4">Financial Highlights</h2>
-          <div className="text-3xl font-bold text-green-700 mb-4">
-            Asking Price: {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire for Price'}
+        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-6">Financial Highlights</h2>
+          <div className="text-4xl font-bold text-emerald-700 mb-6">
+            {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire for Price'}
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-gray-800">
-            <p><strong>Annual Revenue:</strong> {listing.annual_revenue ? `$${listing.annual_revenue.toLocaleString()}` : 'N/A'}</p>
-            <p><strong>SDE:</strong> {listing.sde ? `$${listing.sde.toLocaleString()}` : 'N/A'}</p>
-            <p><strong>Annual Profit:</strong> {listing.annual_profit ? `$${listing.annual_profit.toLocaleString()}` : 'N/A'}</p>
-            <p><strong>Inventory Value:</strong> {listing.inventory_value ? `$${listing.inventory_value.toLocaleString()}` : 'N/A'}</p>
-            <p><strong>Equipment Value:</strong> {listing.equipment_value ? `$${listing.equipment_value.toLocaleString()}` : 'N/A'}</p>
-            <p><strong>Employees:</strong> {listing.employees || 'N/A'}</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-gray-800">
+            <p><span className="font-semibold">Annual Revenue:</span> {listing.annual_revenue ? `$${listing.annual_revenue.toLocaleString()}` : 'N/A'}</p>
+            <p><span className="font-semibold">SDE:</span> {listing.sde ? `$${listing.sde.toLocaleString()}` : 'N/A'}</p>
+            <p><span className="font-semibold">Annual Profit:</span> {listing.annual_profit ? `$${listing.annual_profit.toLocaleString()}` : 'N/A'}</p>
+            <p><span className="font-semibold">Inventory Value:</span> {listing.inventory_value ? `$${listing.inventory_value.toLocaleString()}` : 'N/A'}</p>
+            <p><span className="font-semibold">Equipment Value:</span> {listing.equipment_value ? `$${listing.equipment_value.toLocaleString()}` : 'N/A'}</p>
+            <p><span className="font-semibold">Employees:</span> {listing.employees || 'N/A'}</p>
           </div>
-        </div>
+        </section>
 
         {/* ✅ Business Description */}
-        <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
-          <h2 className="text-2xl font-semibold text-blue-900 mb-3">Business Description</h2>
-          <p className="text-gray-800 leading-relaxed">
+        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Business Description</h2>
+          <p className="text-gray-800 leading-relaxed text-lg">
             {listing.description_choice === 'ai'
               ? listing.ai_description
               : listing.business_description || 'No description available.'}
           </p>
-        </div>
+        </section>
 
-        {/* ✅ Additional Detail Sections (New) */}
-        <div className="bg-white rounded-2xl shadow-md p-6 mt-8 space-y-6">
+        {/* ✅ Additional Detail Sections */}
+        <section className="bg-white rounded-2xl shadow-md p-8 mt-10 space-y-6">
           {listing.customer_type && (
             <div>
-              <h3 className="text-xl font-semibold text-blue-800 mb-1">Customer Type</h3>
-              <p className="text-gray-700">{listing.customer_type}</p>
+              <h3 className="text-2xl font-serif font-semibold text-blue-800 mb-1">Customer Type</h3>
+              <p className="text-gray-700 text-lg">{listing.customer_type}</p>
             </div>
           )}
 
           {listing.owner_involvement && (
             <div>
-              <h3 className="text-xl font-semibold text-blue-800 mb-1">Owner Involvement</h3>
-              <p className="text-gray-700">{listing.owner_involvement}</p>
+              <h3 className="text-2xl font-serif font-semibold text-blue-800 mb-1">Owner Involvement</h3>
+              <p className="text-gray-700 text-lg">{listing.owner_involvement}</p>
             </div>
           )}
 
           {listing.growth_potential && (
             <div>
-              <h3 className="text-xl font-semibold text-blue-800 mb-1">Growth Potential</h3>
-              <p className="text-gray-700">{listing.growth_potential}</p>
+              <h3 className="text-2xl font-serif font-semibold text-blue-800 mb-1">Growth Potential</h3>
+              <p className="text-gray-700 text-lg">{listing.growth_potential}</p>
             </div>
           )}
 
           {listing.training_offered && (
             <div>
-              <h3 className="text-xl font-semibold text-blue-800 mb-1">Training & Support</h3>
-              <p className="text-gray-700">{listing.training_offered}</p>
+              <h3 className="text-2xl font-serif font-semibold text-blue-800 mb-1">Training & Support</h3>
+              <p className="text-gray-700 text-lg">{listing.training_offered}</p>
             </div>
           )}
 
           {listing.reason_for_selling && (
             <div>
-              <h3 className="text-xl font-semibold text-blue-800 mb-1">Reason for Selling</h3>
-              <p className="text-gray-700">{listing.reason_for_selling}</p>
+              <h3 className="text-2xl font-serif font-semibold text-blue-800 mb-1">Reason for Selling</h3>
+              <p className="text-gray-700 text-lg">{listing.reason_for_selling}</p>
             </div>
           )}
-        </div>
+        </section>
 
         {/* ✅ Business Details */}
-        <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
-          <h2 className="text-2xl font-semibold text-blue-900 mb-3">Business Details</h2>
-          <div className="grid md:grid-cols-2 gap-4 text-gray-800">
-            <p><strong>Monthly Lease:</strong> {listing.monthly_lease ? `$${listing.monthly_lease.toLocaleString()}` : 'N/A'}</p>
-            <p><strong>Home-Based:</strong> {listing.home_based ? 'Yes' : 'No'}</p>
-            <p><strong>Relocatable:</strong> {listing.relocatable ? 'Yes' : 'No'}</p>
-            <p><strong>Includes Inventory:</strong> {listing.includes_inventory ? 'Yes' : 'No'}</p>
-            <p><strong>Includes Building:</strong> {listing.includes_building ? 'Yes' : 'No'}</p>
-            <p><strong>Real Estate Included:</strong> {listing.real_estate_included ? 'Yes' : 'No'}</p>
-            <p><strong>Financing Type:</strong> {listing.financing_type?.replace(/-/g, ' ') || 'N/A'}</p>
-            <p><strong>Years in Business:</strong> {listing.years_in_business || 'N/A'}</p>
+        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Business Details</h2>
+          <div className="grid md:grid-cols-2 gap-6 text-gray-800">
+            <p><span className="font-semibold">Monthly Lease:</span> {listing.monthly_lease ? `$${listing.monthly_lease.toLocaleString()}` : 'N/A'}</p>
+            <p><span className="font-semibold">Home-Based:</span> {listing.home_based ? 'Yes' : 'No'}</p>
+            <p><span className="font-semibold">Relocatable:</span> {listing.relocatable ? 'Yes' : 'No'}</p>
+            <p><span className="font-semibold">Includes Inventory:</span> {listing.includes_inventory ? 'Yes' : 'No'}</p>
+            <p><span className="font-semibold">Includes Building:</span> {listing.includes_building ? 'Yes' : 'No'}</p>
+            <p><span className="font-semibold">Real Estate Included:</span> {listing.real_estate_included ? 'Yes' : 'No'}</p>
+            <p><span className="font-semibold">Financing Type:</span> {listing.financing_type?.replace(/-/g, ' ') || 'N/A'}</p>
+            <p><span className="font-semibold">Years in Business:</span> {listing.years_in_business || 'N/A'}</p>
           </div>
-        </div>
+        </section>
 
         {/* ✅ Additional Photos */}
         {otherImages.length > 0 && (
-          <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
-            <h2 className="text-2xl font-semibold text-blue-900 mb-3">Additional Photos</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+            <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Additional Photos</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {otherImages.map((url, idx) => (
                 <img
                   key={idx}
                   src={url}
                   alt={`Business ${idx + 2}`}
-                  className="w-full h-40 object-cover rounded-lg"
+                  className="w-full h-44 object-cover rounded-lg"
                 />
               ))}
             </div>
-          </div>
+          </section>
         )}
 
         {/* ✅ Buyer Actions */}
         {buyer ? (
-          <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
-            <h2 className="text-2xl font-semibold text-blue-900 mb-3">Contact Seller</h2>
+          <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+            <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Contact Seller</h2>
             {success ? (
               <p className="text-green-600">✅ Your message was sent!</p>
             ) : (
@@ -297,21 +297,12 @@ export default function ListingDetail() {
                   >
                     Email Me This Listing
                   </button>
-                  {listing && (
-                    <button
-                      type="button"
-                      onClick={() => router.push(`/deal-maker?listingId=${listing.id}`)}
-                      className="bg-yellow-500 hover:bg-yellow-600 text-white px-5 py-2 rounded-lg font-semibold"
-                    >
-                      Use AI Deal Maker
-                    </button>
-                  )}
                 </div>
               </form>
             )}
-          </div>
+          </section>
         ) : (
-          <div className="bg-white rounded-2xl shadow-md p-6 mt-8">
+          <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
             <p className="text-red-600">
               You must{' '}
               <a
@@ -322,7 +313,7 @@ export default function ListingDetail() {
               </a>{' '}
               before contacting the seller.
             </p>
-          </div>
+          </section>
         )}
       </div>
     </main>
