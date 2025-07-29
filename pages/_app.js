@@ -83,7 +83,7 @@ export default function App({ Component, pageProps }) {
   return (
     <SessionContextProvider supabaseClient={supabase} initialSession={pageProps.initialSession}>
       <AuthRedirector />
-      <div className={`${inter.variable} ${merriweather.variable} min-h-screen bg-white text-gray-800`}>
+      <div className={`${inter.variable} ${merriweather.variable} font-sans min-h-screen bg-white text-gray-800`}>
         <Header />
         <main className="pt-20 px-4">
           <Component {...pageProps} />
