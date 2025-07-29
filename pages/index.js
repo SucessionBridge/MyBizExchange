@@ -8,7 +8,6 @@ export default function Home() {
 
   useEffect(() => {
     const checkUserAndRedirect = async () => {
-      // ✅ Skip redirect if user clicked logo with ?force=true
       if (router.query.force === 'true') {
         console.log("✅ Force=true detected on index.js. Skipping redirect.");
         return;
@@ -69,6 +68,24 @@ export default function Home() {
                   Sell My Business
                 </a>
               </Link>
+            </div>
+          </div>
+        </section>
+
+        {/* ✅ Why We Built SuccessionBridge Section */}
+        <section className="bg-gray-50 py-16 px-6 md:px-12 mb-16 rounded-xl shadow-sm">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-3xl font-bold mb-6">Why We Built SuccessionBridge</h2>
+            <div className="text-lg text-gray-700 leading-relaxed space-y-4">
+              <p>After 8 years of running a profitable business, my partner and I decided to sell.</p>
+              <p>We were generating around <strong>$200K/year in revenue</strong> with approximately <strong>$150K/year in SDE</strong>, but when we called a business broker, we were told:</p>
+              <blockquote className="italic text-gray-600 border-l-4 border-blue-500 pl-4">
+                “Unless your asking price is $1M or more, no broker will give you the time.”
+              </blockquote>
+              <p>One year later, we sold the business for <strong>over $4M — without a broker.</strong></p>
+              <p><strong>The key?</strong><br />We got the listing in front of the right buyers and let the market create the value.</p>
+              <p className="font-semibold">That experience taught us a simple truth:<br />More eyes = more chances to sell.</p>
+              <p>SuccessionBridge was built to give business owners that same advantage — connecting sellers and buyers directly without relying on expensive brokers.</p>
             </div>
           </div>
         </section>
@@ -162,3 +179,4 @@ export default function Home() {
     </main>
   );
 }
+
