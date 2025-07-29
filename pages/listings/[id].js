@@ -262,6 +262,24 @@ export default function ListingDetail() {
             </div>
           </section>
         )}
+{/* ✅ AI Enhanced Deal Maker */}
+{buyer && (
+  <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+    <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">
+      AI Enhanced Deal Maker
+    </h2>
+    <p className="text-gray-700 mb-4">
+      Use AI to structure a creative offer (seller financing, rent-to-own, profit share, etc.) based on this business’s details.
+    </p>
+    <button
+      onClick={() => router.push(`/deal-builder?listing=${id}`)}
+      className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-medium"
+    >
+      Launch Deal Builder
+    </button>
+  </section>
+)}
+
 
         {/* ✅ Buyer Actions */}
         {buyer ? (
