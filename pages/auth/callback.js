@@ -7,52 +7,29 @@ export default function AuthCallback() {
   const router = useRouter();
 
   useEffect(() => {
-    const completeLogin = async () => {
-      console.log("📍 Entered /auth/callback");
+    const handleAuth = async () => {
+      console.log('📍 Entered /auth/callback');
 
-      // ✅ Finish magic link/OAuth login
-      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession();
-      if (exchangeError) {
-        console.error("❌ Session exchange failed:", exchangeError);
+      const { error } = await supabase.auth.exchangeCodeForSession();
+      if (error) {
+        console.error('❌ Auth error:', error);
         router.replace('/login');
         return;
       }
 
-      const {
-        data: { user },
-        error: userError
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('✅ Logged in user:', user?.email);
 
-      if (userError || !user) {
-        console.error("❌ No user found:", userError);
-        router.replace('/login');
-        return;
-      }
-
-      console.log("✅ Logged in as:", user.email);
-
-      // ✅ Check if this user has a buyer profile
-      const { data: buyer } = await supabase
-        .from('buyers')
-        .select('id')
-        .eq('auth_id', user.id)
-        .maybeSingle();
-
-      if (buyer) {
-        router.replace('/buyer-dashboard');
-        return;
-      }
-
-      // ✅ Otherwise send to onboarding
-      router.replace('/buyer-onboarding');
+      // 🔥 TEMP: Just send to dashboard to verify login works
+      router.replace('/buyer-dashboard');
     };
 
-    completeLogin();
+    handleAuth();
   }, [router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-      <p className="text-lg">🔄 Logging you in...</p>
+      Logging you in...
     </div>
   );
 }
