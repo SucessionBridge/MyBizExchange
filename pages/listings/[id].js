@@ -190,46 +190,45 @@ export default function ListingDetail() {
           </p>
         </section>
 
-        {/* ✅ Additional Detail Sections */}
-       {/* ✅ Additional Detail Sections */}
-<div className="bg-white rounded-2xl shadow-md p-6 mt-8 space-y-6">
-  {listing.customer_type && (
-    <div>
-      <h3 className="text-xl font-semibold text-blue-800 mb-1">Customer Type</h3>
-      <p className="text-gray-700">{listing.customer_type}</p>
-    </div>
-  )}
+        {/* ✅ Additional Details */}
+        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Additional Information</h2>
+          <div className="space-y-6 text-gray-800">
+            {listing.customer_type && (
+              <div>
+                <h3 className="text-xl font-semibold text-blue-800 mb-1">Customer Type</h3>
+                <p>{listing.customer_type}</p>
+              </div>
+            )}
 
-  {listing.owner_involvement && (
-    <div>
-      <h3 className="text-xl font-semibold text-blue-800 mb-1">Owner Involvement</h3>
-      <p className="text-gray-700">{listing.owner_involvement}</p>
-    </div>
-  )}
+            {listing.owner_involvement && (
+              <div>
+                <h3 className="text-xl font-semibold text-blue-800 mb-1">Owner Involvement</h3>
+                <p>{listing.owner_involvement}</p>
+              </div>
+            )}
 
-  {listing.growth_potential && (
-    <div>
-      <h3 className="text-xl font-semibold text-blue-800 mb-1">Growth Potential</h3>
-      <p className="text-gray-700">{listing.growth_potential}</p>
-    </div>
-  )}
+            {listing.growth_potential && (
+              <div>
+                <h3 className="text-xl font-semibold text-blue-800 mb-1">Growth Potential</h3>
+                <p>{listing.growth_potential}</p>
+              </div>
+            )}
 
-  {listing.training_offered && (
-    <div>
-      <h3 className="text-xl font-semibold text-blue-800 mb-1">Training & Support</h3>
-      <p className="text-gray-700">{listing.training_offered}</p>
-    </div>
-  )}
+            {listing.training_offered && (
+              <div>
+                <h3 className="text-xl font-semibold text-blue-800 mb-1">Training & Support</h3>
+                <p>{listing.training_offered}</p>
+              </div>
+            )}
 
-  {listing.reason_for_selling && (
-    <div>
-      <h3 className="text-xl font-semibold text-blue-800 mb-1">Reason for Selling</h3>
-      <p className="text-gray-700">{listing.reason_for_selling}</p>
-    </div>
-  )}
-</div>
-
-          )}
+            {listing.reason_for_selling && (
+              <div>
+                <h3 className="text-xl font-semibold text-blue-800 mb-1">Reason for Selling</h3>
+                <p>{listing.reason_for_selling}</p>
+              </div>
+            )}
+          </div>
         </section>
 
         {/* ✅ Business Details */}
@@ -323,5 +322,6 @@ export default function ListingDetail() {
     </main>
   );
 }
+
 
 
