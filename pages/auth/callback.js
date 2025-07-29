@@ -1,81 +1,58 @@
 // pages/auth/callback.js
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../../lib/supabaseClient';
 
 export default function AuthCallback() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
+    const completeLogin = async () => {
+      console.log("📍 Entered /auth/callback");
 
-    const handleRedirect = async () => {
-      console.log('📍 Entered /auth/callback');
-
-      // ✅ Wait for query params to exist (fixes code verifier issue)
-      if (!router.isReady) return;
-
-      try {
-        // ✅ Exchange code for session (magic link / OAuth)
-        const { error: sessionError } = await supabase.auth.exchangeCodeForSession();
-        if (sessionError) {
-          console.error('❌ Session error:', sessionError);
-          router.replace('/login');
-          return;
-        }
-
-        const {
-          data: { user },
-          error: userError,
-        } = await supabase.auth.getUser();
-
-        if (!isMounted) return;
-
-        if (userError || !user) {
-          console.error('❌ No user found:', userError);
-          router.replace('/login');
-          return;
-        }
-
-        console.log('✅ Logged in user:', user.email, user.id);
-
-        // ✅ Look for buyer profile by auth_id
-        const { data: profile } = await supabase
-          .from('buyers')
-          .select('name')
-          .eq('auth_id', user.id)
-          .maybeSingle();
-
-        if (!isMounted) return;
-
-        if (profile && profile.name) {
-          // ✅ Redirect to dashboard with name
-          const nameParam = encodeURIComponent(profile.name);
-          router.replace(`/buyer-dashboard?name=${nameParam}`);
-        } else {
-          // 🚧 No profile, send to onboarding
-          router.replace('/buyer-onboarding');
-        }
-      } catch (err) {
-        console.error('🔥 Unexpected error:', err);
+      // ✅ Finish magic link/OAuth login
+      const { error: exchangeError } = await supabase.auth.exchangeCodeForSession();
+      if (exchangeError) {
+        console.error("❌ Session exchange failed:", exchangeError);
         router.replace('/login');
-      } finally {
-        if (isMounted) setLoading(false);
+        return;
       }
+
+      const {
+        data: { user },
+        error: userError
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        console.error("❌ No user found:", userError);
+        router.replace('/login');
+        return;
+      }
+
+      console.log("✅ Logged in as:", user.email);
+
+      // ✅ Check if this user has a buyer profile
+      const { data: buyer } = await supabase
+        .from('buyers')
+        .select('id')
+        .eq('auth_id', user.id)
+        .maybeSingle();
+
+      if (buyer) {
+        router.replace('/buyer-dashboard');
+        return;
+      }
+
+      // ✅ Otherwise send to onboarding
+      router.replace('/buyer-onboarding');
     };
 
-    handleRedirect();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [router.isReady]); // ✅ important: wait until router is ready
+    completeLogin();
+  }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center text-gray-700">
-      {loading ? 'Logging you in...' : 'Redirecting...'}
+    <div className="min-h-screen flex items-center justify-center">
+      <p className="text-lg">🔄 Logging you in...</p>
     </div>
   );
 }
-
