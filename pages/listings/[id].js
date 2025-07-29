@@ -191,40 +191,44 @@ export default function ListingDetail() {
         </section>
 
         {/* ✅ Additional Detail Sections */}
-        <section className="bg-white rounded-2xl shadow-md p-8 mt-10 space-y-6">
-          {listing.customer_type && (
-            <div>
-              <h3 className="text-2xl font-serif font-semibold text-blue-800 mb-1">Customer Type</h3>
-              <p className="text-gray-700 text-lg">{listing.customer_type}</p>
-            </div>
-          )}
+       {/* ✅ Additional Detail Sections */}
+<div className="bg-white rounded-2xl shadow-md p-6 mt-8 space-y-6">
+  {listing.customer_type && (
+    <div>
+      <h3 className="text-xl font-semibold text-blue-800 mb-1">Customer Type</h3>
+      <p className="text-gray-700">{listing.customer_type}</p>
+    </div>
+  )}
 
-          {listing.owner_involvement && (
-            <div>
-              <h3 className="text-2xl font-serif font-semibold text-blue-800 mb-1">Owner Involvement</h3>
-              <p className="text-gray-700 text-lg">{listing.owner_involvement}</p>
-            </div>
-          )}
+  {listing.owner_involvement && (
+    <div>
+      <h3 className="text-xl font-semibold text-blue-800 mb-1">Owner Involvement</h3>
+      <p className="text-gray-700">{listing.owner_involvement}</p>
+    </div>
+  )}
 
-          {listing.growth_potential && (
-            <div>
-              <h3 className="text-2xl font-serif font-semibold text-blue-800 mb-1">Growth Potential</h3>
-              <p className="text-gray-700 text-lg">{listing.growth_potential}</p>
-            </div>
-          )}
+  {listing.growth_potential && (
+    <div>
+      <h3 className="text-xl font-semibold text-blue-800 mb-1">Growth Potential</h3>
+      <p className="text-gray-700">{listing.growth_potential}</p>
+    </div>
+  )}
 
-          {listing.training_offered && (
-            <div>
-              <h3 className="text-2xl font-serif font-semibold text-blue-800 mb-1">Training & Support</h3>
-              <p className="text-gray-700 text-lg">{listing.training_offered}</p>
-            </div>
-          )}
+  {listing.training_offered && (
+    <div>
+      <h3 className="text-xl font-semibold text-blue-800 mb-1">Training & Support</h3>
+      <p className="text-gray-700">{listing.training_offered}</p>
+    </div>
+  )}
 
-          {listing.reason_for_selling && (
-            <div>
-              <h3 className="text-2xl font-serif font-semibold text-blue-800 mb-1">Reason for Selling</h3>
-              <p className="text-gray-700 text-lg">{listing.reason_for_selling}</p>
-            </div>
+  {listing.reason_for_selling && (
+    <div>
+      <h3 className="text-xl font-semibold text-blue-800 mb-1">Reason for Selling</h3>
+      <p className="text-gray-700">{listing.reason_for_selling}</p>
+    </div>
+  )}
+</div>
+
           )}
         </section>
 
