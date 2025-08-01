@@ -1,35 +1,55 @@
 // pages/auth/callback.js
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../../lib/supabaseClient';
 
 export default function AuthCallback() {
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const handleAuth = async () => {
+    const handleRedirect = async () => {
       console.log('📍 Entered /auth/callback');
 
+      // ✅ Complete login flow for Magic Link/OAuth
       const { error } = await supabase.auth.exchangeCodeForSession();
       if (error) {
-        console.error('❌ Auth error:', error);
+        console.error('❌ Session error:', error.message);
         router.replace('/login');
         return;
       }
 
       const { data: { user } } = await supabase.auth.getUser();
-      console.log('✅ Logged in user:', user?.email);
+      if (!user) {
+        console.error('❌ No user found after login');
+        router.replace('/login');
+        return;
+      }
 
-      // 🔥 TEMP: Just send to dashboard to verify login works
-      router.replace('/buyer-dashboard');
+      console.log('✅ Logged in user:', user.email);
+
+      // ✅ Check buyer profile
+      const { data: buyer } = await supabase
+        .from('buyers')
+        .select('name')
+        .eq('auth_id', user.id)
+        .maybeSingle();
+
+      if (buyer && buyer.name) {
+        router.replace(`/buyer-dashboard?name=${encodeURIComponent(buyer.name)}`);
+        return;
+      }
+
+      // ✅ No buyer profile → go to onboarding
+      router.replace('/buyer-onboarding');
     };
 
-    handleAuth();
+    handleRedirect();
   }, [router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-      Logging you in...
+      {loading ? 'Logging you in...' : 'Redirecting...'}
     </div>
   );
 }
