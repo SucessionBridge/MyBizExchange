@@ -1,4 +1,3 @@
-// pages/login.js
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
@@ -77,4 +76,5 @@ export default function Login() {
     </main>
   );
 }
+
 
