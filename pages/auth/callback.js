@@ -12,49 +12,63 @@ export default function AuthCallback() {
       console.log('📍 Entered /auth/callback');
       console.log("🌐 Full callback URL:", window.location.href);
 
-      let access_token, refresh_token;
+      const url = window.location.href;
 
-      if (window.location.hash.includes('access_token')) {
-        const params = new URLSearchParams(window.location.hash.replace('#', ''));
-        access_token = params.get('access_token');
-        refresh_token = params.get('refresh_token');
-        console.log('🔐 Tokens from hash:', { access_token, refresh_token });
+      try {
+        if (url.includes('#access_token')) {
+          // ✅ Implicit flow (Google)
+          const params = new URLSearchParams(url.split('#')[1]);
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
 
-        if (access_token && refresh_token) {
-          await supabase.auth.setSession({ access_token, refresh_token });
+          if (access_token && refresh_token) {
+            console.log('🔐 Setting session from hash tokens');
+            await supabase.auth.setSession({ access_token, refresh_token });
+          } else {
+            console.error('❌ Missing tokens in implicit flow');
+            router.replace('/login');
+            return;
+          }
+        } else if (url.includes('?code=')) {
+          // ✅ PKCE flow (Magic Link)
+          console.log('🔄 Exchanging PKCE code for session');
+          const { error } = await supabase.auth.exchangeCodeForSession(url);
+          if (error) {
+            console.error('❌ exchangeCodeForSession error:', error.message);
+            router.replace('/login');
+            return;
+          }
         } else {
-          console.error('❌ Missing tokens');
+          console.error('❌ No auth tokens or code in URL');
           router.replace('/login');
           return;
         }
-      } else {
-        console.error('❌ No tokens found in URL');
-        router.replace('/login');
-        return;
-      }
 
-      // ✅ Wait for Supabase to emit SIGNED_IN event before redirecting
-      const { data: listener } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          console.log('✅ Session confirmed, user:', session.user.email);
+        // ✅ After session set, get user
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log('✅ Logged in user:', user);
 
-          const { data: buyer } = await supabase
-            .from('buyers')
-            .select('name')
-            .eq('auth_id', session.user.id)
-            .eq('email', session.user.email)
-            .maybeSingle();
-
-          if (buyer && buyer.name) {
-            router.replace(`/buyer-dashboard?name=${encodeURIComponent(buyer.name)}`);
-          } else {
-            router.replace('/buyer-onboarding');
-          }
+        if (!user) {
+          router.replace('/login');
+          return;
         }
-      });
 
-      // Cleanup listener on unmount
-      return () => listener.subscription.unsubscribe();
+        // ✅ Check buyer profile
+        const { data: buyer } = await supabase
+          .from('buyers')
+          .select('name')
+          .eq('auth_id', user.id)
+          .eq('email', user.email)
+          .maybeSingle();
+
+        if (buyer && buyer.name) {
+          router.replace(`/buyer-dashboard?name=${encodeURIComponent(buyer.name)}`);
+        } else {
+          router.replace('/buyer-onboarding');
+        }
+      } finally {
+        setLoading(false);
+      }
     };
 
     handleRedirect();
@@ -66,6 +80,3 @@ export default function AuthCallback() {
     </div>
   );
 }
-
-
-
