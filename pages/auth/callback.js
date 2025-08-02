@@ -33,6 +33,7 @@ export default function AuthCallback() {
         .from('buyers')
         .select('name')
         .eq('auth_id', user.id)
+        .eq('email', user.email)
         .maybeSingle();
 
       if (buyer && buyer.name) {
