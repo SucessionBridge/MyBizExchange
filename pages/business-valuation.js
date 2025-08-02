@@ -45,6 +45,11 @@ export default function BusinessValuation() {
     }));
   };
 
+  const formatCurrency = (num) => {
+    if (!num || isNaN(num)) return '$0';
+    return `$${parseFloat(num).toLocaleString()}`;
+  };
+
   const calculateValuation = () => {
     const revenue = parseFloat(formData.annualRevenue) || 0;
     const expenses = parseFloat(formData.annualExpenses) || 0;
@@ -67,10 +72,6 @@ export default function BusinessValuation() {
     return sdeValue + realEstate + (equipmentValue > 0 ? 0 : equipmentValue);
   };
 
-  const formatCurrency = (num) => {
-    return `$${Number(num || 0).toLocaleString()}`;
-  };
-
   const generatePDF = () => {
     const doc = new jsPDF();
     doc.setFont('helvetica', 'bold');
@@ -79,10 +80,11 @@ export default function BusinessValuation() {
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(
+    const disclaimer = doc.splitTextToSize(
       'Disclaimer: This valuation is a simple tool to help business owners get a general sense of what their business may be worth. It should not be used for investment, loan, or legal decisions.',
-      20, 30, { maxWidth: 170 }
+      170
     );
+    doc.text(disclaimer, 20, 30);
 
     let y = 50;
 
@@ -138,20 +140,25 @@ export default function BusinessValuation() {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(16);
     doc.text(formatCurrency(calculateValuation().toFixed(2)), 20, y);
-    y += 12;
+    y += 16;
 
     addSection('Seller Financing Advantage');
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(11);
-    doc.text(
+
+    const sellerText1 = doc.splitTextToSize(
       'Offering seller financing under your own terms can increase your total payout while making your business more attractive to buyers.',
-      20, y, { maxWidth: 170 }
+      170
     );
-    y += 14;
-    doc.text(
+    doc.text(sellerText1, 20, y);
+    y += sellerText1.length * 6 + 4;
+
+    const sellerText2 = doc.splitTextToSize(
       'For example: Financing $250K over 4 years at 6% interest could add tens of thousands in interest income to your sale price.',
-      20, y, { maxWidth: 170 }
+      170
     );
+    doc.text(sellerText2, 20, y);
+    y += sellerText2.length * 6 + 10;
 
     doc.setFontSize(9);
     doc.setFont('helvetica', 'italic');
@@ -164,11 +171,12 @@ export default function BusinessValuation() {
     <main className="min-h-screen p-6 bg-gray-50">
       <div className="max-w-3xl mx-auto bg-white shadow-md p-6 rounded-lg">
         <h1 className="text-3xl font-bold mb-6">Valuation Wizard</h1>
+
         <p className="mb-4 text-sm text-gray-600">
-          Disclaimer: This valuation is a simple tool to help business owners get a general sense of what their business may be worth. It should not be used for investment, loan, or legal decisions.
+          📌 This valuation is a simple tool to help business owners get a general sense of what their business may be worth. 
+          It should not be used for investment, loan, or legal decisions.
         </p>
 
-        {/* ✅ Inputs */}
         <div className="space-y-4">
           <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" />
           <input name="yearsInBusiness" placeholder="Years in Business" value={formData.yearsInBusiness} onChange={handleChange} className="w-full border p-3 rounded" />
@@ -196,26 +204,19 @@ export default function BusinessValuation() {
           <label className="block font-medium">List Equipment</label>
           {formData.equipment.map((eq, idx) => (
             <div key={idx} className="flex space-x-2 mb-2">
-              <input
-                placeholder="Equipment Name"
-                value={eq.name}
-                onChange={(e) => handleEquipmentChange(idx, 'name', e.target.value)}
-                className="flex-1 border p-2 rounded"
-              />
-              <input
-                placeholder="Value ($)"
-                value={eq.value}
-                onChange={(e) => handleEquipmentChange(idx, 'value', e.target.value)}
-                className="w-32 border p-2 rounded"
-              />
+              <input placeholder="Equipment Name" value={eq.name} onChange={(e) => handleEquipmentChange(idx, 'name', e.target.value)} className="flex-1 border p-2 rounded" />
+              <input placeholder="Value ($)" value={eq.value} onChange={(e) => handleEquipmentChange(idx, 'value', e.target.value)} className="w-32 border p-2 rounded" />
             </div>
           ))}
           <button onClick={addEquipment} className="text-blue-600 hover:underline">+ Add Equipment</button>
 
           <input name="realEstateValue" placeholder="Real Estate Value ($)" value={formData.realEstateValue} onChange={handleChange} className="w-full border p-3 rounded" />
 
-          <input name="returnCustomers" placeholder="What % of customers are repeat customers?" value={formData.returnCustomers} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="contractsValue" placeholder="Value of contracts in place ($)" value={formData.contractsValue} onChange={handleChange} className="w-full border p-3 rounded" />
+          <label className="block font-medium">Percentage of Return Customers (%)</label>
+          <input name="returnCustomers" placeholder="e.g. 70%" value={formData.returnCustomers} onChange={handleChange} className="w-full border p-3 rounded" />
+
+          <label className="block font-medium">Contracts in Place (Estimated $ Value)</label>
+          <input name="contractsValue" placeholder="e.g. $100,000" value={formData.contractsValue} onChange={handleChange} className="w-full border p-3 rounded" />
 
           <label className="block font-medium">Would you consider seller financing as part of your exit?</label>
           <select name="sellerFinancing" value={formData.sellerFinancing} onChange={handleChange} className="w-full border p-3 rounded">
@@ -226,11 +227,13 @@ export default function BusinessValuation() {
 
           <div className="mt-6">
             <p className="text-xl font-semibold mb-2">Estimated Valuation: {formatCurrency(calculateValuation().toFixed(2))}</p>
-            <p className="text-sm text-gray-600">
-              💡 The price you choose to sell your business is ultimately your decision. Considering seller financing may help you achieve a better price and reduce taxable gains.
+            <p className="text-sm text-gray-600 mb-4">
+              💡 Remember: The price you choose to sell your business is ultimately your decision. 
+              Offering seller financing under your terms can increase your payout and reduce tax burdens 
+              while attracting more buyers.
             </p>
 
-            <button onClick={generatePDF} className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 mt-4">
+            <button onClick={generatePDF} className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
               Download PDF Report
             </button>
           </div>
