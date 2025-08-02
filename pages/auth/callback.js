@@ -13,11 +13,12 @@ export default function AuthCallback() {
       console.log("🌐 Full callback URL:", window.location.href);
       console.log('🔑 Domain:', window.location.origin);
 
-      // ✅ Check existing session before exchanging
+      // ✅ Check existing session before exchange
       const { data: currentSession } = await supabase.auth.getSession();
       console.log('🧪 Current Session BEFORE exchange:', currentSession);
 
-      const { error } = await supabase.auth.exchangeCodeForSession();
+      // ✅ FIX: Pass the full URL to exchangeCodeForSession
+      const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
       if (error) {
         console.error('❌ Session error:', error.message);
         router.replace('/login');
@@ -44,10 +45,9 @@ export default function AuthCallback() {
 
       if (buyer && buyer.name) {
         router.replace(`/buyer-dashboard?name=${encodeURIComponent(buyer.name)}`);
-        return;
+      } else {
+        router.replace('/buyer-onboarding');
       }
-
-      router.replace('/buyer-onboarding');
     };
 
     handleRedirect();
@@ -59,4 +59,3 @@ export default function AuthCallback() {
     </div>
   );
 }
-
