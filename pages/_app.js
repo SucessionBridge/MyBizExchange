@@ -1,15 +1,13 @@
 // pages/_app.js
 import '../styles/globals.css';
 import Header from '../components/Header';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { SessionContextProvider, useSession, useSupabaseClient } from '@supabase/auth-helpers-react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
 import { Toaster } from 'react-hot-toast';
 
-// ✅ Import Google Fonts using next/font
 import { Inter, Merriweather } from 'next/font/google';
-
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const merriweather = Merriweather({ subsets: ['latin'], weight: ['400', '700'], variable: '--font-merriweather' });
 
@@ -17,25 +15,20 @@ function AuthRedirector() {
   const session = useSession();
   const router = useRouter();
   const sb = useSupabaseClient();
+  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    console.log('🔍 AuthRedirector Path:', router.pathname, 'Force:', router.query.force, 'User:', session?.user?.id);
-
-    // ✅ Wait until Supabase finishes loading the session (undefined = still loading)
-    if (session === undefined) {
-      console.log('⏳ Session still loading, waiting...');
-      return;
+    if (!session?.user) {
+      console.log('⏸️ No session yet, waiting...');
+      return; // Don't redirect until we know
     }
 
-    // ✅ Only check redirects if user exists and we are on the homepage
-    if (!session?.user || router.pathname !== '/' || router.query.force === 'true') {
-      if (router.query.force === 'true') {
-        console.log('✅ Force=true detected. Skipping redirect to allow homepage view.');
-      }
+    if (router.pathname !== '/' || router.query.force === 'true') {
       return;
     }
 
     const checkBuyerProfile = async () => {
+      setChecking(true);
       console.log('📡 Checking buyer profile for user:', session.user.id);
 
       const { data: profile } = await sb
@@ -51,31 +44,11 @@ function AuthRedirector() {
         console.log('🆕 No profile — redirecting to onboarding');
         router.replace('/buyer-onboarding');
       }
+      setChecking(false);
     };
 
     checkBuyerProfile();
   }, [session, router, sb]);
-
-  // ✅ Fallback for stray Google redirects that skip /auth/callback
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && router.pathname === '/') {
-        console.log('🔄 Fallback: user landed on / with session, checking profile...');
-        (async () => {
-          const { data: profile } = await sb
-            .from('buyers')
-            .select('id')
-            .eq('auth_id', session.user.id)
-            .maybeSingle();
-          if (profile) {
-            router.replace('/buyer-dashboard');
-          } else {
-            router.replace('/buyer-onboarding');
-          }
-        })();
-      }
-    });
-  }, [router, sb]);
 
   return null;
 }
