@@ -1,3 +1,4 @@
+// pages/auth/callback.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../../lib/supabaseClient';
@@ -9,6 +10,12 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleRedirect = async () => {
       console.log('📍 Entered /auth/callback');
+      console.log("🌐 Full callback URL:", window.location.href);
+      console.log('🔑 Domain:', window.location.origin);
+
+      // ✅ Check existing session before exchanging
+      const { data: currentSession } = await supabase.auth.getSession();
+      console.log('🧪 Current Session BEFORE exchange:', currentSession);
 
       const { error } = await supabase.auth.exchangeCodeForSession();
       if (error) {
@@ -18,6 +25,8 @@ export default function AuthCallback() {
       }
 
       const { data: { user } } = await supabase.auth.getUser();
+      console.log('🧪 Current User AFTER exchange:', user);
+
       if (!user) {
         console.error('❌ No user found after login');
         router.replace('/login');
@@ -30,6 +39,7 @@ export default function AuthCallback() {
         .from('buyers')
         .select('name')
         .eq('auth_id', user.id)
+        .eq('email', user.email)
         .maybeSingle();
 
       if (buyer && buyer.name) {
