@@ -10,6 +10,7 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleRedirect = async () => {
       console.log('📍 Entered /auth/callback');
+      console.log("🌐 Full callback URL:", window.location.href); // ✅ Added to see the code returned
 
       // ✅ Complete login flow for Magic Link/OAuth
       const { error } = await supabase.auth.exchangeCodeForSession();
@@ -54,3 +55,4 @@ export default function AuthCallback() {
     </div>
   );
 }
+
