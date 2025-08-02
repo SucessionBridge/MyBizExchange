@@ -1,4 +1,3 @@
-// pages/auth/callback.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../../lib/supabaseClient';
