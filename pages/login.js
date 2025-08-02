@@ -6,6 +6,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // ✅ Magic Link Login
   const handleMagicLink = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -26,23 +27,13 @@ export default function Login() {
     }
   };
 
+  // ✅ Google OAuth Login
   const handleGoogleLogin = async () => {
-    const redirect =
-      process.env.NODE_ENV === 'production'
-        ? 'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback'
-        : `${window.location.origin}/auth/callback`;
-
-    console.log('🔑 Starting Google OAuth with redirect:', redirect);
-
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: redirect,
-        queryParams: {
-          prompt: 'select_account',
-          access_type: 'online',
-          response_type: 'token' // ✅ Forces implicit flow
-        }
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: 'select_account' } // Forces account selector
       }
     });
 
@@ -87,4 +78,6 @@ export default function Login() {
     </main>
   );
 }
+
+
 
