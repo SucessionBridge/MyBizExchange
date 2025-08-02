@@ -10,12 +10,7 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleRedirect = async () => {
       console.log('📍 Entered /auth/callback');
-      console.log("🌐 Full callback URL:", window.location.href);
 
-      // 🔍 Log query params to see if code/state exist
-      console.log("🔍 router.query:", router.query);
-
-      // ✅ Complete login flow for Magic Link/OAuth
       const { error } = await supabase.auth.exchangeCodeForSession();
       if (error) {
         console.error('❌ Session error:', error.message);
@@ -32,12 +27,10 @@ export default function AuthCallback() {
 
       console.log('✅ Logged in user:', user.email);
 
-      // ✅ Check buyer profile
       const { data: buyer } = await supabase
         .from('buyers')
         .select('name')
         .eq('auth_id', user.id)
-        .eq('email', user.email)
         .maybeSingle();
 
       if (buyer && buyer.name) {
@@ -45,7 +38,6 @@ export default function AuthCallback() {
         return;
       }
 
-      // ✅ No buyer profile → go to onboarding
       router.replace('/buyer-onboarding');
     };
 
