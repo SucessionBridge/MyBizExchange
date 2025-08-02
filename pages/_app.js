@@ -21,6 +21,13 @@ function AuthRedirector() {
   useEffect(() => {
     console.log('🔍 AuthRedirector Path:', router.pathname, 'Force:', router.query.force, 'User:', session?.user?.id);
 
+    // ✅ Wait until Supabase finishes loading the session (undefined = still loading)
+    if (session === undefined) {
+      console.log('⏳ Session still loading, waiting...');
+      return;
+    }
+
+    // ✅ Only check redirects if user exists and we are on the homepage
     if (!session?.user || router.pathname !== '/' || router.query.force === 'true') {
       if (router.query.force === 'true') {
         console.log('✅ Force=true detected. Skipping redirect to allow homepage view.');
@@ -49,31 +56,25 @@ function AuthRedirector() {
     checkBuyerProfile();
   }, [session, router, sb]);
 
+  // ✅ Fallback for stray Google redirects that skip /auth/callback
   useEffect(() => {
-    const { data: authListener } = sb.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔔 Auth event:', event, 'Path:', router.pathname);
-
-      if (
-        event === 'SIGNED_IN' &&
-        session?.user &&
-        router.pathname === '/' &&
-        router.query.force !== 'true'
-      ) {
-        const { data: profile } = await sb
-          .from('buyers')
-          .select('id')
-          .eq('auth_id', session.user.id)
-          .maybeSingle();
-
-        if (profile) {
-          router.replace('/buyer-dashboard');
-        } else {
-          router.replace('/buyer-onboarding');
-        }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session && router.pathname === '/') {
+        console.log('🔄 Fallback: user landed on / with session, checking profile...');
+        (async () => {
+          const { data: profile } = await sb
+            .from('buyers')
+            .select('id')
+            .eq('auth_id', session.user.id)
+            .maybeSingle();
+          if (profile) {
+            router.replace('/buyer-dashboard');
+          } else {
+            router.replace('/buyer-onboarding');
+          }
+        })();
       }
     });
-
-    return () => authListener?.subscription?.unsubscribe();
   }, [router, sb]);
 
   return null;
