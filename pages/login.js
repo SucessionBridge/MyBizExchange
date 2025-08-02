@@ -28,11 +28,19 @@ export default function Login() {
   };
 
   const handleGoogleLogin = async () => {
+    // ✅ Force production callback URL in prod to avoid PKCE mismatches
+    const redirect =
+      process.env.NODE_ENV === 'production'
+        ? 'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback'
+        : `${window.location.origin}/auth/callback`;
+
+    console.log('🔑 Starting Google OAuth with redirect:', redirect);
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: { prompt: 'select_account' } // forces redirect through callback
+        redirectTo: redirect,
+        queryParams: { prompt: 'select_account' } // ensures proper redirect flow
       }
     });
 
@@ -77,4 +85,5 @@ export default function Login() {
     </main>
   );
 }
+
 
