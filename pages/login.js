@@ -27,22 +27,32 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    // ✅ Force production callback URL in prod to avoid PKCE mismatches
-    const redirect =
-      process.env.NODE_ENV === 'production'
-        ? 'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback'
-        : `${window.location.origin}/auth/callback`;
+ const handleGoogleLogin = async () => {
+  const redirect =
+    process.env.NODE_ENV === 'production'
+      ? 'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback'
+      : `${window.location.origin}/auth/callback`;
 
-    console.log('🔑 Starting Google OAuth with redirect:', redirect);
+  console.log('🔑 Starting Google OAuth with implicit flow redirect:', redirect);
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirect,
-        queryParams: { prompt: 'select_account' } // ensures proper redirect flow
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: redirect,
+      queryParams: {
+        prompt: 'select_account',
+        // ✅ Force implicit flow, bypass PKCE verifier
+        access_type: 'online',
+        response_type: 'token'
       }
-    });
+    }
+  });
+
+  if (error) {
+    alert('❌ Google sign-in failed: ' + error.message);
+  }
+};
+
 
     if (error) {
       alert('❌ Google sign-in failed: ' + error.message);
