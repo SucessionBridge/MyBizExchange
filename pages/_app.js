@@ -1,11 +1,10 @@
-// pages/_app.js
 import '../styles/globals.css';
 import Header from '../components/Header';
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
 import supabase from '../lib/supabaseClient';
 import { Toaster } from 'react-hot-toast';
 
-// ✅ Google Fonts
+// ✅ Import Google Fonts using next/font
 import { Inter, Merriweather } from 'next/font/google';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
@@ -33,4 +32,5 @@ export default function App({ Component, pageProps }) {
     </SessionContextProvider>
   );
 }
+
 
