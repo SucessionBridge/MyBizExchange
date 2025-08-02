@@ -25,20 +25,6 @@ export default function Login() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: 'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback',
-        queryParams: { prompt: 'select_account' }
-      }
-    });
-
-    if (error) {
-      alert('❌ Google sign-in failed: ' + error.message);
-    }
-  };
-
   return (
     <main className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
       <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
@@ -61,21 +47,9 @@ export default function Login() {
             {loading ? 'Sending Magic Link...' : 'Send Magic Link'}
           </button>
         </form>
-
-        <div className="mt-6 text-center">
-          <p className="text-gray-500 mb-2">OR</p>
-          <button
-            onClick={handleGoogleLogin}
-            className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded"
-          >
-            Sign in with Google
-          </button>
-        </div>
       </div>
     </main>
   );
 }
-
-
 
 
