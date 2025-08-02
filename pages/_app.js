@@ -15,45 +15,51 @@ function AuthRedirector() {
   const session = useSession();
   const router = useRouter();
   const sb = useSupabaseClient();
-  const [checking, setChecking] = useState(false);
 
   useEffect(() => {
-    if (!session?.user) {
-      console.log('⏸️ No session yet, waiting...');
-      return; // Don't redirect until we know
+    // ✅ Don't run redirect logic on the callback page
+    if (router.pathname === '/auth/callback') return;
+
+    if (!session?.user) return; // Wait for session to exist
+
+    // ✅ Only redirect if on the homepage
+    if (router.pathname === '/' && router.query.force !== 'true') {
+      const checkBuyerProfile = async () => {
+        const { data: profile } = await sb
+          .from('buyers')
+          .select('id')
+          .eq('auth_id', session.user.id)
+          .maybeSingle();
+
+        if (profile) {
+          router.replace('/buyer-dashboard');
+        } else {
+          router.replace('/buyer-onboarding');
+        }
+      };
+      checkBuyerProfile();
     }
-
-    if (router.pathname !== '/' || router.query.force === 'true') {
-      return;
-    }
-
-    const checkBuyerProfile = async () => {
-      setChecking(true);
-      console.log('📡 Checking buyer profile for user:', session.user.id);
-
-      const { data: profile } = await sb
-        .from('buyers')
-        .select('id')
-        .eq('auth_id', session.user.id)
-        .maybeSingle();
-
-      if (profile) {
-        console.log('✅ Buyer found — redirecting to dashboard');
-        router.replace('/buyer-dashboard');
-      } else {
-        console.log('🆕 No profile — redirecting to onboarding');
-        router.replace('/buyer-onboarding');
-      }
-      setChecking(false);
-    };
-
-    checkBuyerProfile();
   }, [session, router, sb]);
 
   return null;
 }
 
 export default function App({ Component, pageProps }) {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    // ✅ Wait until Supabase restores session before rendering anything
+    const init = async () => {
+      await supabase.auth.getSession();
+      setReady(true);
+    };
+    init();
+  }, []);
+
+  if (!ready) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+
   return (
     <SessionContextProvider supabaseClient={supabase} initialSession={pageProps.initialSession}>
       <AuthRedirector />
