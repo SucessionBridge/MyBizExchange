@@ -1,9 +1,33 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
+import { useSession } from '@supabase/auth-helpers-react';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
+  const session = useSession();
+  const router = useRouter();
+
+  // ✅ If user is logged in, redirect away from login page
+  useEffect(() => {
+    if (session?.user) {
+      const checkProfile = async () => {
+        const { data: buyer } = await supabase
+          .from('buyers')
+          .select('id')
+          .eq('auth_id', session.user.id)
+          .maybeSingle();
+
+        if (buyer) {
+          router.replace('/buyer-dashboard');
+        } else {
+          router.replace('/buyer-onboarding');
+        }
+      };
+      checkProfile();
+    }
+  }, [session, router]);
 
   const handleMagicLink = async (e) => {
     e.preventDefault();
@@ -12,7 +36,7 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: 'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback'
+        emailRedirectTo: `${window.location.origin}/auth/callback`
       }
     });
 
@@ -51,6 +75,4 @@ export default function Login() {
     </main>
   );
 }
-
-
 
