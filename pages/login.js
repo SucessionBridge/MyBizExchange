@@ -6,7 +6,6 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // ✅ Magic Link login
   const handleMagicLink = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -27,7 +26,6 @@ export default function Login() {
     }
   };
 
-  // ✅ Google login (implicit flow to bypass PKCE)
   const handleGoogleLogin = async () => {
     const redirect =
       process.env.NODE_ENV === 'production'
@@ -43,7 +41,7 @@ export default function Login() {
         queryParams: {
           prompt: 'select_account',
           access_type: 'online',
-          response_type: 'token' // ✅ Forces implicit flow (no PKCE)
+          response_type: 'token' // ✅ Forces implicit flow
         }
       }
     });
@@ -58,7 +56,6 @@ export default function Login() {
       <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
         <h1 className="text-2xl font-bold mb-4 text-center">Login</h1>
 
-        {/* ✅ Magic Link Form */}
         <form onSubmit={handleMagicLink} className="space-y-4">
           <input
             type="email"
@@ -71,5 +68,23 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hov
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded"
+          >
+            {loading ? 'Sending Magic Link...' : 'Send Magic Link'}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <p className="text-gray-500 mb-2">OR</p>
+          <button
+            onClick={handleGoogleLogin}
+            className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded"
+          >
+            Sign in with Google
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+}
 
