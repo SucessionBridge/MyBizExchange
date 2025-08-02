@@ -1,4 +1,3 @@
-// pages/login.js
 import { useState } from 'react';
 import supabase from '../lib/supabaseClient';
 
@@ -6,7 +5,6 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // ✅ Magic Link Login
   const handleMagicLink = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -14,7 +12,7 @@ export default function Login() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`
+        emailRedirectTo: 'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback'
       }
     });
 
@@ -27,13 +25,12 @@ export default function Login() {
     }
   };
 
-  // ✅ Google OAuth Login
   const handleGoogleLogin = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: { prompt: 'select_account' } // Forces account selector
+        redirectTo: 'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback',
+        queryParams: { prompt: 'select_account' }
       }
     });
 
@@ -78,6 +75,7 @@ export default function Login() {
     </main>
   );
 }
+
 
 
 
