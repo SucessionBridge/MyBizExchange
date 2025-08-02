@@ -1,3 +1,4 @@
+
 // pages/auth/callback.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -12,62 +13,59 @@ export default function AuthCallback() {
       console.log('📍 Entered /auth/callback');
       console.log("🌐 Full callback URL:", window.location.href);
 
-      const url = window.location.href;
+      // ✅ Handle implicit flow (#access_token) for Magic Link
+      if (window.location.hash.includes('access_token')) {
+        const params = new URLSearchParams(window.location.hash.replace('#', ''));
+        const access_token = params.get('access_token');
+        const refresh_token = params.get('refresh_token');
+        console.log('🔐 Using implicit flow tokens');
 
-      try {
-        if (url.includes('#access_token')) {
-          // ✅ Implicit flow (Google)
-          const params = new URLSearchParams(url.split('#')[1]);
-          const access_token = params.get('access_token');
-          const refresh_token = params.get('refresh_token');
-
-          if (access_token && refresh_token) {
-            console.log('🔐 Setting session from hash tokens');
-            await supabase.auth.setSession({ access_token, refresh_token });
-          } else {
-            console.error('❌ Missing tokens in implicit flow');
-            router.replace('/login');
-            return;
-          }
-        } else if (url.includes('?code=')) {
-          // ✅ PKCE flow (Magic Link)
-          console.log('🔄 Exchanging PKCE code for session');
-          const { error } = await supabase.auth.exchangeCodeForSession(url);
-          if (error) {
-            console.error('❌ exchangeCodeForSession error:', error.message);
-            router.replace('/login');
-            return;
-          }
-        } else {
-          console.error('❌ No auth tokens or code in URL');
+        if (access_token && refresh_token) {
+          await supabase.auth.setSession({
+            access_token,
+            refresh_token
+          });
+        }
+      } else {
+        // ✅ Standard PKCE code exchange flow (Google OAuth)
+        const { error } = await supabase.auth.exchangeCodeForSession(window.location.href);
+        if (error) {
+          console.error('❌ Session error:', error.message);
           router.replace('/login');
           return;
         }
+      }
 
-        // ✅ After session set, get user
-        const { data: { user } } = await supabase.auth.getUser();
-        console.log('✅ Logged in user:', user);
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('✅ Logged in user ID:', user?.id);
+      console.log('✅ Logged in user Email:', user?.email);
 
-        if (!user) {
-          router.replace('/login');
-          return;
-        }
+      if (!user) {
+        console.error('❌ No user found after login');
+        router.replace('/login');
+        return;
+      }
 
-        // ✅ Check buyer profile
-        const { data: buyer } = await supabase
-          .from('buyers')
-          .select('name')
-          .eq('auth_id', user.id)
-          .eq('email', user.email)
-          .maybeSingle();
+      // ✅ Case-insensitive email match + auth_id OR email fallback
+      const { data: buyer } = await supabase
+        .from('buyers')
+        .select('name, auth_id, email')
+        .or(`auth_id.eq.${user.id},email.ilike.${user.email}`)
+        .maybeSingle();
 
-        if (buyer && buyer.name) {
-          router.replace(`/buyer-dashboard?name=${encodeURIComponent(buyer.name)}`);
-        } else {
-          router.replace('/buyer-onboarding');
-        }
-      } finally {
-        setLoading(false);
+      console.log('🧪 Buyer profile lookup result:', buyer);
+
+      if (buyer) {
+        console.log('🔍 DB auth_id:', buyer.auth_id);
+        console.log('🔍 DB email:', buyer.email);
+      } else {
+        console.log('⚠️ No matching buyer found');
+      }
+
+      if (buyer && buyer.name) {
+        router.replace(`/buyer-dashboard?name=${encodeURIComponent(buyer.name)}`);
+      } else {
+        router.replace('/buyer-onboarding');
       }
     };
 
