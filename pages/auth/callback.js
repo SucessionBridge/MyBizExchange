@@ -10,7 +10,10 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleRedirect = async () => {
       console.log('📍 Entered /auth/callback');
-      console.log("🌐 Full callback URL:", window.location.href); // ✅ Added to see the code returned
+      console.log("🌐 Full callback URL:", window.location.href);
+
+      // 🔍 Log query params to see if code/state exist
+      console.log("🔍 router.query:", router.query);
 
       // ✅ Complete login flow for Magic Link/OAuth
       const { error } = await supabase.auth.exchangeCodeForSession();
