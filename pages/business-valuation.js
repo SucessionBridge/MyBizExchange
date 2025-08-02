@@ -7,7 +7,6 @@ export default function BusinessValuation() {
     yearsInBusiness: '',
     email: '',
     industry: '',
-    otherIndustry: '',
     annualRevenue: '',
     annualExpenses: '',
     totalSalariesPaid: '',
@@ -15,12 +14,11 @@ export default function BusinessValuation() {
     personalAddBacks: '',
     hasEmployees: 'yes',
     equipment: [{ name: '', value: '' }],
-    realEstateIncluded: 'no',
     realEstateValue: '',
+    includeRealEstate: 'no',
     returnCustomers: '',
-    hasContracts: 'no',
     contractsValue: '',
-    sellerFinancing: 'maybe',
+    sellerFinancing: 'no'
   });
 
   const industries = [
@@ -53,7 +51,7 @@ export default function BusinessValuation() {
     const expenses = parseFloat(formData.annualExpenses) || 0;
     const ownerSalaryAddBack = parseFloat(formData.ownerSalaryAddBack) || 0;
     const addBacks = parseFloat(formData.personalAddBacks) || 0;
-    const realEstate = formData.realEstateIncluded === 'yes' ? parseFloat(formData.realEstateValue) || 0 : 0;
+    const realEstate = formData.includeRealEstate === 'yes' ? (parseFloat(formData.realEstateValue) || 0) : 0;
 
     const equipmentValue = formData.equipment.reduce((sum, eq) => {
       return sum + (parseFloat(eq.value) || 0);
@@ -66,99 +64,108 @@ export default function BusinessValuation() {
       : (formData.hasEmployees === 'yes' ? 2.2 : 1.8);
 
     const sdeValue = sde * multiplier;
-    return { businessValue: sdeValue, realEstateValue: realEstate, total: sdeValue + realEstate };
+
+    return sdeValue + realEstate;
   };
 
   const generatePDF = () => {
-    const { businessValue, realEstateValue, total } = calculateValuation();
-
     const doc = new jsPDF();
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(18);
     doc.text('SuccessionBridge Business Valuation', 20, 20);
 
-    doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.text(
       'Disclaimer: This valuation is a simple tool to help business owners get a general sense of what their business may be worth. It should not be used for investment, loan, or legal decisions.',
-      20,
-      30,
-      { maxWidth: 170 }
+      20, 28, { maxWidth: 170 }
     );
 
-    let y = 50;
-    const addLine = (label, value) => {
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${label}:`, 20, y);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`${value}`, 90, y);
-      y += 10;
-    };
+    let y = 40;
+    doc.setFontSize(14);
+    doc.text('Business Information', 20, y);
+    y += 2;
+    doc.line(20, y, 190, y);
+    y += 8;
 
-    addLine('Business Name', formData.businessName);
-    addLine('Years in Business', formData.yearsInBusiness);
-    addLine('Email', formData.email);
-    addLine('Industry', formData.industry === 'Other' ? formData.otherIndustry : formData.industry);
-    addLine('Annual Revenue', `$${formData.annualRevenue}`);
-    addLine('Annual Expenses', `$${formData.annualExpenses}`);
-    addLine('Total Salaries Paid', `$${formData.totalSalariesPaid}`);
-    addLine("Owner's Salary Add-Back", `$${formData.ownerSalaryAddBack}`);
-    addLine('Personal Add-Backs', `$${formData.personalAddBacks}`);
-    addLine('Employees', formData.hasEmployees);
+    doc.setFontSize(12);
+    doc.text(`Business Name: ${formData.businessName}`, 20, y); y += 8;
+    doc.text(`Years in Business: ${formData.yearsInBusiness}`, 20, y); y += 8;
+    doc.text(`Email: ${formData.email}`, 20, y); y += 8;
+    doc.text(`Industry: ${formData.industry}`, 20, y); y += 12;
 
-    doc.setFont('helvetica', 'bold');
-    doc.text('Equipment:', 20, y);
-    y += 10;
-    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(14);
+    doc.text('Financials', 20, y);
+    y += 2;
+    doc.line(20, y, 190, y);
+    y += 8;
+
+    doc.setFontSize(12);
+    doc.text(`Annual Revenue: $${formData.annualRevenue}`, 20, y); y += 8;
+    doc.text(`Annual Expenses: $${formData.annualExpenses}`, 20, y); y += 8;
+    doc.text(`Total Salaries Paid: $${formData.totalSalariesPaid}`, 20, y); y += 8;
+    doc.text(`Owner's Salary Add-Back: $${formData.ownerSalaryAddBack}`, 20, y); y += 8;
+    doc.text(`Personal Add-Backs: $${formData.personalAddBacks}`, 20, y); y += 12;
+
+    doc.setFontSize(14);
+    doc.text('Additional Details', 20, y);
+    y += 2;
+    doc.line(20, y, 190, y);
+    y += 8;
+
+    doc.setFontSize(12);
+    doc.text(`Employees: ${formData.hasEmployees}`, 20, y); y += 8;
+    doc.text(`Return Customers (%): ${formData.returnCustomers}`, 20, y); y += 8;
+    doc.text(`Contracts Value: $${formData.contractsValue}`, 20, y); y += 8;
+
+    doc.text('Equipment:', 20, y); y += 8;
     formData.equipment.forEach(eq => {
-      doc.text(`- ${eq.name || 'N/A'}: $${eq.value || 0}`, 30, y);
-      y += 10;
+      doc.text(`- ${eq.name}: $${eq.value}`, 30, y);
+      y += 8;
     });
 
-    if (formData.realEstateIncluded === 'yes') {
-      addLine('Real Estate Value', `$${formData.realEstateValue}`);
-    }
+    doc.text(`Include Real Estate: ${formData.includeRealEstate}`, 20, y); y += 8;
+    doc.text(`Real Estate Value: $${formData.realEstateValue}`, 20, y); y += 12;
 
-    addLine('Estimated Business Value', `$${businessValue.toFixed(2)}`);
-    if (realEstateValue > 0) {
-      addLine('Estimated Total (Business + Real Estate)', `$${total.toFixed(2)}`);
-    }
+    doc.setFontSize(14);
+    doc.text(`Estimated Valuation: $${calculateValuation().toFixed(2)}`, 20, y);
+    y += 14;
 
-    y += 10;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Seller Financing Advantage:', 20, y);
-    y += 10;
-    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(14);
+    doc.text('Seller Financing Advantage', 20, y);
+    y += 2;
+    doc.line(20, y, 190, y);
+    y += 8;
+
+    doc.setFontSize(12);
     doc.text(
-      'Offering seller financing under your own terms can increase your total payout. For example, financing part of the sale over several years with interest can add significant income and attract more buyers.',
-      20,
-      y,
-      { maxWidth: 170 }
+      'Offering seller financing under your own terms can increase your total payout while making your business more attractive to buyers.',
+      20, y, { maxWidth: 170 }
     );
-
-    y += 40;
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'italic');
+    y += 12;
+    doc.setFontSize(10);
     doc.text('Generated by SuccessionBridge Valuation Wizard', 20, y);
+    y += 12;
+    doc.setFontSize(12);
+    doc.text(
+      'For example: Financing $250K over 4 years at 6% interest could add tens of thousands in interest income to your sale price.',
+      20, y, { maxWidth: 170 }
+    );
 
     doc.save('valuation-report.pdf');
   };
-
-  const { businessValue, realEstateValue, total } = calculateValuation();
 
   return (
     <main className="min-h-screen p-6 bg-gray-50">
       <div className="max-w-3xl mx-auto bg-white shadow-md p-6 rounded-lg">
         <h1 className="text-3xl font-bold mb-2">Valuation Wizard</h1>
-        <p className="text-sm text-gray-600 mb-6">
-          Disclaimer: This valuation is a simple tool to help business owners get a general sense of what their business may be worth. 
-          It should not be used for investment, loan, or legal decisions.
+        <p className="mb-4 text-sm text-gray-600">
+          📌 This valuation is a simple tool to help business owners get a general sense of what their business may be worth. It should not be used for investment, loan, or legal decisions.
         </p>
 
         <div className="space-y-4">
           <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" />
           <input name="yearsInBusiness" placeholder="Years in Business" value={formData.yearsInBusiness} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="email" type="email" placeholder="Email Address (for report delivery)" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" required />
+          <input name="email" type="email" placeholder="Email Address (we’ll send your report)" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" required />
 
           <select name="industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded">
             <option value="">Select Industry</option>
@@ -167,15 +174,11 @@ export default function BusinessValuation() {
             ))}
           </select>
 
-          {formData.industry === 'Other' && (
-            <input name="otherIndustry" placeholder="Enter Industry" value={formData.otherIndustry} onChange={handleChange} className="w-full border p-3 rounded" />
-          )}
-
           <input name="annualRevenue" placeholder="Annual Revenue ($)" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
           <input name="annualExpenses" placeholder="Annual Expenses ($)" value={formData.annualExpenses} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="totalSalariesPaid" placeholder="Total Salaries Paid ($)" value={formData.totalSalariesPaid} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="ownerSalaryAddBack" placeholder="Owner's Salary Add-Back ($)" value={formData.ownerSalaryAddBack} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="personalAddBacks" placeholder="Personal Add-Backs ($)" value={formData.personalAddBacks} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="totalSalariesPaid" placeholder="Total Salaries Paid (including owner)" value={formData.totalSalariesPaid} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="ownerSalaryAddBack" placeholder="Owner’s Salary (only if already included above)" value={formData.ownerSalaryAddBack} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="personalAddBacks" placeholder="Add-backs (personal expenses, etc.)" value={formData.personalAddBacks} onChange={handleChange} className="w-full border p-3 rounded" />
 
           <label className="block font-medium">Does your business have employees?</label>
           <select name="hasEmployees" value={formData.hasEmployees} onChange={handleChange} className="w-full border p-3 rounded">
@@ -183,53 +186,45 @@ export default function BusinessValuation() {
             <option value="no">No, I operate it alone</option>
           </select>
 
+          <label className="block font-medium">Return Customers (%)</label>
+          <input name="returnCustomers" placeholder="Approximate percentage of repeat customers" value={formData.returnCustomers} onChange={handleChange} className="w-full border p-3 rounded" />
+
+          <label className="block font-medium">Contracts in Place ($ value)</label>
+          <input name="contractsValue" placeholder="Total value of active contracts" value={formData.contractsValue} onChange={handleChange} className="w-full border p-3 rounded" />
+
           <label className="block font-medium">List Non-Essential Equipment</label>
+          <p className="text-sm text-gray-600">💡 Only include equipment here if it is NOT essential to running the business (like extra tools or backup vehicles). If the equipment is required for daily operations (e.g. oven for a bakery, dump truck for landscaping), leave this blank — its value is already reflected in the valuation multiplier.</p>
+
           {formData.equipment.map((eq, idx) => (
             <div key={idx} className="flex space-x-2 mb-2">
-              <input
-                placeholder="Equipment Name"
-                value={eq.name}
-                onChange={(e) => handleEquipmentChange(idx, 'name', e.target.value)}
-                className="flex-1 border p-2 rounded"
-              />
-              <input
-                placeholder="Value ($)"
-                value={eq.value}
-                onChange={(e) => handleEquipmentChange(idx, 'value', e.target.value)}
-                className="w-32 border p-2 rounded"
-              />
+              <input placeholder="Equipment Name" value={eq.name} onChange={(e) => handleEquipmentChange(idx, 'name', e.target.value)} className="flex-1 border p-2 rounded" />
+              <input placeholder="Value ($)" value={eq.value} onChange={(e) => handleEquipmentChange(idx, 'value', e.target.value)} className="w-32 border p-2 rounded" />
             </div>
           ))}
           <button onClick={addEquipment} className="text-blue-600 hover:underline">+ Add Equipment</button>
 
           <label className="block font-medium">Include Real Estate in Valuation?</label>
-          <select name="realEstateIncluded" value={formData.realEstateIncluded} onChange={handleChange} className="w-full border p-3 rounded">
+          <p className="text-sm text-gray-600">💡 If you own the property and plan to include it in the sale, select "Yes". If the property is not part of the sale (or will be leased), select "No".</p>
+          <select name="includeRealEstate" value={formData.includeRealEstate} onChange={handleChange} className="w-full border p-3 rounded">
             <option value="no">No</option>
             <option value="yes">Yes</option>
           </select>
-          {formData.realEstateIncluded === 'yes' && (
-            <input name="realEstateValue" placeholder="Real Estate Value ($)" value={formData.realEstateValue} onChange={handleChange} className="w-full border p-3 rounded" />
-          )}
+          <input name="realEstateValue" placeholder="Real Estate Value ($)" value={formData.realEstateValue} onChange={handleChange} className="w-full border p-3 rounded" />
 
           <label className="block font-medium">Would you consider seller financing as part of your exit?</label>
           <select name="sellerFinancing" value={formData.sellerFinancing} onChange={handleChange} className="w-full border p-3 rounded">
+            <option value="no">No</option>
             <option value="yes">Yes</option>
             <option value="maybe">Maybe</option>
-            <option value="no">No</option>
           </select>
 
           <div className="mt-6">
-            <p className="text-xl font-semibold mb-2">Estimated Business Value: ${businessValue.toFixed(2)}</p>
-            {realEstateValue > 0 && (
-              <p className="text-lg text-gray-700 mb-2">+ Real Estate: ${realEstateValue.toFixed(2)}</p>
-            )}
-            <p className="text-xl font-bold mb-4">Total Estimated Value: ${total.toFixed(2)}</p>
-
-            <p className="text-sm text-gray-600 mb-4">
-              💡 The price you choose to sell your business is ultimately your decision. Considering seller financing under your terms can increase your total payout and attract more buyers.
+            <p className="text-xl font-semibold mb-2">Estimated Valuation: ${calculateValuation().toFixed(2)}</p>
+            <p className="text-sm text-gray-600">
+              💡 The price you choose to sell your business is ultimately your decision. How you get paid and who you sell it to are also your decisions. Use this valuation as a guideline, and remember: offering seller financing under your own terms can increase your payout and make your business more attractive to buyers.
             </p>
 
-            <button onClick={generatePDF} className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
+            <button onClick={generatePDF} className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 mt-4">
               Download PDF Report
             </button>
           </div>
