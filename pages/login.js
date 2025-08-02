@@ -1,12 +1,12 @@
+// pages/login.js
 import { useState } from 'react';
-import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
+  // ✅ Magic Link login
   const handleMagicLink = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -27,32 +27,26 @@ export default function Login() {
     }
   };
 
- const handleGoogleLogin = async () => {
-  const redirect =
-    process.env.NODE_ENV === 'production'
-      ? 'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback'
-      : `${window.location.origin}/auth/callback`;
+  // ✅ Google login (implicit flow to bypass PKCE)
+  const handleGoogleLogin = async () => {
+    const redirect =
+      process.env.NODE_ENV === 'production'
+        ? 'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback'
+        : `${window.location.origin}/auth/callback`;
 
-  console.log('🔑 Starting Google OAuth with implicit flow redirect:', redirect);
+    console.log('🔑 Starting Google OAuth with redirect:', redirect);
 
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: redirect,
-      queryParams: {
-        prompt: 'select_account',
-        // ✅ Force implicit flow, bypass PKCE verifier
-        access_type: 'online',
-        response_type: 'token'
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: redirect,
+        queryParams: {
+          prompt: 'select_account',
+          access_type: 'online',
+          response_type: 'token' // ✅ Forces implicit flow (no PKCE)
+        }
       }
-    }
-  });
-
-  if (error) {
-    alert('❌ Google sign-in failed: ' + error.message);
-  }
-};
-
+    });
 
     if (error) {
       alert('❌ Google sign-in failed: ' + error.message);
@@ -64,6 +58,7 @@ export default function Login() {
       <div className="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
         <h1 className="text-2xl font-bold mb-4 text-center">Login</h1>
 
+        {/* ✅ Magic Link Form */}
         <form onSubmit={handleMagicLink} className="space-y-4">
           <input
             type="email"
@@ -76,24 +71,5 @@ export default function Login() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded"
-          >
-            {loading ? 'Sending Magic Link...' : 'Send Magic Link'}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center">
-          <p className="text-gray-500 mb-2">OR</p>
-          <button
-            onClick={handleGoogleLogin}
-            className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded"
-          >
-            Sign in with Google
-          </button>
-        </div>
-      </div>
-    </main>
-  );
-}
-
+            className="w-full bg-blue-600 hov
 
