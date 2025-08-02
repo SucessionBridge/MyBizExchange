@@ -28,15 +28,11 @@ export default function Login() {
   };
 
   const handleGoogleLogin = async () => {
-  await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: `${window.location.origin}/auth/callback`,
-      queryParams: { prompt: 'select_account' } // forces redirect through callback
-    }
-  });
-};
-
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { prompt: 'select_account' } // forces redirect through callback
       }
     });
 
@@ -81,5 +77,4 @@ export default function Login() {
     </main>
   );
 }
-
 
