@@ -30,10 +30,10 @@ export default function Header() {
   return (
     <header className="bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
-        {/* ✅ Homepage logo bypass redirect */}
+        {/* ✅ Homepage logo */}
         <Link href="/?force=true">
           <span className="flex items-center text-2xl font-serif font-bold cursor-pointer">
-            <span className="text-[#2E3A59]">Succession</span>
+            <span className="text-[#1E3A8A]">Succession</span>
             <span className="text-[#F59E0B] flex items-center relative">
               Bridge
               <svg
@@ -45,10 +45,10 @@ export default function Header() {
                 <path
                   d="M0 60h200v4H0z M20 60V30h4v30z M180 60V30h-4v30z M0 30 C60 0 140 0 200 30"
                   fill="none"
-                  stroke="#F59E0B"
+                  stroke="#F59E0B"   // ✅ Golden bridge line
                   strokeWidth="4"
                 />
-                <path d="M95 60V20h4v40z" fill="#F59E0B" />
+                <path d="M95 60V20h4v40z" fill="#F59E0B" /> {/* ✅ Golden center pillar */}
               </svg>
             </span>
           </span>
@@ -163,4 +163,5 @@ export default function Header() {
     </header>
   );
 }
+
 
