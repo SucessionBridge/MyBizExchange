@@ -76,14 +76,25 @@ seller_financing_considered: '',
           const res = await fetch('/api/generate-description', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sentenceSummary: formData.sentenceSummary,
-              customers: formData.customers,
-              opportunity: formData.growthPotential,
-              uniqueEdge: formData.customerLove || formData.proudOf,
-              industry: formData.industry,
-              location: formData.location
-            })
+           body: JSON.stringify({
+  sentenceSummary: formData.sentenceSummary,
+  customers: formData.customers,
+  bestSellers: formData.bestSellers,
+  customerLove: formData.customerLove,
+  repeatCustomers: formData.repeatCustomers,
+  keepsThemComing: formData.keepsThemComing,
+  ownerInvolvement: formData.ownerInvolvement,
+  opportunity: formData.growthPotential,
+  proudOf: formData.proudOf,
+  adviceToBuyer: formData.adviceToBuyer,
+  businessName: formData.businessName,
+  industry: formData.industry,
+  location: formData.location || `${formData.location_city}, ${formData.location_state}`,
+  annualRevenue: formData.annualRevenue,
+  annualProfit: formData.annualProfit,
+  includesInventory: formData.includesInventory,
+  includesBuilding: formData.includesBuilding
+})
           });
 
           if (!res.ok) {
