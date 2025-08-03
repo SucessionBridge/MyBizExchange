@@ -17,8 +17,8 @@ export default function BusinessValuation() {
     equipment: [{ name: '', value: '' }],
     realEstateValue: '',
     sellerFinancing: 'no',
-    returnCustomers: '',       // ✅ Added back
-    contractsInPlace: ''       // ✅ Added back
+    returnCustomers: '',       // ✅ Additional Notes restored
+    contractsInPlace: ''       // ✅ Additional Notes restored
   });
 
   const industries = [
@@ -78,12 +78,12 @@ export default function BusinessValuation() {
     const { businessValue, totalValue } = calculateValuation();
     const doc = new jsPDF();
 
-    // Title
+    // === Title ===
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
     doc.text('SuccessionBridge Business Valuation', 20, 20);
 
-    // Disclaimer
+    // === Disclaimer ===
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.text(
@@ -115,6 +115,7 @@ export default function BusinessValuation() {
     addLine('Email:', formData.email);
     addLine('Industry:', formData.industry);
 
+    // === Financials ===
     y += 6;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
@@ -132,6 +133,7 @@ export default function BusinessValuation() {
       addLine('Real Estate Value:', `$${parseFloat(formData.realEstateValue || 0).toLocaleString()}`);
     }
 
+    // === Equipment ===
     y += 6;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
@@ -150,7 +152,7 @@ export default function BusinessValuation() {
       y += lineHeight;
     }
 
-    // ✅ Additional Notes Section Restored
+    // === Additional Notes ===
     y += 6;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
@@ -196,7 +198,7 @@ export default function BusinessValuation() {
       { maxWidth: 170 }
     );
 
-    // Footer
+    // === Footer ===
     y += 20;
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(9);
@@ -274,7 +276,7 @@ export default function BusinessValuation() {
             <input name="realEstateValue" placeholder="Real Estate Value ($)" value={formData.realEstateValue} onChange={handleChange} className="w-full border p-3 rounded" />
           )}
 
-          {/* ✅ Re-added missing fields */}
+          {/* ✅ Additional Notes inputs restored */}
           <input name="returnCustomers" placeholder="Return Customers % (e.g. 75%)" value={formData.returnCustomers} onChange={handleChange} className="w-full border p-3 rounded" />
           <input name="contractsInPlace" placeholder="Contracts in Place (e.g. 3 long-term clients)" value={formData.contractsInPlace} onChange={handleChange} className="w-full border p-3 rounded" />
 
