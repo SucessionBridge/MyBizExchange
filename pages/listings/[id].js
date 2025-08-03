@@ -1,199 +1,331 @@
+import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import supabase from '../lib/supabaseClient';
-import Link from 'next/link';
-import Head from 'next/head';
+import supabase from '../../lib/supabaseClient'; // ✅ Fixed path
 
-function ListingCard({ listing, index }) {
-  const imageUrl =
-    Array.isArray(listing.image_urls) &&
-    listing.image_urls.length > 0 &&
-    listing.image_urls[0]
-      ? listing.image_urls[0]
-      : '/placeholder-listing.jpg'; // ✅ Use branded placeholder
+export default function ListingDetail() {
+  const router = useRouter();
+  const { id } = router.query;
 
-  const displayName = listing.hide_business_name
-    ? 'Confidential Business Listing'
-    : (listing.business_name && listing.business_name.trim()) ||
-      (listing.businessName && listing.businessName.trim()) ||
-      `${listing.industry || 'Unnamed'} Business`;
-
-  const description =
-    listing.description_choice === 'ai'
-      ? listing.ai_description?.trim()
-      : listing.business_description?.trim();
-
-  return (
-    <div
-      key={`${listing.id}-${index}`}
-      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col"
-    >
-      <img
-        src={imageUrl}
-        alt={`${displayName} image`}
-        className="w-full h-48 object-cover"
-        onError={(e) => {
-          e.target.onerror = null;
-          e.target.src = '/placeholder-listing.jpg';
-        }}
-      />
-
-      <div className="p-5 flex flex-col flex-grow">
-        <h2 className="text-xl font-bold text-gray-900 mb-1">{displayName}</h2>
-        <p className="text-sm text-gray-500 font-medium mb-3">
-          {(listing.location || 'Unknown')} • {(listing.industry || 'Unspecified')}
-        </p>
-
-        <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed mb-4">
-          {description || 'No description provided.'}
-        </p>
-
-        <div className="grid grid-cols-3 gap-2 text-sm text-gray-800 mb-3">
-          <p><strong>Revenue:</strong><br />${Number(listing.annual_revenue || 0).toLocaleString()}</p>
-          <p><strong>Profit:</strong><br />${Number(listing.annual_profit || 0).toLocaleString()}</p>
-          <p><strong>Price:</strong><br />${Number(listing.asking_price || 0).toLocaleString()}</p>
-        </div>
-
-        {listing.financing_type?.toLowerCase().includes('seller') && (
-          <span className="inline-block bg-green-50 text-green-700 text-xs font-semibold px-2 py-1 rounded border border-green-200 mb-3">
-            Seller Financing Available
-          </span>
-        )}
-
-        <div className="mt-auto">
-          <Link href={`/listings/${listing.id}`}>
-            <a className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-medium text-center py-2 rounded-lg transition">
-              View Details
-            </a>
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function Listings() {
-  const [listings, setListings] = useState([]);
+  const [listing, setListing] = useState(null);
+  const [buyer, setBuyer] = useState(null);
+  const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedTerm, setDebouncedTerm] = useState('');
+  const [success, setSuccess] = useState(false);
+
+  const toTitleCase = (str) =>
+    str
+      ? str
+          .toLowerCase()
+          .split(' ')
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(' ')
+      : '';
 
   useEffect(() => {
-    const handler = setTimeout(() => setDebouncedTerm(searchTerm), 500);
-    return () => clearTimeout(handler);
-  }, [searchTerm]);
+    if (!id) return;
+    fetchListing();
+    fetchBuyerProfile();
+  }, [id]);
 
-  useEffect(() => {
-    async function fetchListings() {
-      setLoading(true);
-      let query = supabase
-        .from('sellers')
-        .select(`
-          id,
-          business_name,
-          hide_business_name,
-          business_description,
-          ai_description,
-          description_choice,
-          image_urls,
-          location,
-          industry,
-          annual_revenue,
-          annual_profit,
-          asking_price,
-          financing_type,
-          created_at
-        `)
-        .order('created_at', { ascending: false });
+  async function fetchListing() {
+    const { data, error } = await supabase
+      .from('sellers')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-      if (debouncedTerm.trim() !== '') {
-        query = query.or(
-          `business_name.ilike.%${debouncedTerm}%,industry.ilike.%${debouncedTerm}%,location.ilike.%${debouncedTerm}%,business_description.ilike.%${debouncedTerm}%,ai_description.ilike.%${debouncedTerm}%`
-        );
-      }
+    if (error) {
+      console.error('Error loading listing:', error);
+    } else {
+      setListing(data);
+    }
+  }
 
-      const { data, error } = await query;
-      if (error) console.error('❌ Error fetching listings:', error);
-      else setListings(data);
+  async function fetchBuyerProfile() {
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
       setLoading(false);
+      return;
     }
 
-    fetchListings();
-  }, [debouncedTerm]);
+    let { data: buyerData } = await supabase
+      .from('buyers')
+      .select('*')
+      .eq('auth_id', user.id)
+      .maybeSingle();
+
+    if (!buyerData) {
+      const { data: emailMatch } = await supabase
+        .from('buyers')
+        .select('*')
+        .eq('email', user.email)
+        .maybeSingle();
+      buyerData = emailMatch;
+    }
+
+    if (buyerData) setBuyer(buyerData);
+    setLoading(false);
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!message || !buyer || !listing) return;
+
+    try {
+      const response = await fetch('/api/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message,
+          seller_id: listing.auth_id,
+          listing_id: listing.id,
+          buyer_name: buyer.name || buyer.full_name || buyer.email,
+          buyer_email: buyer.email,
+          topic: 'business-inquiry',
+          extension: 'successionbridge',
+        }),
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        console.error('❌ Message failed:', result.error);
+        alert('Message failed to send.');
+      } else {
+        alert('✅ Message sent to the seller!');
+        setMessage('');
+        setSuccess(true);
+      }
+    } catch (err) {
+      console.error('❌ Error sending message:', err);
+      alert('Something went wrong.');
+    }
+  }
+
+  async function handleSaveListing() {
+    if (!buyer) {
+      alert('You must be logged in as a buyer to save listings.');
+      return;
+    }
+
+    const { error } = await supabase.from('saved_listings').insert([
+      { buyer_email: buyer.email, listing_id: id }
+    ]);
+
+    if (error) {
+      console.error('Save failed:', error);
+      alert("Couldn't save this listing.");
+    } else {
+      alert('✅ Listing saved to your profile.');
+    }
+  }
+
+  async function handleEmailMe() {
+    if (!buyer || !buyer.email) {
+      alert('You must be logged in to receive listings by email.');
+      return;
+    }
+
+    const { error } = await supabase.from('email_requests').insert([
+      { buyer_email: buyer.email, listing_id: id }
+    ]);
+
+    if (error) {
+      console.error('Email request failed:', error);
+      alert('There was a problem sending this listing by email.');
+    } else {
+      alert('✅ This listing will be emailed to you.');
+    }
+  }
+
+  if (!id || loading) return <div className="p-8 text-center text-gray-600">Loading...</div>;
+  if (!listing) return <div className="p-8 text-center text-gray-600">Listing not found.</div>;
+
+  const mainImage =
+    listing.image_urls?.length > 0 ? listing.image_urls[0] : '/placeholder-listing.jpg'; // ✅ Use branded placeholder
+  const otherImages = listing.image_urls?.slice(1) || [];
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <Head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-      </Head>
+    <main className="bg-gray-50 min-h-screen pb-16 font-sans">
+      <div className="max-w-5xl mx-auto px-4">
+        <a
+          href="/listings"
+          className="inline-block mt-6 mb-8 text-sm text-blue-600 hover:underline"
+        >
+          ← Back to Marketplace
+        </a>
 
-      <div className="max-w-7xl mx-auto px-4 pt-10 pb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-6 text-center">
-          Explore Available Businesses for Sale
-        </h1>
-
-        {/* 🔍 Search */}
-        <div className="max-w-xl mx-auto mb-8">
-          <input
-            type="text"
-            placeholder="Search by name, industry, location..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          />
+        {/* ✅ Hero */}
+        <div className="relative w-full h-72 md:h-96 rounded-2xl overflow-hidden shadow-lg">
+          <img src={mainImage} alt="Business" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-end p-8">
+            <h1 className="text-4xl md:text-5xl font-serif font-bold text-white drop-shadow-lg">
+              {toTitleCase(
+                listing.hide_business_name
+                  ? 'Confidential Business Listing'
+                  : listing.business_name || `${listing.industry} Business`
+              )}
+            </h1>
+            <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
+          </div>
         </div>
 
-        {/* 🔓 Unlock Section (kept as-is, minor spacing adjustments) */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-10 max-w-3xl mx-auto text-center border border-gray-100">
-          <h2 className="text-3xl font-bold text-gray-900 mb-3">Unlock Full Buyer Access</h2>
-          <p className="text-gray-600 mb-6 text-lg">
-            Unlock AI-powered tools to make smarter offers and match with the right businesses.
+        {/* ✅ Financial Highlights */}
+        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-6">Financial Highlights</h2>
+          <div className="text-4xl font-bold text-emerald-700 mb-6">
+            {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire for Price'}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-gray-800">
+            <p><span className="font-semibold">Annual Revenue:</span> {listing.annual_revenue ? `$${listing.annual_revenue.toLocaleString()}` : 'N/A'}</p>
+            <p><span className="font-semibold">SDE:</span> {listing.sde ? `$${listing.sde.toLocaleString()}` : 'N/A'}</p>
+            <p><span className="font-semibold">Annual Profit:</span> {listing.annual_profit ? `$${listing.annual_profit.toLocaleString()}` : 'N/A'}</p>
+            <p><span className="font-semibold">Inventory Value:</span> {listing.inventory_value ? `$${listing.inventory_value.toLocaleString()}` : 'N/A'}</p>
+            <p><span className="font-semibold">Equipment Value:</span> {listing.equipment_value ? `$${listing.equipment_value.toLocaleString()}` : 'N/A'}</p>
+            <p><span className="font-semibold">Employees:</span> {listing.employees || 'N/A'}</p>
+          </div>
+        </section>
+
+        {/* ✅ Business Description */}
+        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Business Description</h2>
+          <p className="text-gray-800 leading-relaxed text-lg">
+            {listing.description_choice === 'ai'
+              ? listing.ai_description
+              : listing.business_description || 'No description available.'}
           </p>
+        </section>
 
-          <div className="text-left max-w-md mx-auto space-y-3 mb-6">
-            {[
-              'Access detailed financials and seller info',
-              'Message sellers directly',
-              'Save and track listings in your dashboard',
-              'Use our AI-powered Deal Maker to structure offers',
-              'Get AI-matched with businesses that fit your goals'
-            ].map((text, idx) => (
-              <div className="flex items-start" key={idx}>
-                <svg className="w-5 h-5 text-green-500 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <p className="ml-3 text-gray-700">{text}</p>
+        {/* ✅ Additional Details */}
+        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Additional Information</h2>
+          <div className="space-y-6 text-gray-800">
+            {listing.customer_type && (
+              <div>
+                <h3 className="text-xl font-semibold text-blue-800 mb-1">Customer Type</h3>
+                <p>{listing.customer_type}</p>
               </div>
-            ))}
+            )}
+            {listing.owner_involvement && (
+              <div>
+                <h3 className="text-xl font-semibold text-blue-800 mb-1">Owner Involvement</h3>
+                <p>{listing.owner_involvement}</p>
+              </div>
+            )}
+            {listing.growth_potential && (
+              <div>
+                <h3 className="text-xl font-semibold text-blue-800 mb-1">Growth Potential</h3>
+                <p>{listing.growth_potential}</p>
+              </div>
+            )}
+            {listing.training_offered && (
+              <div>
+                <h3 className="text-xl font-semibold text-blue-800 mb-1">Training & Support</h3>
+                <p>{listing.training_offered}</p>
+              </div>
+            )}
+            {listing.reason_for_selling && (
+              <div>
+                <h3 className="text-xl font-semibold text-blue-800 mb-1">Reason for Selling</h3>
+                <p>{listing.reason_for_selling}</p>
+              </div>
+            )}
           </div>
+        </section>
 
-          <div className="flex justify-center space-x-4">
-            <Link href="/buyer-onboarding">
-              <a className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow">
-                Create Buyer Profile
-              </a>
-            </Link>
-            <Link href="/login">
-              <a className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold border">
-                Login
-              </a>
-            </Link>
+        {/* ✅ Business Details */}
+        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Business Details</h2>
+          <div className="grid md:grid-cols-2 gap-6 text-gray-800">
+            <p><span className="font-semibold">Monthly Lease:</span> {listing.monthly_lease ? `$${listing.monthly_lease.toLocaleString()}` : 'N/A'}</p>
+            <p><span className="font-semibold">Home-Based:</span> {listing.home_based ? 'Yes' : 'No'}</p>
+            <p><span className="font-semibold">Relocatable:</span> {listing.relocatable ? 'Yes' : 'No'}</p>
+            <p><span className="font-semibold">Includes Inventory:</span> {listing.includes_inventory ? 'Yes' : 'No'}</p>
+            <p><span className="font-semibold">Includes Building:</span> {listing.includes_building ? 'Yes' : 'No'}</p>
+            <p><span className="font-semibold">Real Estate Included:</span> {listing.real_estate_included ? 'Yes' : 'No'}</p>
+            <p><span className="font-semibold">Financing Type:</span> {listing.financing_type?.replace(/-/g, ' ') || 'N/A'}</p>
+            <p><span className="font-semibold">Years in Business:</span> {listing.years_in_business || 'N/A'}</p>
           </div>
-        </div>
+        </section>
 
-        {loading ? (
-          <p className="text-center text-gray-600">Loading listings...</p>
-        ) : listings.length === 0 ? (
-          <p className="text-center text-gray-500">No businesses found for your search.</p>
+        {/* ✅ Additional Photos */}
+        {otherImages.length > 0 && (
+          <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+            <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Additional Photos</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {otherImages.map((url, idx) => (
+                <img
+                  key={idx}
+                  src={url}
+                  alt={`Business ${idx + 2}`}
+                  className="w-full h-44 object-cover rounded-lg"
+                  onError={(e) => { e.target.src = '/placeholder-listing.jpg'; }}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ✅ Buyer Actions */}
+        {buyer ? (
+          <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+            <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Contact Seller</h2>
+            {success ? (
+              <p className="text-green-600">✅ Your message was sent!</p>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <textarea
+                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-400"
+                  rows="5"
+                  placeholder="Write your message to the seller..."
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  required
+                />
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="submit"
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg"
+                  >
+                    Send Message
+                  </button>
+                  <button
+                    onClick={handleSaveListing}
+                    type="button"
+                    className="bg-gray-100 hover:bg-gray-200 px-5 py-2 rounded-lg border"
+                  >
+                    Save Listing
+                  </button>
+                  <button
+                    onClick={handleEmailMe}
+                    type="button"
+                    className="bg-gray-100 hover:bg-gray-200 px-5 py-2 rounded-lg border"
+                  >
+                    Email Me This Listing
+                  </button>
+                </div>
+              </form>
+            )}
+          </section>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {listings.map((listing, index) => (
-              <ListingCard key={`${listing.id}-${index}`} listing={listing} index={index} />
-            ))}
-          </div>
+          <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+            <p className="text-red-600">
+              You must{' '}
+              <a
+                href={`/buyer-onboarding?redirect=/listings/${id}`}
+                className="underline font-semibold"
+              >
+                complete your buyer profile
+              </a>{' '}
+              before contacting the seller.
+            </p>
+          </section>
         )}
       </div>
-    </div>
+    </main>
   );
 }
+
