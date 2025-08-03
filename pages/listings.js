@@ -2,14 +2,16 @@ import { useEffect, useState } from 'react';
 import supabase from '../lib/supabaseClient';
 import Link from 'next/link';
 import Head from 'next/head';
+import { BookmarkIcon as OutlineBookmark } from '@heroicons/react/24/outline';
+import { BookmarkIcon as SolidBookmark } from '@heroicons/react/24/solid';
 
-function ListingCard({ listing, index }) {
+function ListingCard({ listing, index, onSave, saved }) {
   const imageUrl =
     Array.isArray(listing.image_urls) &&
     listing.image_urls.length > 0 &&
     listing.image_urls[0]
       ? listing.image_urls[0]
-      : '/placeholder-listing.jpg'; // ✅ Use branded placeholder
+      : null;
 
   const displayName = listing.hide_business_name
     ? 'Confidential Business Listing'
@@ -25,44 +27,71 @@ function ListingCard({ listing, index }) {
   return (
     <div
       key={`${listing.id}-${index}`}
-      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col"
+      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-[#D4AF37]"
     >
-      <img
-        src={imageUrl}
-        alt={`${displayName} image`}
-        className="w-full h-48 object-cover"
-        onError={(e) => {
-          e.target.onerror = null;
-          e.target.src = '/placeholder-listing.jpg';
-        }}
-      />
+      {/* Image */}
+      {imageUrl ? (
+        <img
+          src={imageUrl}
+          alt={`${displayName} image`}
+          className="w-full h-48 object-cover"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = '/placeholder.png';
+          }}
+        />
+      ) : (
+        <div className="w-full h-48 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center text-blue-400 font-semibold text-lg">
+          No Image Available
+        </div>
+      )}
 
-      <div className="p-5 flex flex-col flex-grow">
-        <h2 className="text-xl font-bold text-gray-900 mb-1">{displayName}</h2>
-        <p className="text-sm text-gray-500 font-medium mb-3">
+      {/* Content */}
+      <div className="p-5 space-y-3 relative">
+        <h2 className="text-xl font-bold text-[#1E3A8A]">{displayName}</h2>
+        <div className="h-1 w-12 bg-[#D4AF37] rounded-full mb-1"></div>
+
+        <p className="text-sm text-gray-500 font-medium">
           {(listing.location || 'Unknown')} • {(listing.industry || 'Unspecified')}
         </p>
-
-        <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed mb-4">
+        <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed">
           {description || 'No description provided.'}
         </p>
 
-        <div className="grid grid-cols-3 gap-2 text-sm text-gray-800 mb-3">
+        {/* Financials */}
+        <div className="text-sm text-gray-800 mt-3 grid grid-cols-3 gap-2">
           <p><strong>Revenue:</strong><br />${Number(listing.annual_revenue || 0).toLocaleString()}</p>
           <p><strong>Profit:</strong><br />${Number(listing.annual_profit || 0).toLocaleString()}</p>
           <p><strong>Price:</strong><br />${Number(listing.asking_price || 0).toLocaleString()}</p>
         </div>
 
+        {/* Financing Badge */}
         {listing.financing_type?.toLowerCase().includes('seller') && (
-          <span className="inline-block bg-green-50 text-green-700 text-xs font-semibold px-2 py-1 rounded border border-green-200 mb-3">
+          <span className="inline-block mt-2 bg-[#FFF8E1] text-[#1E3A8A] text-xs font-semibold px-2 py-1 rounded border border-[#D4AF37]">
             Seller Financing Available
           </span>
         )}
 
-        <div className="mt-auto">
+        {/* Save Icon */}
+        {onSave && (
+          <button
+            onClick={() => onSave(listing.id)}
+            className="absolute top-4 right-4"
+            aria-label="Save Listing"
+          >
+            {saved ? (
+              <SolidBookmark className="w-6 h-6 text-[#D4AF37]" />
+            ) : (
+              <OutlineBookmark className="w-6 h-6 text-gray-400 hover:text-[#D4AF37]" />
+            )}
+          </button>
+        )}
+
+        {/* View Details */}
+        <div className="pt-3">
           <Link href={`/listings/${listing.id}`}>
-            <a className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-medium text-center py-2 rounded-lg transition">
-              View Details
+            <a className="inline-block text-[#1E3A8A] hover:text-[#0f2357] font-medium text-sm transition-colors">
+              View Details →
             </a>
           </Link>
         </div>
@@ -76,6 +105,8 @@ export default function Listings() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
+  const [savedIds, setSavedIds] = useState([]);
+  const [buyerEmail, setBuyerEmail] = useState(null);
 
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedTerm(searchTerm), 500);
@@ -117,21 +148,43 @@ export default function Listings() {
       setLoading(false);
     }
 
+    async function fetchBuyer() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setBuyerEmail(user.email);
+    }
+
     fetchListings();
+    fetchBuyer();
   }, [debouncedTerm]);
+
+  async function handleSave(listingId) {
+    if (!buyerEmail) {
+      alert('You must be logged in as a buyer to save listings.');
+      return;
+    }
+
+    const alreadySaved = savedIds.includes(listingId);
+    if (alreadySaved) {
+      await supabase.from('saved_listings').delete().eq('listing_id', listingId).eq('buyer_email', buyerEmail);
+      setSavedIds((prev) => prev.filter((id) => id !== listingId));
+    } else {
+      await supabase.from('saved_listings').insert([{ buyer_email: buyerEmail, listing_id: listingId }]);
+      setSavedIds((prev) => [...prev, listingId]);
+    }
+  }
 
   return (
     <div className="bg-gray-50 min-h-screen">
       <Head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+        <title>Buy a Business | SuccessionBridge Marketplace</title>
+        <meta name="description" content="Browse businesses for sale and buy a business with SuccessionBridge's marketplace." />
       </Head>
 
       <div className="max-w-7xl mx-auto px-4 pt-10 pb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-6 text-center">
-          Explore Available Businesses for Sale
+        <h1 className="text-4xl font-bold text-center text-[#1E3A8A] mb-2">
+          Buy a Business – Explore Available Opportunities
         </h1>
+        <p className="text-center text-gray-600 mb-6">Discover businesses for sale and make your next big move with SuccessionBridge.</p>
 
         {/* 🔍 Search */}
         <div className="max-w-xl mx-auto mb-8">
@@ -140,13 +193,13 @@ export default function Listings() {
             placeholder="Search by name, industry, location..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#1E3A8A] focus:border-[#1E3A8A]"
           />
         </div>
 
-        {/* 🔓 Unlock Section (kept as-is, minor spacing adjustments) */}
+        {/* 🔓 Unlock Section */}
         <div className="bg-white rounded-2xl shadow-lg p-8 mb-10 max-w-3xl mx-auto text-center border border-gray-100">
-          <h2 className="text-3xl font-bold text-gray-900 mb-3">Unlock Full Buyer Access</h2>
+          <h2 className="text-3xl font-bold text-[#1E3A8A] mb-3">Unlock Full Buyer Access</h2>
           <p className="text-gray-600 mb-6 text-lg">
             Unlock AI-powered tools to make smarter offers and match with the right businesses.
           </p>
@@ -170,7 +223,7 @@ export default function Listings() {
 
           <div className="flex justify-center space-x-4">
             <Link href="/buyer-onboarding">
-              <a className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow">
+              <a className="bg-[#1E3A8A] hover:bg-[#0f2357] text-white px-6 py-3 rounded-lg font-semibold shadow">
                 Create Buyer Profile
               </a>
             </Link>
@@ -185,11 +238,24 @@ export default function Listings() {
         {loading ? (
           <p className="text-center text-gray-600">Loading listings...</p>
         ) : listings.length === 0 ? (
-          <p className="text-center text-gray-500">No businesses found for your search.</p>
+          <div className="text-center">
+            <p className="text-gray-500 mb-4">No businesses found for your search.</p>
+            <Link href="/buyer-onboarding">
+              <a className="inline-block bg-[#1E3A8A] hover:bg-[#0f2357] text-white px-6 py-3 rounded-lg font-semibold shadow">
+                Create Buyer Profile
+              </a>
+            </Link>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 animate-fadeIn">
             {listings.map((listing, index) => (
-              <ListingCard key={`${listing.id}-${index}`} listing={listing} index={index} />
+              <ListingCard
+                key={`${listing.id}-${index}`}
+                listing={listing}
+                index={index}
+                onSave={buyerEmail ? handleSave : null}
+                saved={savedIds.includes(listing.id)}
+              />
             ))}
           </div>
         )}
