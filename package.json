@@ -10,6 +10,7 @@
     "@supabase/supabase-js": "^2.38.3",
     "@supabase/auth-helpers-nextjs": "^0.6.0",
     "@supabase/auth-helpers-react": "^0.4.0",
+    "@heroicons/react": "^2.0.18",
     "formidable": "^3.5.1",
     "jspdf": "^3.0.1",
     "lucide-react": "^0.264.0",
@@ -25,5 +26,6 @@
     "tailwindcss": "^3.4.1"
   }
 }
+
 
 
