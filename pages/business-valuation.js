@@ -17,6 +17,8 @@ export default function BusinessValuation() {
     equipment: [{ name: '', value: '' }],
     realEstateValue: '',
     sellerFinancing: 'no',
+    returnCustomers: '',       // ✅ Added back
+    contractsInPlace: ''       // ✅ Added back
   });
 
   const industries = [
@@ -76,10 +78,12 @@ export default function BusinessValuation() {
     const { businessValue, totalValue } = calculateValuation();
     const doc = new jsPDF();
 
+    // Title
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(18);
     doc.text('SuccessionBridge Business Valuation', 20, 20);
 
+    // Disclaimer
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.text(
@@ -92,11 +96,17 @@ export default function BusinessValuation() {
     let y = 50;
     const lineHeight = 8;
 
+    // === Business Information ===
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('Business Information', 20, y);
+    y += lineHeight;
+
     const addLine = (label, value) => {
       doc.setFont('helvetica', 'bold');
       doc.text(label, 20, y);
       doc.setFont('helvetica', 'normal');
-      doc.text(value || '-', 90, y);
+      doc.text(value || 'N/A', 90, y);
       y += lineHeight;
     };
 
@@ -105,7 +115,7 @@ export default function BusinessValuation() {
     addLine('Email:', formData.email);
     addLine('Industry:', formData.industry);
 
-    y += 4;
+    y += 6;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.text('Financials', 20, y);
@@ -114,30 +124,10 @@ export default function BusinessValuation() {
     addLine('Annual Revenue:', `$${parseFloat(formData.annualRevenue || 0).toLocaleString()}`);
     addLine('Annual Expenses:', `$${parseFloat(formData.annualExpenses || 0).toLocaleString()}`);
     addLine('Total Salaries Paid:', `$${parseFloat(formData.totalSalariesPaid || 0).toLocaleString()}`);
-    addLine("Owner's Salary Add-Back:", `$${parseFloat(formData.ownerSalaryAddBack || 0).toLocaleString()}`);
+    addLine("Owner Salary Add-Back:", `$${parseFloat(formData.ownerSalaryAddBack || 0).toLocaleString()}`);
     addLine('Personal Add-Backs:', `$${parseFloat(formData.personalAddBacks || 0).toLocaleString()}`);
-    addLine('Employees:', formData.hasEmployees);
+    addLine('Employees:', formData.hasEmployees === 'yes' ? 'Yes' : 'No');
 
-    y += 4;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Equipment:', 20, y);
-    y += lineHeight;
-    doc.setFont('helvetica', 'normal');
-    if (formData.equipment.length > 0) {
-      formData.equipment.forEach(eq => {
-        if (eq.name || eq.value) {
-          doc.text(`- ${eq.name || 'Unnamed'}: $${eq.value || 0}`, 30, y);
-          y += lineHeight;
-        }
-      });
-    } else {
-      doc.text('None listed', 30, y);
-      y += lineHeight;
-    }
-
-    y += 4;
-    doc.setFont('helvetica', 'bold');
-    addLine('Include Real Estate:', formData.includeRealEstate);
     if (formData.includeRealEstate === 'yes') {
       addLine('Real Estate Value:', `$${parseFloat(formData.realEstateValue || 0).toLocaleString()}`);
     }
@@ -145,9 +135,39 @@ export default function BusinessValuation() {
     y += 6;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
-    doc.text(`Estimated Business Value: $${businessValue.toFixed(2)}`, 20, y);
+    doc.text('Equipment', 20, y);
     y += lineHeight;
+    doc.setFont('helvetica', 'normal');
+    if (formData.equipment.some(eq => eq.name || eq.value)) {
+      formData.equipment.forEach(eq => {
+        if (eq.name || eq.value) {
+          doc.text(`- ${eq.name || 'Unnamed'}: $${eq.value || 0}`, 30, y);
+          y += lineHeight;
+        }
+      });
+    } else {
+      doc.text('(None listed) N/A', 30, y);
+      y += lineHeight;
+    }
 
+    // ✅ Additional Notes Section Restored
+    y += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('Additional Notes', 20, y);
+    y += lineHeight;
+    addLine('Return Customers %:', formData.returnCustomers);
+    addLine('Contracts in Place:', formData.contractsInPlace);
+
+    // === Estimated Valuation ===
+    y += 6;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('Estimated Valuation', 20, y);
+    y += lineHeight;
+    doc.setFont('helvetica', 'normal');
+    doc.text(`$${businessValue.toFixed(2)}`, 20, y);
+    y += lineHeight;
     if (formData.includeRealEstate === 'yes') {
       doc.text(`+ Real Estate: $${parseFloat(formData.realEstateValue || 0).toLocaleString()}`, 20, y);
       y += lineHeight;
@@ -155,19 +175,29 @@ export default function BusinessValuation() {
       y += lineHeight;
     }
 
+    // === Seller Financing Advantage ===
     y += 10;
     doc.setFont('helvetica', 'bold');
-    doc.text('Seller Financing Advantage:', 20, y);
+    doc.setFontSize(12);
+    doc.text('Seller Financing Advantage', 20, y);
     y += lineHeight;
     doc.setFont('helvetica', 'normal');
     doc.text(
-      'Offering seller financing under your own terms can increase your total payout. For example, financing $250K over 4 years at 6% interest could add tens of thousands in interest income to your sale price.',
+      'Offering seller financing under your own terms can increase your total payout while making your business more attractive to buyers.',
+      20,
+      y,
+      { maxWidth: 170 }
+    );
+    y += lineHeight * 2;
+    doc.text(
+      'For example: Financing $250K over 4 years at 6% interest could add tens of thousands in interest income to your sale price.',
       20,
       y,
       { maxWidth: 170 }
     );
 
-    y += 24;
+    // Footer
+    y += 20;
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(9);
     doc.text('Generated by SuccessionBridge Valuation Wizard', 20, y);
@@ -244,6 +274,10 @@ export default function BusinessValuation() {
             <input name="realEstateValue" placeholder="Real Estate Value ($)" value={formData.realEstateValue} onChange={handleChange} className="w-full border p-3 rounded" />
           )}
 
+          {/* ✅ Re-added missing fields */}
+          <input name="returnCustomers" placeholder="Return Customers % (e.g. 75%)" value={formData.returnCustomers} onChange={handleChange} className="w-full border p-3 rounded" />
+          <input name="contractsInPlace" placeholder="Contracts in Place (e.g. 3 long-term clients)" value={formData.contractsInPlace} onChange={handleChange} className="w-full border p-3 rounded" />
+
           <label className="block font-medium">Would you consider seller financing as part of your exit?</label>
           <select name="sellerFinancing" value={formData.sellerFinancing} onChange={handleChange} className="w-full border p-3 rounded">
             <option value="no">No</option>
@@ -273,4 +307,5 @@ export default function BusinessValuation() {
     </main>
   );
 }
+
 
