@@ -145,7 +145,7 @@ export default function ListingDetail() {
   if (!listing) return <div className="p-8 text-center text-gray-600">Listing not found.</div>;
 
   const mainImage =
-    listing.image_urls?.length > 0 ? listing.image_urls[0] : '/placeholder-listing.jpg'; // ✅ Use branded placeholder
+    listing.image_urls?.length > 0 ? listing.image_urls[0] : '/placeholder-listing.jpg'; // ✅ Placeholder
   const otherImages = listing.image_urls?.slice(1) || [];
 
   return (
@@ -269,6 +269,25 @@ export default function ListingDetail() {
           </section>
         )}
 
+        {/* ✅ AI Enhanced Deal Maker - PRESERVED */}
+        {buyer && (
+          <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+            <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">
+              AI Enhanced Deal Maker
+            </h2>
+            <p className="text-gray-700 mb-4">
+              Use AI to structure a creative offer (seller financing, rent-to-own, profit share, etc.)
+              based on this business’s details.
+            </p>
+            <button
+              onClick={() => router.push(`/deal-maker?listingId=${id}`)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-medium"
+            >
+              Launch Deal Builder
+            </button>
+          </section>
+        )}
+
         {/* ✅ Buyer Actions */}
         {buyer ? (
           <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
@@ -328,4 +347,3 @@ export default function ListingDetail() {
     </main>
   );
 }
-
