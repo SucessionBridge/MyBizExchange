@@ -27,51 +27,27 @@ function ListingCard({ listing, index, onSave, saved }) {
   return (
     <div
       key={`${listing.id}-${index}`}
-      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-[#D4AF37]"
+      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-[#D4AF37] flex flex-col"
     >
       {/* Image */}
       {imageUrl ? (
         <img
           src={imageUrl}
           alt={`${displayName} image`}
-          className="w-full h-48 object-cover"
+          className="w-full h-52 object-cover"
           onError={(e) => {
             e.target.onerror = null;
             e.target.src = '/placeholder.png';
           }}
         />
       ) : (
-        <div className="w-full h-48 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center text-blue-400 font-semibold text-lg">
+        <div className="w-full h-52 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center text-blue-400 font-semibold text-lg">
           No Image Available
         </div>
       )}
 
       {/* Content */}
-      <div className="p-5 space-y-3 relative">
-        <h2 className="text-xl font-bold text-[#1E3A8A]">{displayName}</h2>
-        <div className="h-1 w-12 bg-[#D4AF37] rounded-full mb-1"></div>
-
-        <p className="text-sm text-gray-500 font-medium">
-          {(listing.location || 'Unknown')} • {(listing.industry || 'Unspecified')}
-        </p>
-        <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed">
-          {description || 'No description provided.'}
-        </p>
-
-        {/* Financials */}
-        <div className="text-sm text-gray-800 mt-3 grid grid-cols-3 gap-2">
-          <p><strong>Revenue:</strong><br />${Number(listing.annual_revenue || 0).toLocaleString()}</p>
-          <p><strong>Profit:</strong><br />${Number(listing.annual_profit || 0).toLocaleString()}</p>
-          <p><strong>Price:</strong><br />${Number(listing.asking_price || 0).toLocaleString()}</p>
-        </div>
-
-        {/* Financing Badge */}
-        {listing.financing_type?.toLowerCase().includes('seller') && (
-          <span className="inline-block mt-2 bg-[#FFF8E1] text-[#1E3A8A] text-xs font-semibold px-2 py-1 rounded border border-[#D4AF37]">
-            Seller Financing Available
-          </span>
-        )}
-
+      <div className="p-5 flex flex-col flex-grow relative">
         {/* Save Icon */}
         {onSave && (
           <button
@@ -80,17 +56,51 @@ function ListingCard({ listing, index, onSave, saved }) {
             aria-label="Save Listing"
           >
             {saved ? (
-              <SolidBookmark className="w-6 h-6 text-[#D4AF37]" />
+              <SolidBookmark className="w-7 h-7 text-[#D4AF37]" />
             ) : (
-              <OutlineBookmark className="w-6 h-6 text-gray-400 hover:text-[#D4AF37]" />
+              <OutlineBookmark className="w-7 h-7 text-gray-400 hover:text-[#D4AF37]" />
             )}
           </button>
         )}
 
-        {/* View Details */}
-        <div className="pt-3">
+        <h2 className="text-xl font-bold text-[#1E3A8A] mb-1">{displayName}</h2>
+        <div className="h-1 w-12 bg-[#D4AF37] rounded-full mb-2"></div>
+
+        <p className="text-sm text-gray-500 font-medium mb-2">
+          {(listing.location || 'Unknown')} • {(listing.industry || 'Unspecified')}
+        </p>
+
+        <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed mb-4">
+          {description || 'No description provided.'}
+        </p>
+
+        {/* Financials */}
+        <div className="grid grid-cols-3 gap-3 text-sm text-gray-800 mb-3">
+          <div>
+            <p className="font-semibold text-[#1E3A8A]">Revenue</p>
+            <p>${Number(listing.annual_revenue || 0).toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-[#1E3A8A]">Profit</p>
+            <p>${Number(listing.annual_profit || 0).toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-[#1E3A8A]">Price</p>
+            <p>${Number(listing.asking_price || 0).toLocaleString()}</p>
+          </div>
+        </div>
+
+        {/* Financing Badge */}
+        {listing.financing_type?.toLowerCase().includes('seller') && (
+          <span className="inline-block bg-[#FFF8E1] text-[#1E3A8A] text-xs font-semibold px-2 py-1 rounded border border-[#D4AF37] mb-3">
+            Seller Financing Available
+          </span>
+        )}
+
+        {/* CTA */}
+        <div className="mt-auto">
           <Link href={`/listings/${listing.id}`}>
-            <a className="inline-block text-[#1E3A8A] hover:text-[#0f2357] font-medium text-sm transition-colors">
+            <a className="block w-full bg-[#1E3A8A] hover:bg-[#0f2357] text-white font-medium text-center py-2 rounded-lg transition">
               View Details →
             </a>
           </Link>
@@ -184,7 +194,9 @@ export default function Listings() {
         <h1 className="text-4xl font-bold text-center text-[#1E3A8A] mb-2">
           Buy a Business – Explore Available Opportunities
         </h1>
-        <p className="text-center text-gray-600 mb-6">Discover businesses for sale and make your next big move with SuccessionBridge.</p>
+        <p className="text-center text-gray-600 mb-6">
+          Discover businesses for sale and make your next big move with SuccessionBridge.
+        </p>
 
         {/* 🔍 Search */}
         <div className="max-w-xl mx-auto mb-8">
@@ -263,3 +275,4 @@ export default function Listings() {
     </div>
   );
 }
+
