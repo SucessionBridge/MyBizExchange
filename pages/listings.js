@@ -9,13 +9,13 @@ function ListingCard({ listing, index }) {
     listing.image_urls.length > 0 &&
     listing.image_urls[0]
       ? listing.image_urls[0]
-      : null;
+      : '/placeholder-listing.jpg'; // ✅ Use branded placeholder
 
- const displayName = listing.hide_business_name
-  ? 'Confidential Business Listing'
-  : (listing.business_name && listing.business_name.trim()) ||
-    (listing.businessName && listing.businessName.trim()) ||
-    `${listing.industry || 'Unnamed'} Business`;
+  const displayName = listing.hide_business_name
+    ? 'Confidential Business Listing'
+    : (listing.business_name && listing.business_name.trim()) ||
+      (listing.businessName && listing.businessName.trim()) ||
+      `${listing.industry || 'Unnamed'} Business`;
 
   const description =
     listing.description_choice === 'ai'
@@ -25,49 +25,44 @@ function ListingCard({ listing, index }) {
   return (
     <div
       key={`${listing.id}-${index}`}
-      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100"
+      className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden border border-gray-100 flex flex-col"
     >
-      {imageUrl ? (
-        <img
-          src={imageUrl}
-          alt={`${displayName} image`}
-          className="w-full h-48 object-cover"
-          onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = '/placeholder.png';
-          }}
-        />
-      ) : (
-        <div className="w-full h-48 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center text-blue-400 font-semibold text-lg">
-          No Image Available
-        </div>
-      )}
+      <img
+        src={imageUrl}
+        alt={`${displayName} image`}
+        className="w-full h-48 object-cover"
+        onError={(e) => {
+          e.target.onerror = null;
+          e.target.src = '/placeholder-listing.jpg';
+        }}
+      />
 
-      <div className="p-5 space-y-3">
-        <h2 className="text-xl font-bold text-gray-900">{displayName}</h2>
-        <p className="text-sm text-gray-500 font-medium">
+      <div className="p-5 flex flex-col flex-grow">
+        <h2 className="text-xl font-bold text-gray-900 mb-1">{displayName}</h2>
+        <p className="text-sm text-gray-500 font-medium mb-3">
           {(listing.location || 'Unknown')} • {(listing.industry || 'Unspecified')}
         </p>
-        <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed">
+
+        <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed mb-4">
           {description || 'No description provided.'}
         </p>
 
-        <div className="text-sm text-gray-800 mt-3 grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 text-sm text-gray-800 mb-3">
           <p><strong>Revenue:</strong><br />${Number(listing.annual_revenue || 0).toLocaleString()}</p>
           <p><strong>Profit:</strong><br />${Number(listing.annual_profit || 0).toLocaleString()}</p>
           <p><strong>Price:</strong><br />${Number(listing.asking_price || 0).toLocaleString()}</p>
         </div>
 
         {listing.financing_type?.toLowerCase().includes('seller') && (
-          <span className="inline-block mt-2 bg-green-50 text-green-700 text-xs font-semibold px-2 py-1 rounded border border-green-200">
+          <span className="inline-block bg-green-50 text-green-700 text-xs font-semibold px-2 py-1 rounded border border-green-200 mb-3">
             Seller Financing Available
           </span>
         )}
 
-        <div className="pt-3">
+        <div className="mt-auto">
           <Link href={`/listings/${listing.id}`}>
-            <a className="inline-block text-blue-600 hover:text-blue-800 font-medium text-sm transition-colors">
-              View Details →
+            <a className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-medium text-center py-2 rounded-lg transition">
+              View Details
             </a>
           </Link>
         </div>
@@ -149,7 +144,7 @@ export default function Listings() {
           />
         </div>
 
-        {/* 🔓 Unlock Section */}
+        {/* 🔓 Unlock Section (kept as-is, minor spacing adjustments) */}
         <div className="bg-white rounded-2xl shadow-lg p-8 mb-10 max-w-3xl mx-auto text-center border border-gray-100">
           <h2 className="text-3xl font-bold text-gray-900 mb-3">Unlock Full Buyer Access</h2>
           <p className="text-gray-600 mb-6 text-lg">
