@@ -90,60 +90,84 @@ export default function DealMaker() {
   };
 
   if (!listing || !buyer) {
-    return <div className="p-8 text-center">Loading deal maker...</div>;
+    return <div className="p-8 text-center text-gray-600">Loading deal maker...</div>;
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <button
-        onClick={() => router.push(`/listings/${listing.id}`)}
-        className="text-blue-600 hover:underline mb-4 inline-block"
-      >
-        ← Back to Listing
-      </button>
+    <main className="bg-gray-50 min-h-screen py-8 px-4">
+      <div className="max-w-6xl mx-auto">
+        <button
+          onClick={() => router.push(`/listings/${listing.id}`)}
+          className="text-blue-600 hover:underline mb-6 inline-block"
+        >
+          ← Back to Listing
+        </button>
 
-      <h1 className="text-3xl font-bold text-center text-blue-900 mb-6">
-        AI Deal Maker
-      </h1>
+        <h1 className="text-3xl md:text-4xl font-bold text-center text-blue-900 mb-8">
+          AI Deal Maker
+        </h1>
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-xl font-semibold mb-2">Creating proposals for:</h2>
-        <p className="text-gray-700">
-          <strong>{listing.business_name || 'Business'}</strong> in{' '}
-          {listing.city}, {listing.state_or_province}
-        </p>
-      </div>
-
-      {error && (
-        <div className="bg-red-100 text-red-700 p-3 rounded mb-4">
-          {error}
-        </div>
-      )}
-
-      <button
-        onClick={generateDeals}
-        disabled={loading}
-        className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 mb-6"
-      >
-        {loading ? 'Generating Deals...' : 'Generate 3 Deal Options'}
-      </button>
-
-      {deals.length > 0 && (
-        <div className="space-y-6">
-          {deals.map((deal, index) => (
-            <div key={index} className="bg-white p-5 rounded-lg shadow">
-              <pre className="whitespace-pre-wrap text-gray-800">{deal}</pre>
-              <button
-                onClick={() => sendDealToSeller(deal)}
-                className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
-              >
-                Send This Deal to Seller
-              </button>
+        <div className="grid md:grid-cols-2 gap-8">
+          {/* ✅ Left Panel: Business Summary */}
+          <div className="bg-white rounded-2xl shadow p-6">
+            <h2 className="text-xl font-semibold mb-2 text-gray-900">Creating proposals for:</h2>
+            <p className="text-gray-700 mb-4">
+              <strong>{listing.business_name || 'Business'}</strong><br />
+              {listing.city}, {listing.state_or_province}
+            </p>
+            <div className="bg-blue-50 rounded-lg p-4 text-sm text-gray-700">
+              <p><strong>Asking Price:</strong> {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire for Price'}</p>
+              <p><strong>Revenue:</strong> {listing.annual_revenue ? `$${listing.annual_revenue.toLocaleString()}` : 'N/A'}</p>
+              <p><strong>Profit:</strong> {listing.annual_profit ? `$${listing.annual_profit.toLocaleString()}` : 'N/A'}</p>
+              {listing.financing_type && (
+                <p><strong>Financing:</strong> {listing.financing_type}</p>
+              )}
             </div>
-          ))}
+          </div>
+
+          {/* ✅ Right Panel: AI Deal Builder */}
+          <div className="bg-white rounded-2xl shadow p-6 flex flex-col">
+            {error && (
+              <div className="bg-red-100 text-red-700 p-3 rounded mb-4">
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={generateDeals}
+              disabled={loading}
+              className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 mb-6"
+            >
+              {loading ? 'Generating Deals...' : 'Generate 3 Deal Options'}
+            </button>
+
+            {loading && (
+              <div className="flex justify-center items-center py-6">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-emerald-600"></div>
+              </div>
+            )}
+
+            {deals.length > 0 && (
+              <div className="space-y-6">
+                {deals.map((deal, index) => (
+                  <div key={index} className="bg-gray-50 p-5 rounded-lg shadow-inner">
+                    <h3 className="text-lg font-bold text-blue-800 mb-2">Deal Option {index + 1}</h3>
+                    <pre className="whitespace-pre-wrap text-gray-800">{deal}</pre>
+                    <button
+                      onClick={() => sendDealToSeller(deal)}
+                      className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full md:w-auto"
+                    >
+                      Send This Deal to Seller
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      )}
-    </div>
+      </div>
+    </main>
   );
 }
+
 
