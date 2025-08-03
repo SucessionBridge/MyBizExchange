@@ -80,7 +80,7 @@ export default function ListingDetail() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message,
+          message: `${message}\n\nListing ID: SB-${listing.id}`,
           seller_id: listing.auth_id,
           listing_id: listing.id,
           buyer_name: buyer.name || buyer.full_name || buyer.email,
@@ -145,7 +145,7 @@ export default function ListingDetail() {
   if (!listing) return <div className="p-8 text-center text-gray-600">Listing not found.</div>;
 
   const mainImage =
-    listing.image_urls?.length > 0 ? listing.image_urls[0] : '/placeholder-listing.jpg'; // ✅ Placeholder
+    listing.image_urls?.length > 0 ? listing.image_urls[0] : '/placeholder-listing.jpg';
   const otherImages = listing.image_urls?.slice(1) || [];
 
   return (
@@ -162,20 +162,34 @@ export default function ListingDetail() {
         <div className="relative w-full h-72 md:h-96 rounded-2xl overflow-hidden shadow-lg">
           <img src={mainImage} alt="Business" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-end p-8">
-            <h1 className="text-4xl md:text-5xl font-serif font-bold text-white drop-shadow-lg">
-              {toTitleCase(
-                listing.hide_business_name
-                  ? 'Confidential Business Listing'
-                  : listing.business_name || `${listing.industry} Business`
-              )}
-            </h1>
-            <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between">
+              <div>
+                <h1 className="text-4xl md:text-5xl font-serif font-bold text-white drop-shadow-lg">
+                  {toTitleCase(
+                    listing.hide_business_name
+                      ? 'Confidential Business Listing'
+                      : listing.business_name || `${listing.industry} Business`
+                  )}
+                </h1>
+                <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
+              </div>
+              <div className="mt-3 md:mt-0 bg-white bg-opacity-80 text-gray-800 px-4 py-1 rounded-lg text-sm font-semibold">
+                Ad #SB-{listing.id}
+              </div>
+            </div>
           </div>
+          {listing.hide_business_name && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-white text-5xl font-bold opacity-20">CONFIDENTIAL</span>
+            </div>
+          )}
         </div>
 
         {/* ✅ Financial Highlights */}
         <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-6">Financial Highlights</h2>
+          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-2">Financial Highlights</h2>
+          <div className="h-1 w-16 bg-[#D4AF37] rounded-full mb-6"></div>
+          <div className="text-lg font-semibold text-gray-800 mb-2">Asking Price:</div>
           <div className="text-4xl font-bold text-emerald-700 mb-6">
             {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire for Price'}
           </div>
@@ -191,7 +205,8 @@ export default function ListingDetail() {
 
         {/* ✅ Business Description */}
         <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Business Description</h2>
+          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-2">Business Description</h2>
+          <div className="h-1 w-16 bg-[#D4AF37] rounded-full mb-4"></div>
           <p className="text-gray-800 leading-relaxed text-lg">
             {listing.description_choice === 'ai'
               ? listing.ai_description
@@ -201,7 +216,8 @@ export default function ListingDetail() {
 
         {/* ✅ Additional Details */}
         <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Additional Information</h2>
+          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-2">Additional Information</h2>
+          <div className="h-1 w-16 bg-[#D4AF37] rounded-full mb-4"></div>
           <div className="space-y-6 text-gray-800">
             {listing.customer_type && (
               <div>
@@ -238,7 +254,8 @@ export default function ListingDetail() {
 
         {/* ✅ Business Details */}
         <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Business Details</h2>
+          <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-2">Business Details</h2>
+          <div className="h-1 w-16 bg-[#D4AF37] rounded-full mb-4"></div>
           <div className="grid md:grid-cols-2 gap-6 text-gray-800">
             <p><span className="font-semibold">Monthly Lease:</span> {listing.monthly_lease ? `$${listing.monthly_lease.toLocaleString()}` : 'N/A'}</p>
             <p><span className="font-semibold">Home-Based:</span> {listing.home_based ? 'Yes' : 'No'}</p>
@@ -254,7 +271,8 @@ export default function ListingDetail() {
         {/* ✅ Additional Photos */}
         {otherImages.length > 0 && (
           <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-            <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Additional Photos</h2>
+            <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-2">Additional Photos</h2>
+            <div className="h-1 w-16 bg-[#D4AF37] rounded-full mb-4"></div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {otherImages.map((url, idx) => (
                 <img
@@ -272,9 +290,10 @@ export default function ListingDetail() {
         {/* ✅ AI Enhanced Deal Maker - PRESERVED */}
         {buyer && (
           <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-            <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">
+            <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-2">
               AI Enhanced Deal Maker
             </h2>
+            <div className="h-1 w-16 bg-[#D4AF37] rounded-full mb-4"></div>
             <p className="text-gray-700 mb-4">
               Use AI to structure a creative offer (seller financing, rent-to-own, profit share, etc.)
               based on this business’s details.
@@ -291,7 +310,8 @@ export default function ListingDetail() {
         {/* ✅ Buyer Actions */}
         {buyer ? (
           <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-            <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-4">Contact Seller</h2>
+            <h2 className="text-3xl font-serif font-semibold text-blue-900 mb-2">Contact Seller</h2>
+            <div className="h-1 w-16 bg-[#D4AF37] rounded-full mb-4"></div>
             {success ? (
               <p className="text-green-600">✅ Your message was sent!</p>
             ) : (
@@ -343,6 +363,11 @@ export default function ListingDetail() {
             </p>
           </section>
         )}
+
+        {/* ✅ Footer Listing ID */}
+        <div className="text-center text-sm text-gray-400 mt-10">
+          Listing ID: SB-{listing.id}
+        </div>
       </div>
     </main>
   );
