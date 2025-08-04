@@ -192,7 +192,8 @@ const handleSubmit = async () => {
   sde: formData.sde,
   asking_price: formData.askingPrice,
   employees: formData.employees,
-  monthly_lease: formData.monthly_lease,
+monthly_lease: Number(formData.monthly_lease) || 0,
+
   inventory_value: formData.inventory_value,
   equipment_value: formData.equipment_value,
   includes_inventory: formData.includesInventory,
@@ -247,7 +248,7 @@ const handleSubmit = async () => {
     console.error("❌ Submission error:", error);
     alert("There was an error submitting the listing.");
   } finally {
-    
+    setSubmitting(false);
   }
 };
 
@@ -591,6 +592,7 @@ const handleSubmit = async () => {
   <option value="Wyoming">Wyoming</option>
 </select>
 <input
+  type="number"
   name="years_in_business"
   placeholder="Years in Business"
   value={formData.years_in_business}
@@ -599,6 +601,7 @@ const handleSubmit = async () => {
 />
 
 <input
+  type="number"
   name="owner_hours_per_week"
   placeholder="Owner Hours per Week"
   value={formData.owner_hours_per_week}
@@ -606,10 +609,35 @@ const handleSubmit = async () => {
   className="w-full border p-3 rounded"
 />
 
-              <input name="website" placeholder="Website" value={formData.website} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="annualRevenue" placeholder="Annual Revenue" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="annualProfit" placeholder="Annual Profit" value={formData.annualProfit} onChange={handleChange} className="w-full border p-3 rounded" />
-             <input
+<input
+  type="text"
+  name="website"
+  placeholder="Website"
+  value={formData.website}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+
+<input
+  type="number"
+  name="annual_revenue"
+  placeholder="Annual Revenue"
+  value={formData.annual_revenue}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+
+<input
+  type="number"
+  name="annual_profit"
+  placeholder="Annual Profit"
+  value={formData.annual_profit}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+
+<input
+  type="number"
   name="sde"
   placeholder="SDE"
   value={formData.sde}
@@ -622,20 +650,51 @@ const handleSubmit = async () => {
   and one-time expenses. Commonly used to value small businesses.
 </p>
 
-              <input name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="employees" placeholder="Number of Employees" value={formData.employees} onChange={handleChange} className="w-full border p-3 rounded" />
-             <input
-  name="monthly_lease"
+<input
   type="number"
+  name="asking_price"
+  placeholder="Asking Price"
+  value={formData.asking_price}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+
+<input
+  type="number"
+  name="employees"
+  placeholder="Number of Employees"
+  value={formData.employees}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+
+<input
+  type="number"
+  name="monthly_lease"
   placeholder="Monthly Lease Payment for Business Premises"
   value={formData.monthly_lease}
   onChange={handleChange}
   className="w-full border p-3 rounded"
 />
 
-              <input name="inventory_value" placeholder="Inventory Value" value={formData.inventory_value} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="equipment_value" placeholder="Equipment Value" value={formData.equipment_value} onChange={handleChange} className="w-full border p-3 rounded" />
-   
+<input
+  type="number"
+  name="inventory_value"
+  placeholder="Inventory Value"
+  value={formData.inventory_value}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+
+<input
+  type="number"
+  name="equipment_value"
+  placeholder="Equipment Value"
+  value={formData.equipment_value}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+
 <label className="flex items-center">
   <input 
     name="asking_price_includes_property" 
@@ -646,17 +705,37 @@ const handleSubmit = async () => {
   />
   Does the asking price include building/property?
 </label>
-              <label className="flex items-center"><input name="relocatable" type="checkbox" checked={formData.relocatable} onChange={handleChange} className="mr-2" />Relocatable</label>
-              <label className="flex items-center"><input name="home_based" type="checkbox" checked={formData.home_based} onChange={handleChange} className="mr-2" />Home-Based</label>
-             {/* 🔹 Preferred Payment Method Dropdown */}
+
+<label className="flex items-center">
+  <input
+    name="relocatable"
+    type="checkbox"
+    checked={formData.relocatable}
+    onChange={handleChange}
+    className="mr-2"
+  />
+  Relocatable
+</label>
+
+<label className="flex items-center">
+  <input
+    name="home_based"
+    type="checkbox"
+    checked={formData.home_based}
+    onChange={handleChange}
+    className="mr-2"
+  />
+  Home-Based
+</label>
+
 <label className="block font-medium text-gray-700">Preferred Payment Method</label>
 <p className="text-sm text-gray-500 mb-2">
   Choose how you would prefer the business to be purchased. This is just your preference, 
   and buyers can still make offers using different terms.
 </p>
 <select 
-  name="financingType"
-  value={formData.financingType}
+  name="financing_preference"
+  value={formData.financing_preference}
   onChange={handleChange}
   className="w-full border p-3 rounded"
 >
@@ -664,6 +743,7 @@ const handleSubmit = async () => {
   <option value="seller-financed">Seller Financing Available</option>
   <option value="rent-to-own">Rent to Own</option>
 </select>
+
 
 {/* 🔹 Seller Financing Encouragement Box */}
 <div className="bg-gray-50 p-4 rounded border mt-4">
