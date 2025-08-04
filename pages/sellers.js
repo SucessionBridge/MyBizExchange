@@ -322,6 +322,14 @@ seller_financing_considered: formData.seller_financing_considered,
           <div>
             <h3 className="text-xl font-semibold border-b pb-2 mb-3">Financial Overview</h3>
             <p><strong>Asking Price:</strong> {formatCurrency(formData.askingPrice)}</p>
+         
+{(formData.seller_financing_considered === 'yes' || formData.seller_financing_considered === 'maybe') && (
+  <div className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded font-medium mt-2">
+    💰 Seller Financing Possible
+  </div>
+)}
+
+
             <p><strong>Annual Revenue:</strong> {formatCurrency(formData.annualRevenue)}</p>
             <p><strong>SDE:</strong> {formatCurrency(formData.sde)}</p>
             <p><strong>Annual Profit:</strong> {formatCurrency(formData.annualProfit)}</p>
@@ -632,19 +640,52 @@ seller_financing_considered: formData.seller_financing_considered,
 
               <input name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="employees" placeholder="Number of Employees" value={formData.employees} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="monthly_lease" placeholder="Monthly Lease Amount" value={formData.monthly_lease} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="monthly_lease" placeholder="Monthly Lease Payment for Business Premises" value={formData.monthly_lease} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="inventory_value" placeholder="Inventory Value" value={formData.inventory_value} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="equipment_value" placeholder="Equipment Value" value={formData.equipment_value} onChange={handleChange} className="w-full border p-3 rounded" />
-              <label className="flex items-center"><input name="includesInventory" type="checkbox" checked={formData.includesInventory} onChange={handleChange} className="mr-2" />Includes Inventory</label>
-              <label className="flex items-center"><input name="includesBuilding" type="checkbox" checked={formData.includesBuilding} onChange={handleChange} className="mr-2" />Includes Building</label>
+   
+<label className="flex items-center">
+  <input 
+    name="asking_price_includes_property" 
+    type="checkbox" 
+    checked={formData.asking_price_includes_property || false} 
+    onChange={handleChange} 
+    className="mr-2" 
+  />
+  Does the asking price include building/property?
+</label>
+
+
               <label className="flex items-center"><input name="real_estate_included" type="checkbox" checked={formData.real_estate_included} onChange={handleChange} className="mr-2" />Real Estate Included</label>
               <label className="flex items-center"><input name="relocatable" type="checkbox" checked={formData.relocatable} onChange={handleChange} className="mr-2" />Relocatable</label>
               <label className="flex items-center"><input name="home_based" type="checkbox" checked={formData.home_based} onChange={handleChange} className="mr-2" />Home-Based</label>
               <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded">
+      
                 <option value="buyer-financed">Buyer Financed</option>
                 <option value="seller-financed">Seller Financed</option>
                 <option value="rent-to-own">Rent to Own</option>
               </select>
+
+<div className="bg-gray-50 p-4 rounded border mt-4">
+  <h3 className="font-semibold mb-2">Payment Options Preferences</h3>
+  <p className="text-sm text-gray-600 mb-2">
+    Would you consider seller financing if the buyer and seller could create a deal that works for both?
+    Listings that allow seller financing under your own terms often get more buyer attention.
+  </p>
+  <select 
+    name="seller_financing_considered"
+    value={formData.seller_financing_considered}
+    onChange={handleChange}
+    className="w-full border p-2 rounded"
+  >
+    <option value="">Select</option>
+    <option value="yes">Yes</option>
+    <option value="maybe">Maybe</option>
+    <option value="no">No</option>
+  </select>
+</div>
+
+
               {renderImages()}
               <button onClick={() => setStep(3)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
               {renderBackButton()}
