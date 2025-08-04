@@ -192,12 +192,14 @@ export default function ListingDetail() {
         💰 Seller Financing Terms Available on Request
       </span>
     )}
+{listing.seller_financing_considered &&
+  ['yes', 'maybe'].includes(listing.seller_financing_considered.toLowerCase()) && (
+    <span className="mt-4 md:mt-0 inline-block bg-green-50 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
+      Seller Financing Possible
+    </span>
+)}
 
-    {listing.financing_type?.toLowerCase().includes('seller') && !listing.seller_financing_considered && (
-      <span className="mt-4 md:mt-0 inline-block bg-green-50 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
-        Seller Financing Available
-      </span>
-    )}
+  
   </div>
 
   <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-gray-800">
