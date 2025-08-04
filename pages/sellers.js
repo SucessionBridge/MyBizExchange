@@ -46,7 +46,6 @@ seller_financing_considered: '',
     equipment_value: '',
     includesInventory: false,
     includesBuilding: false,
-    real_estate_included: false,
     relocatable: false,
     home_based: false,
     financingType: 'buyer-financed',
@@ -337,8 +336,7 @@ seller_financing_considered: formData.seller_financing_considered,
             <p><strong>Equipment Value:</strong> {formatCurrency(formData.equipment_value)}</p>
             <p><strong>Includes Inventory:</strong> {formData.includesInventory ? 'Yes' : 'No'}</p>
             <p><strong>Includes Building:</strong> {formData.includesBuilding ? 'Yes' : 'No'}</p>
-            <p><strong>Real Estate Included:</strong> {formData.real_estate_included ? 'Yes' : 'No'}</p>
-          <p><strong>Years in Business:</strong> {formData.years_in_business || 'Undisclosed'}</p>
+             <p><strong>Years in Business:</strong> {formData.years_in_business || 'Undisclosed'}</p>
 <p><strong>Owner Hours/Week:</strong> {formData.owner_hours_per_week || 'Undisclosed'}</p>
 <p><strong>Seller Financing Considered:</strong>
   {formData.seller_financing_considered
@@ -654,23 +652,32 @@ seller_financing_considered: formData.seller_financing_considered,
   />
   Does the asking price include building/property?
 </label>
-
-
-              <label className="flex items-center"><input name="real_estate_included" type="checkbox" checked={formData.real_estate_included} onChange={handleChange} className="mr-2" />Real Estate Included</label>
               <label className="flex items-center"><input name="relocatable" type="checkbox" checked={formData.relocatable} onChange={handleChange} className="mr-2" />Relocatable</label>
               <label className="flex items-center"><input name="home_based" type="checkbox" checked={formData.home_based} onChange={handleChange} className="mr-2" />Home-Based</label>
-              <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded">
-      
-                <option value="buyer-financed">Buyer Financed</option>
-                <option value="seller-financed">Seller Financed</option>
-                <option value="rent-to-own">Rent to Own</option>
-              </select>
+             {/* 🔹 Preferred Payment Method Dropdown */}
+<label className="block font-medium text-gray-700">Preferred Payment Method</label>
+<p className="text-sm text-gray-500 mb-2">
+  Choose how you would prefer the business to be purchased. This is just your preference, 
+  and buyers can still make offers using different terms.
+</p>
+<select 
+  name="financingType"
+  value={formData.financingType}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+>
+  <option value="buyer-financed">Buyer Arranges Own Financing</option>
+  <option value="seller-financed">Seller Financing Available</option>
+  <option value="rent-to-own">Rent to Own</option>
+</select>
 
+{/* 🔹 Seller Financing Encouragement Box */}
 <div className="bg-gray-50 p-4 rounded border mt-4">
-  <h3 className="font-semibold mb-2">Payment Options Preferences</h3>
+  <h3 className="font-semibold mb-2">Seller Financing Option</h3>
   <p className="text-sm text-gray-600 mb-2">
-    Would you consider seller financing if the buyer and seller could create a deal that works for both?
-    Listings that allow seller financing under your own terms often get more buyer attention.
+    Offering seller financing can help you sell faster and attract more buyers. 
+    You set the terms, including down payment and interest. Even selecting 
+    “Maybe” gives you more exposure to qualified buyers who are serious.
   </p>
   <select 
     name="seller_financing_considered"
@@ -683,7 +690,35 @@ seller_financing_considered: formData.seller_financing_considered,
     <option value="maybe">Maybe</option>
     <option value="no">No</option>
   </select>
+
+  {/* 🔹 Extra fields appear only if Yes or Maybe is selected */}
+  {(formData.seller_financing_considered === 'yes' || formData.seller_financing_considered === 'maybe') && (
+    <div className="mt-3 space-y-2">
+      <input 
+        name="down_payment"
+        placeholder="Typical Down Payment (%)"
+        value={formData.down_payment || ''}
+        onChange={handleChange}
+        className="w-full border p-2 rounded"
+      />
+      <input 
+        name="interest_rate"
+        placeholder="Interest Rate (%)"
+        value={formData.interest_rate || ''}
+        onChange={handleChange}
+        className="w-full border p-2 rounded"
+      />
+      <input 
+        name="term_length"
+        placeholder="Term Length (Years)"
+        value={formData.term_length || ''}
+        onChange={handleChange}
+        className="w-full border p-2 rounded"
+      />
+    </div>
+  )}
 </div>
+
 
 
               {renderImages()}
