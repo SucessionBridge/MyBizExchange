@@ -293,7 +293,7 @@ const handleSubmit = async () => {
 
         {formData.images.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
-           {fo rmData.images.map((url, i) => (
+           {formData.images.map((url, i) => (
               <div key={i} className="relative">
                 <img
                   src={url}
