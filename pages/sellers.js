@@ -607,19 +607,6 @@ seller_financing_considered: formData.seller_financing_considered,
   className="w-full border p-3 rounded"
 />
 
-<label className="block font-medium text-gray-700">Would you consider seller financing if terms were favorable?</label>
-<select
-  name="seller_financing_considered"
-  value={formData.seller_financing_considered}
-  onChange={handleChange}
-  className="w-full border p-3 rounded"
->
-  <option value="">Select</option>
-  <option value="yes">Yes</option>
-  <option value="no">No</option>
-  <option value="maybe">Maybe</option>
-</select>
-
               <input name="website" placeholder="Website" value={formData.website} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="annualRevenue" placeholder="Annual Revenue" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="annualProfit" placeholder="Annual Profit" value={formData.annualProfit} onChange={handleChange} className="w-full border p-3 rounded" />
