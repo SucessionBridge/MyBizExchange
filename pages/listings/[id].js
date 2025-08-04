@@ -176,49 +176,58 @@ export default function ListingDetail() {
         </div>
 
         {/* ✅ Financial Highlights */}
-        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-          <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-6 border-b-2 border-[#F59E0B] pb-2">
-            Financial Highlights
-          </h2>
+<section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+  <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-6 border-b-2 border-[#F59E0B] pb-2">
+    Financial Highlights
+  </h2>
 
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-            <div className="text-3xl md:text-4xl font-bold text-emerald-700">
-              Asking Price: {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire'}
-            </div>
-            {listing.financing_type?.toLowerCase().includes('seller') && (
-              <span className="mt-4 md:mt-0 inline-block bg-green-50 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
-                Seller Financing Available
-              </span>
-            )}
-          </div>
+  <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+    <div className="text-3xl md:text-4xl font-bold text-emerald-700">
+      Asking Price: {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire'}
+    </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-gray-800">
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Annual Revenue</p>
-              <p className="text-lg font-bold">{listing.annual_revenue ? `$${listing.annual_revenue.toLocaleString()}` : 'N/A'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Annual Profit</p>
-              <p className="text-lg font-bold">{listing.annual_profit ? `$${listing.annual_profit.toLocaleString()}` : 'N/A'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">SDE</p>
-              <p className="text-lg font-bold">{listing.sde ? `$${listing.sde.toLocaleString()}` : 'N/A'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Inventory Value</p>
-              <p className="text-lg font-bold">{listing.inventory_value ? `$${listing.inventory_value.toLocaleString()}` : 'N/A'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Equipment Value</p>
-              <p className="text-lg font-bold">{listing.equipment_value ? `$${listing.equipment_value.toLocaleString()}` : 'N/A'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Employees</p>
-              <p className="text-lg font-bold">{listing.employees || 'N/A'}</p>
-            </div>
-          </div>
-        </section>
+    {/* ✅ Show Green Seller Financing Tag if Yes/Maybe */}
+    {(listing.seller_financing_considered === 'yes' || listing.seller_financing_considered === 'maybe') && (
+      <span className="mt-4 md:mt-0 inline-block bg-green-100 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
+        💰 Seller Financing Terms Available on Request
+      </span>
+    )}
+
+    {listing.financing_type?.toLowerCase().includes('seller') && !listing.seller_financing_considered && (
+      <span className="mt-4 md:mt-0 inline-block bg-green-50 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
+        Seller Financing Available
+      </span>
+    )}
+  </div>
+
+  <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-gray-800">
+    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+      <p className="text-xs uppercase text-gray-500 font-semibold">Annual Revenue</p>
+      <p className="text-lg font-bold">{listing.annual_revenue ? `$${listing.annual_revenue.toLocaleString()}` : 'N/A'}</p>
+    </div>
+    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+      <p className="text-xs uppercase text-gray-500 font-semibold">Annual Profit</p>
+      <p className="text-lg font-bold">{listing.annual_profit ? `$${listing.annual_profit.toLocaleString()}` : 'N/A'}</p>
+    </div>
+    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+      <p className="text-xs uppercase text-gray-500 font-semibold">SDE</p>
+      <p className="text-lg font-bold">{listing.sde ? `$${listing.sde.toLocaleString()}` : 'N/A'}</p>
+    </div>
+    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+      <p className="text-xs uppercase text-gray-500 font-semibold">Inventory Value</p>
+      <p className="text-lg font-bold">{listing.inventory_value ? `$${listing.inventory_value.toLocaleString()}` : 'N/A'}</p>
+    </div>
+    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+      <p className="text-xs uppercase text-gray-500 font-semibold">Equipment Value</p>
+      <p className="text-lg font-bold">{listing.equipment_value ? `$${listing.equipment_value.toLocaleString()}` : 'N/A'}</p>
+    </div>
+    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+      <p className="text-xs uppercase text-gray-500 font-semibold">Employees</p>
+      <p className="text-lg font-bold">{listing.employees || 'N/A'}</p>
+    </div>
+  </div>
+</section>
+
 
         {/* ✅ Business Description */}
         <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
