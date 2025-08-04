@@ -207,7 +207,7 @@ const saveModalChanges = () => {
         asking_price: parseFloat(askingPrice) || 0,
         years_in_business: parseInt(formData.years_in_business) || null,
 owner_hours_per_week: parseInt(formData.owner_hours_per_week) || null,
-seller_financing_considered: formData.seller_financing_considered,
+
 term_length: parseInt(formData.seller_financing_term_months) || null,
 down_payment: parseFloat(formData.seller_financing_down_payment) || null,
 
