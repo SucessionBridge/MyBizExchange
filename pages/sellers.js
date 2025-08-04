@@ -624,7 +624,15 @@ const handleSubmit = async () => {
 
               <input name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="employees" placeholder="Number of Employees" value={formData.employees} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="monthly_lease" placeholder="Monthly Lease Payment for Business Premises" value={formData.monthly_lease} onChange={handleChange} className="w-full border p-3 rounded" />
+             <input
+  name="monthly_lease"
+  type="number"
+  placeholder="Monthly Lease Payment for Business Premises"
+  value={formData.monthly_lease}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+
               <input name="inventory_value" placeholder="Inventory Value" value={formData.inventory_value} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="equipment_value" placeholder="Equipment Value" value={formData.equipment_value} onChange={handleChange} className="w-full border p-3 rounded" />
    
