@@ -389,9 +389,7 @@ const renderPreview = () => {
   );
 };
 
- 
-
-        <div className="mt-8 space-y-4">
+       <div className="mt-8 space-y-4">
           <div className="flex gap-4">
             <button
               onClick={() => setPreviewMode(false)}
@@ -448,6 +446,10 @@ const renderPreview = () => {
     );
   };
   return (
+     </div>
+    );
+  };
+  return (
     <main className="bg-white min-h-screen p-6 font-sans">
       <Head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -456,34 +458,60 @@ const renderPreview = () => {
       </Head>
       <div className="max-w-2xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center">{previewMode ? 'Listing Preview' : 'Seller Onboarding'}</h1>
-        {previewMode ? renderPreview() : (
-          step === 1 ? (
-            <div className="space-y-4">
-              <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="email" placeholder="Email" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" />
-              <FloatingInput
-  label="Business Name"
-  name="businessName"
-  value={formData.businessName}
-  onChange={handleChange}
-/>
+    {previewMode ? renderPreview() : (
+  step === 1 ? (
+    <div className="space-y-4">
+      <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded" />
+      <input name="email" placeholder="Email" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" />
+      <FloatingInput
+        label="Business Name"
+        name="businessName"
+        value={formData.businessName}
+        onChange={handleChange}
+      />
+      <label className="flex items-center">
+        <input
+          name="hideBusinessName"
+          type="checkbox"
+          checked={formData.hideBusinessName}
+          onChange={handleChange}
+          className="mr-2"
+        />
+        Hide Business Name
+      </label>
+      <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-3 rounded">
+        Next
+      </button>
+    </div>
+  ) : step === 2 ? (
+    <div className="space-y-4">
+      <input
+        name="industry"
+        placeholder="Industry"
+        value={formData.industry}
+        onChange={handleChange}
+        className="w-full border p-3 rounded"
+      />
+      {/* ✅ New City + State Dropdowns */}
+      <input
+        name="location_city"
+        placeholder="City"
+        value={formData.location_city}
+        onChange={handleChange}
+        className="w-full border p-3 rounded"
+      />
+      <select
+        name="location_state"
+        value={formData.location_state}
+        onChange={handleChange}
+        className="w-full border p-3 rounded"
+      >
+        {/* options here */}
+      </select>
+    </div>
+  ) : null
+)}
 
-              <label className="flex items-center"><input name="hideBusinessName" type="checkbox" checked={formData.hideBusinessName} onChange={handleChange} className="mr-2" />Hide Business Name</label>
-              <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
-            </div>
-          ) : step === 2 ? (
-            <div className="space-y-4">
-              <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded" />
-
-              {/* ✅ New City + State Dropdowns */}
-              <input name="location_city" placeholder="City" value={formData.location_city} onChange={handleChange} className="w-full border p-3 rounded" />
-             <select
-  name="location_state"
-  value={formData.location_state}
-  onChange={handleChange}
-  className="w-full border p-3 rounded"
-
->
   <option value="">Select State/Province</option>
 
   {/* 🇨🇦 Canadian Provinces & Territories */}
