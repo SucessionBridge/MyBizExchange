@@ -269,10 +269,7 @@ export default function ListingDetail() {
               <p className="text-xs uppercase text-gray-500 font-semibold">Financing Type</p>
               <p className="text-lg font-bold">{listing.financing_type?.replace(/-/g, ' ') || 'N/A'}</p>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Real Estate Included</p>
-              <p className="text-lg font-bold">{listing.real_estate_included ? 'Yes' : 'No'}</p>
-            </div>
+           
           </div>
         </section>
 
