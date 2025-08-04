@@ -163,7 +163,7 @@ const handleSubmit = async () => {
       if (uploadError) {
         console.error("❌ Image upload failed:", uploadError.message);
         alert("Image upload failed. Please try again.");
-        setSubmitting(false);
+        setIsSubmitting(false);
         return;
       }
 
@@ -273,7 +273,7 @@ const handleSubmit = async () => {
 
         {formData.images.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
-            {formData.images.map((url, i) => (
+           {fo rmData.images.map((url, i) => (
               <div key={i} className="relative">
                 <img
                   src={url}
