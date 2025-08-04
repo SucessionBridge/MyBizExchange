@@ -13,7 +13,6 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    // Log to ensure incoming data is well-formed
     console.log("📨 Incoming seller payload:", data);
 
     const { error } = await supabase.from('sellers').insert([
@@ -93,6 +92,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server error', detail: err.message });
   }
 }
-
 
 
