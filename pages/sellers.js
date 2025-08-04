@@ -149,109 +149,77 @@ const saveModalChanges = () => {
     setImagePreviews(prev => [...prev, ...previews]);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setSubmitSuccess(false);
-    setSubmitError('');
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setIsSubmitting(true);
 
-    try {
-      const uploadedImageUrls = [];
+  try {
+    // Upload images to Supabase Storage
+    const uploadedImageUrls = [];
+    for (let i = 0; i < formData.images.length; i++) {
+      const image = formData.images[i];
+      const fileExt = image.name.split('.').pop();
+      const fileName = `${Date.now()}_${i}.${fileExt}`;
+      const filePath = `${fileName}`;
 
-      // ✅ Upload images and get public URLs
-      for (const file of formData.images) {
-        const filePath = `${Date.now()}-${file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('seller-images')
-          .upload(filePath, file);
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('seller-images')
+        .upload(filePath, image);
 
-        if (uploadError) {
-          console.error('Image upload failed:', uploadError.message);
-          setSubmitError('Image upload failed. Please try again.');
-          setIsSubmitting(false);
-          return;
-        }
+      if (uploadError) throw uploadError;
 
-        const { data: urlData } = supabase.storage
-          .from('seller-images')
-          .getPublicUrl(filePath);
+      const { data: publicUrlData } = supabase.storage
+        .from('seller-images')
+        .getPublicUrl(filePath);
 
-        uploadedImageUrls.push(urlData.publicUrl);
-      }
-
-      // ✅ Combine city + state into one field
-      const combinedLocation = formData.location_city && formData.location_state
-        ? `${formData.location_city}, ${formData.location_state}`
-        : formData.location;
-
-      const {
-        images,
-        annualRevenue,
-        annualProfit,
-        sde,
-        askingPrice,
-        employees,
-        monthly_lease,
-        inventory_value,
-        equipment_value,
-        ...rest
-      } = formData;
-
-      const payload = {
-        ...rest,
-        business_name: formData.businessName,
-        location: combinedLocation,
-        annual_revenue: parseFloat(annualRevenue) || 0,
-        annual_profit: parseFloat(annualProfit) || 0,
-        sde: parseFloat(sde) || 0,
-        asking_price: parseFloat(askingPrice) || 0,
-        years_in_business: parseInt(formData.years_in_business) || null,
-owner_hours_per_week: parseInt(formData.owner_hours_per_week) || null,
-seller_financing_considered: formData.seller_financing_considered,
-
-        employees: parseInt(employees) || 0,
-        monthly_lease: parseFloat(monthly_lease) || 0,
-        inventory_value: parseFloat(inventory_value) || 0,
-        equipment_value: parseFloat(equipment_value) || 0,
-        image_urls: uploadedImageUrls,
-        original_description: formData.descriptionChoice === 'manual' ? formData.businessDescription : '',
-        ai_description: formData.descriptionChoice === 'ai' ? formData.aiDescription : '',
-        description_choice: formData.descriptionChoice,
-        hide_business_name: formData.hideBusinessName,
-        business_description: formData.businessDescription,
-      };
-
-      let res;
-      if (isEditing && listingId) {
-        res = await fetch(`/api/update-seller-listing?id=${listingId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      } else {
-        res = await fetch('/api/submit-seller-listing', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      }
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Server error');
-      }
-
-      setSubmitSuccess(true);
-      setIsSubmitting(false);
-      setPreviewMode(false);
-      router.push('/thank-you');
-
-    } catch (err) {
-      console.error('❌ Submission error:', err);
-      setSubmitError(err.message || 'Submission failed');
-      setIsSubmitting(false);
+      uploadedImageUrls.push(publicUrlData.publicUrl);
     }
-  };
+
+    // Prepare payload matching Supabase table
+    const payload = {
+      business_name: formData.businessName,
+      email: formData.email,
+      industry: formData.industry,
+      years_in_business: Number(formData.yearsInBusiness),
+      location: formData.location,
+      sde: Number(formData.sde),
+      revenue: Number(formData.revenue),
+      asking_price: Number(formData.askingPrice),
+      customers: formData.customers,
+      opportunity: formData.opportunity,
+      reason_for_selling: formData.reasonForSelling,
+      seller_financing_considered: formData.sellerFinancingConsidered || false,
+      seller_financing_terms: formData.sellerFinancingTerms,
+      financing_type: formData.financingType,
+      down_payment_required: formData.downPaymentRequired ? Number(formData.downPaymentRequired) : null,
+      interest_rate: formData.interestRate ? Number(formData.interestRate) : null,
+      term_length_months: formData.termLengthMonths ? Number(formData.termLengthMonths) : null,
+      home_based: formData.homeBased || false,
+      relocatable: formData.relocatable || false,
+      website: formData.website || '',
+      image_urls: uploadedImageUrls,
+      business_description: formData.businessDescription,
+      ai_description: formData.aiGeneratedDescription,
+      monthly_lease: formData.monthlyLease ? Number(formData.monthlyLease) : null,
+    };
+
+    const response = await fetch('/api/submit-seller-listing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) throw new Error('Insert failed');
+
+    router.push('/thank-you');
+  } catch (error) {
+    console.error('❌ Submission error:', error);
+    alert('Submission failed. Please try again.');
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
   const renderBackButton = () => (
