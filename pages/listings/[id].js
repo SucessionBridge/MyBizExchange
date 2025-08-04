@@ -71,39 +71,41 @@ export default function ListingDetail() {
     setLoading(false);
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!message || !buyer || !listing) return;
+ async function handleSubmit(e) {
+  e.preventDefault();
+  if (!message || !buyer || !listing) return;
 
-    try {
-      const response = await fetch('/api/send-message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          seller_id: listing.auth_id,
-          listing_id: listing.id,
-          buyer_name: buyer.name || buyer.full_name || buyer.email,
-          buyer_email: buyer.email,
-          topic: 'business-inquiry',
-          extension: 'successionbridge',
-        }),
-      });
+  const formData = new FormData();
+  formData.append('message', message);
+  formData.append('seller_id', listing.auth_id);
+  formData.append('listing_id', listing.id);
+  formData.append('buyer_name', buyer.name || buyer.full_name || buyer.email);
+  formData.append('buyer_email', buyer.email);
+  formData.append('topic', 'business-inquiry');
+  formData.append('extension', 'successionbridge');
 
-      const result = await response.json();
-      if (!response.ok) {
-        console.error('❌ Message failed:', result.error);
-        alert('Message failed to send.');
-      } else {
-        alert('✅ Message sent to the seller!');
-        setMessage('');
-        setSuccess(true);
-      }
-    } catch (err) {
-      console.error('❌ Error sending message:', err);
-      alert('Something went wrong.');
+  if (attachment) formData.append('attachment', attachment); // ✅ Add file
+
+  try {
+    const response = await fetch('/api/send-message', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const result = await response.json();
+    if (!response.ok) {
+      alert('Message failed to send.');
+    } else {
+      alert('✅ Message sent to the seller!');
+      setMessage('');
+      setAttachment(null);
+      setSuccess(true);
     }
+  } catch (err) {
+    console.error('❌ Error sending message:', err);
+    alert('Something went wrong.');
   }
+}
 
   async function handleSaveListing() {
     if (!buyer) {
@@ -318,6 +320,12 @@ export default function ListingDetail() {
                   onChange={(e) => setMessage(e.target.value)}
                   required
                 />
+                 <input
+  type="file"
+  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png"
+  onChange={(e) => setAttachment(e.target.files[0])}
+  className="block mt-2"
+/>   
                 <div className="flex flex-wrap gap-3">
                   <button
                     type="submit"
