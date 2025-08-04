@@ -189,8 +189,7 @@ export default function SellerWizard() {
             </label>
           </>
         );
-    }
-  };
+  
       case 3:
         return (
           <>
