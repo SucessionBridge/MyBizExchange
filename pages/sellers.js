@@ -208,6 +208,8 @@ const saveModalChanges = () => {
         years_in_business: parseInt(formData.years_in_business) || null,
 owner_hours_per_week: parseInt(formData.owner_hours_per_week) || null,
 seller_financing_considered: formData.seller_financing_considered,
+seller_financing_term_months: parseInt(formData.seller_financing_term_months) || null,
+seller_financing_down_payment: parseFloat(formData.seller_financing_down_payment) || null,
 
         employees: parseInt(employees) || 0,
         monthly_lease: parseFloat(monthly_lease) || 0,
