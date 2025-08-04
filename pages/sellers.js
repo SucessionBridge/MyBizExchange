@@ -1,484 +1,677 @@
-import { useState } from 'react';
-import supabase from '../lib/supabaseClient';
-import { useRouter } from 'next/router';
 
-export default function Sellers() {
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import Head from 'next/head';
+import supabase from '../lib/supabaseClient'; // ✅ correct
+import FloatingInput from '../components/FloatingInput';
+import EditDescriptionModal from '../components/EditDescriptionModal'; // ✅ NEW
+
+export default function SellerWizard() {
+
   const router = useRouter();
+  const [step, setStep] = useState(1);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [imagePreviews, setImagePreviews] = useState([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [listingId, setListingId] = useState(null);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [editTarget, setEditTarget] = useState(null); // ✅ NEW for modal target
+  const [showModal, setShowModal] = useState(false);
+const [currentEditType, setCurrentEditType] = useState('manual'); // 'manual' or 'ai'
+const [tempDescription, setTempDescription] = useState('');
+const [tempAIDescription, setTempAIDescription] = useState('');
+ 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
-    business_name: '',
-    hide_business_name: false,
+    businessName: '',
+    hideBusinessName: false,
     industry: '',
     location: '',
-    asking_price: '',
-    annual_revenue: '',
-    annual_profit: '',
+    location_city: '',
+    location_state: '',
+    years_in_business: '',
+owner_hours_per_week: '',
+seller_financing_considered: '',
+    website: '',
+    annualRevenue: '',
     sde: '',
-    inventory_value: '',
-    equipment_value: '',
+    askingPrice: '',
     employees: '',
     monthly_lease: '',
-    home_based: false,
+    inventory_value: '',
+    equipment_value: '',
+    includesInventory: false,
+    includesBuilding: false,
+    real_estate_included: false,
     relocatable: false,
-    years_in_business: '',
-    financing_type: '',
-    consider_seller_financing: 'no', // ✅ new field
-    possible_seller_financing: false, // ✅ flag for buyers to see
-    includes_real_estate: false,
-    includes_building: false,
-    asking_price_includes_property: false, // ✅ new for clarity
-    business_description: '',
-    ai_description: '',
-    description_choice: 'manual',
-    image_urls: [],
+    home_based: false,
+    financingType: 'buyer-financed',
+    businessDescription: '',
+    aiDescription: '',
+    descriptionChoice: 'manual',
+    customerType: '',
+    ownerInvolvement: '',
+    growthPotential: '',
+    reasonForSelling: '',
+    trainingOffered: '',
+    sentenceSummary: '',
+    customers: '',
+    bestSellers: '',
+    customerLove: '',
+    repeatCustomers: '',
+    keepsThemComing: '',
+    proudOf: '',
+    adviceToBuyer: '',
+    annualProfit: '',
+    images: []
   });
 
-  const [images, setImages] = useState([]);
-  const [showPreview, setShowPreview] = useState(false);
-  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (previewMode && !formData.aiDescription) {
+      const fetchDescription = async () => {
+        try {
+          const res = await fetch('/api/generate-description', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({
+  sentenceSummary: formData.sentenceSummary,
+  customers: formData.customers,
+  bestSellers: formData.bestSellers,
+  customerLove: formData.customerLove,
+  repeatCustomers: formData.repeatCustomers,
+  keepsThemComing: formData.keepsThemComing,
+  ownerInvolvement: formData.ownerInvolvement,
+  opportunity: formData.growthPotential,
+  proudOf: formData.proudOf,
+  adviceToBuyer: formData.adviceToBuyer,
+  businessName: formData.businessName,
+  industry: formData.industry,
+  location: formData.location || `${formData.location_city}, ${formData.location_state}`,
+  annualRevenue: formData.annualRevenue,
+  annualProfit: formData.annualProfit,
+  includesInventory: formData.includesInventory,
+  includesBuilding: formData.includesBuilding
+})
+          });
+
+          if (!res.ok) {
+            const err = await res.json();
+            console.error('AI description error:', err.message);
+            return;
+          }
+
+          const data = await res.json();
+          setFormData(prev => ({ ...prev, aiDescription: data.description }));
+        } catch (err) {
+          console.error('AI fetch failed:', err);
+        }
+      };
+      fetchDescription();
+    }
+  }, [previewMode]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-      ...(name === 'consider_seller_financing' && (value === 'yes' || value === 'maybe')
-        ? { possible_seller_financing: true }
-        : name === 'consider_seller_financing'
-        ? { possible_seller_financing: false }
-        : {})
-    }));
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  };
+// ✅ Modal controls for editing descriptions
+const openModal = (type) => {
+  setEditTarget(type);
+  if (type === 'manual') {
+    setTempDescription(formData.businessDescription || '');
+  } else {
+    setTempAIDescription(formData.aiDescription || '');
+  }
+  setShowModal(true);
+};
+
+const closeModal = () => {
+  setShowModal(false);
+  setEditTarget(null);
+};
+
+const saveModalChanges = () => {
+  if (editTarget === 'manual') {
+    setFormData(prev => ({ ...prev, businessDescription: tempDescription }));
+  } else if (editTarget === 'ai') {
+    setFormData(prev => ({ ...prev, aiDescription: tempAIDescription }));
+  }
+  closeModal();
+};
+
+   const handleImageUpload = (e) => {
+    const files = Array.from(e.target.files);
+    const previews = files.map(file => URL.createObjectURL(file));
+    setFormData(prev => ({ ...prev, images: [...prev.images, ...files] }));
+    setImagePreviews(prev => [...prev, ...previews]);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setIsSubmitting(true);
+    setSubmitSuccess(false);
+    setSubmitError('');
 
-    const payload = { ...formData, image_urls: images };
+    try {
+      const uploadedImageUrls = [];
 
-    const { error } = await supabase.from('sellers').insert([payload]);
+      // ✅ Upload images and get public URLs
+      for (const file of formData.images) {
+        const filePath = `${Date.now()}-${file.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from('seller-images')
+          .upload(filePath, file);
 
-    if (error) {
-      alert('❌ Submission failed.');
-      setLoading(false);
-    } else {
-      alert('✅ Listing submitted!');
+        if (uploadError) {
+          console.error('Image upload failed:', uploadError.message);
+          setSubmitError('Image upload failed. Please try again.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('seller-images')
+          .getPublicUrl(filePath);
+
+        uploadedImageUrls.push(urlData.publicUrl);
+      }
+
+      // ✅ Combine city + state into one field
+      const combinedLocation = formData.location_city && formData.location_state
+        ? `${formData.location_city}, ${formData.location_state}`
+        : formData.location;
+
+      const {
+        images,
+        annualRevenue,
+        annualProfit,
+        sde,
+        askingPrice,
+        employees,
+        monthly_lease,
+        inventory_value,
+        equipment_value,
+        ...rest
+      } = formData;
+
+      const payload = {
+        ...rest,
+        business_name: formData.businessName,
+        location: combinedLocation,
+        annual_revenue: parseFloat(annualRevenue) || 0,
+        annual_profit: parseFloat(annualProfit) || 0,
+        sde: parseFloat(sde) || 0,
+        asking_price: parseFloat(askingPrice) || 0,
+        years_in_business: parseInt(formData.years_in_business) || null,
+owner_hours_per_week: parseInt(formData.owner_hours_per_week) || null,
+seller_financing_considered: formData.seller_financing_considered,
+
+        employees: parseInt(employees) || 0,
+        monthly_lease: parseFloat(monthly_lease) || 0,
+        inventory_value: parseFloat(inventory_value) || 0,
+        equipment_value: parseFloat(equipment_value) || 0,
+        image_urls: uploadedImageUrls,
+        original_description: formData.descriptionChoice === 'manual' ? formData.businessDescription : '',
+        ai_description: formData.descriptionChoice === 'ai' ? formData.aiDescription : '',
+        description_choice: formData.descriptionChoice,
+        hide_business_name: formData.hideBusinessName,
+        business_description: formData.businessDescription,
+      };
+
+      let res;
+      if (isEditing && listingId) {
+        res = await fetch(`/api/update-seller-listing?id=${listingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } else {
+        res = await fetch('/api/submit-seller-listing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      }
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Server error');
+      }
+
+      setSubmitSuccess(true);
+      setIsSubmitting(false);
+      setPreviewMode(false);
       router.push('/thank-you');
+
+    } catch (err) {
+      console.error('❌ Submission error:', err);
+      setSubmitError(err.message || 'Submission failed');
+      setIsSubmitting(false);
     }
   };
 
-  return (
-    <main className="min-h-screen bg-gray-50 py-10">
-      <div className="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow">
-        <h1 className="text-3xl font-bold mb-6">Seller Onboarding</h1>
+  const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
+  const renderBackButton = () => (
+    <button onClick={() => setStep(s => Math.max(1, s - 1))} className="text-sm text-blue-600 underline mt-2">Back</button>
+  );
 
-        {!showPreview ? (
-          <form onSubmit={handleSubmit} className="space-y-6">
-
-            {/* ✅ Basic Business Info */}
-            <div>
-              <label className="block font-semibold mb-1">Business Name</label>
-              <input
-                type="text"
-                name="business_name"
-                value={formData.business_name}
-                onChange={handleChange}
-                className="w-full border rounded px-3 py-2"
-              />
-              <label className="inline-flex items-center mt-2">
-                <input
-                  type="checkbox"
-                  name="hide_business_name"
-                  checked={formData.hide_business_name}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                Hide business name from public listing
-              </label>
-            </div>
-
-            {/* ✅ Location */}
-            <div>
-              <label className="block font-semibold mb-1">Location</label>
-              <input
-                type="text"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-
-            {/* ✅ Asking Price */}
-            <div>
-              <label className="block font-semibold mb-1">Asking Price</label>
-              <input
-                type="number"
-                name="asking_price"
-                value={formData.asking_price}
-                onChange={handleChange}
-                className="w-full border rounded px-3 py-2"
-              />
-              <label className="inline-flex items-center mt-2">
-                <input
-                  type="checkbox"
-                  name="asking_price_includes_property"
-                  checked={formData.asking_price_includes_property}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                Does the asking price include building/property?
-              </label>
-            </div>
-
-            {/* ✅ Financials */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block font-semibold mb-1">Annual Revenue</label>
-                <input
-                  type="number"
-                  name="annual_revenue"
-                  value={formData.annual_revenue}
-                  onChange={handleChange}
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="block font-semibold mb-1">Annual Profit</label>
-                <input
-                  type="number"
-                  name="annual_profit"
-                  value={formData.annual_profit}
-                  onChange={handleChange}
-                  className="w-full border rounded px-3 py-2"
-                />
-              </div>
-            </div>
-
-            {/* ✅ Lease */}
-            <div>
-              <label className="block font-semibold mb-1">
-                Monthly Lease Payment for Business Premises
-              </label>
-              <input
-                type="number"
-                name="monthly_lease"
-                value={formData.monthly_lease}
-                onChange={handleChange}
-                className="w-full border rounded px-3 py-2"
-              />
-            </div>
-
-            {/* ✅ Payment Options Preferences */}
-            <div>
-              <label className="block text-lg font-bold mb-2">Payment Options Preferences</label>
-              <p className="text-gray-600 text-sm mb-3">
-                Would you consider seller financing if the buyer and seller could create a deal that
-                works for both? Offering seller financing under your own terms can help attract more
-                buyers and increase listing visibility.
-              </p>
-              <select
-                name="consider_seller_financing"
-                value={formData.consider_seller_financing}
-                onChange={handleChange}
-                className="w-full border rounded px-3 py-2"
-              >
-                <option value="no">No</option>
-                <option value="maybe">Maybe</option>
-                <option value="yes">Yes</option>
-              </select>
-            </div>
-
-            {/* ✅ Financing Type */}
-            <div>
-              <label className="block font-semibold mb-1">Preferred Exit / Payment Structure</label>
-              <select
-                name="financing_type"
-                value={formData.financing_type}
-                onChange={handleChange}
-                className="w-full border rounded px-3 py-2"
-              >
-                <option value="">Select...</option>
-                <option value="buyer-financed">Buyer Financed (Cash/Loan)</option>
-                <option value="seller-financed">Seller Financed</option>
-                <option value="rent-to-own">Rent to Own</option>
-              </select>
-            </div>
-
-            {/* ✅ Home Based & Relocatable */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <label className="inline-flex items-center">
-                <input
-                  type="checkbox"
-                  name="home_based"
-                  checked={formData.home_based}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                Home-Based Business
-              </label>
-              <label className="inline-flex items-center">
-                <input
-                  type="checkbox"
-                  name="relocatable"
-                  checked={formData.relocatable}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                Relocatable
-              </label>
-            </div>
-// >>> START PART 2 <<<
-
-// ✅ Business Details Section
-<div className="bg-white p-6 rounded-lg shadow-md">
-  <h2 className="text-2xl font-bold mb-4">Business Details</h2>
-
-  {/* ✅ Monthly Lease */}
-  <label className="block text-sm font-medium mb-1">
-    Monthly Lease Payment for Business Premises
-  </label>
-  <input
-    type="number"
-    className="w-full p-2 border rounded mb-4"
-    placeholder="e.g. 2500"
-    value={formData.monthly_lease || ''}
-    onChange={(e) => setFormData({ ...formData, monthly_lease: e.target.value })}
-  />
-
-  {/* ✅ Asking Price */}
-  <label className="block text-sm font-medium mb-1">Asking Price</label>
-  <input
-    type="number"
-    className="w-full p-2 border rounded mb-4"
-    placeholder="e.g. 150000"
-    value={formData.asking_price || ''}
-    onChange={(e) => setFormData({ ...formData, asking_price: e.target.value })}
-  />
-
-  {/* ✅ Asking Price Includes Property */}
-  <div className="flex items-center gap-2 mb-4">
-    <input
-      type="checkbox"
-      checked={formData.asking_price_includes_property || false}
-      onChange={(e) =>
-        setFormData({ ...formData, asking_price_includes_property: e.target.checked })
-      }
-    />
-    <label className="text-sm">Asking Price Includes Building / Property</label>
-  </div>
-
-  {/* ✅ Home-Based */}
-  <div className="flex items-center gap-2 mb-4">
-    <input
-      type="checkbox"
-      checked={formData.home_based || false}
-      onChange={(e) => setFormData({ ...formData, home_based: e.target.checked })}
-    />
-    <label className="text-sm">Home-Based Business</label>
-  </div>
-
-  {/* ✅ Relocatable */}
-  <div className="flex items-center gap-2 mb-4">
-    <input
-      type="checkbox"
-      checked={formData.relocatable || false}
-      onChange={(e) => setFormData({ ...formData, relocatable: e.target.checked })}
-    />
-    <label className="text-sm">Relocatable Business</label>
-  </div>
-</div>
-
-{/* ✅ Payment Options Preferences */}
-<div className="bg-white p-6 rounded-lg shadow-md mt-6">
-  <h2 className="text-2xl font-bold mb-4">Payment Options Preferences</h2>
-  <p className="text-gray-600 text-sm mb-4">
-    Would you consider seller financing if the buyer and seller could create a deal that works for both parties?
-    Listings that allow seller financing typically get more attention from buyers.
-  </p>
-
-  <select
-    className="w-full p-2 border rounded mb-4"
-    value={formData.financing_type || ''}
-    onChange={(e) => setFormData({ ...formData, financing_type: e.target.value })}
-  >
-    <option value="">Select a preference</option>
-    <option value="buyer-financed">Buyer Financed (Cash or Bank Loan)</option>
-    <option value="seller-financed">Seller Financing (Payments Over Time)</option>
-    <option value="rent-to-own">Rent-to-Own Structure</option>
-  </select>
-
-  <div className="mb-4">
-    <label className="block text-sm font-medium mb-1">Would you consider seller financing?</label>
-    <select
-      className="w-full p-2 border rounded"
-      value={formData.consider_seller_financing || ''}
-      onChange={(e) => setFormData({ ...formData, consider_seller_financing: e.target.value })}
-    >
-      <option value="">Select</option>
-      <option value="yes">Yes</option>
-      <option value="maybe">Maybe</option>
-      <option value="no">No</option>
-    </select>
-  </div>
-</div>
-
-{/* ✅ Description Section */}
-<div className="bg-white p-6 rounded-lg shadow-md mt-6">
-  <h2 className="text-2xl font-bold mb-4">Business Description</h2>
-
-  {/* ✅ Toggle AI or Manual */}
-  <div className="flex gap-4 mb-4">
-    <label className="flex items-center gap-2">
-      <input
-        type="radio"
-        value="manual"
-        checked={formData.description_choice === 'manual'}
-        onChange={() => setFormData({ ...formData, description_choice: 'manual' })}
-      />
-      <span>Manual Description</span>
-    </label>
-    <label className="flex items-center gap-2">
-      <input
-        type="radio"
-        value="ai"
-        checked={formData.description_choice === 'ai'}
-        onChange={() => setFormData({ ...formData, description_choice: 'ai' })}
-      />
-      <span>AI-Generated Description</span>
-    </label>
-  </div>
-
-  {/* ✅ Manual Description */}
-  {formData.description_choice === 'manual' && (
-    <textarea
-      className="w-full p-3 border rounded mb-4"
-      rows="5"
-      placeholder="Describe your business..."
-      value={formData.business_description || ''}
-      onChange={(e) => setFormData({ ...formData, business_description: e.target.value })}
-    />
-  )}
-
-  {/* ✅ AI Description Input Fields */}
-  {formData.description_choice === 'ai' && (
-    <div className="space-y-3">
-      <input
-        type="text"
-        className="w-full p-2 border rounded"
-        placeholder="What does your business do?"
-        value={formData.ai_business_do || ''}
-        onChange={(e) => setFormData({ ...formData, ai_business_do: e.target.value })}
-      />
-      <input
-        type="text"
-        className="w-full p-2 border rounded"
-        placeholder="Who are your customers?"
-        value={formData.ai_customers || ''}
-        onChange={(e) => setFormData({ ...formData, ai_customers: e.target.value })}
-      />
-      <input
-        type="text"
-        className="w-full p-2 border rounded"
-        placeholder="What makes your business unique?"
-        value={formData.ai_unique_edge || ''}
-        onChange={(e) => setFormData({ ...formData, ai_unique_edge: e.target.value })}
-      />
+  const renderImages = () => (
+    <div className="space-y-2">
+      <label className="block font-medium text-gray-700">Photos of your business (max 8)</label>
+      <input type="file" multiple onChange={handleImageUpload} accept="image/*" className="w-full border rounded p-2" />
     </div>
-  )}
-</div>
+  );
 
-// >>> END PART 2 <<<
-// >>> START PART 3 <<<
+  const renderPreview = () => {
+    const toTitleCase = (str) =>
+      str
+        .toLowerCase()
+        .split(' ')
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
 
-// ✅ Preview Section
-{showPreview && (
-  <div className="bg-gray-50 p-6 rounded-lg mt-8 shadow-lg">
-    <h2 className="text-3xl font-bold mb-4">Listing Preview</h2>
+    const getListingTitle = () => {
+      if (formData.industry) {
+        return `${toTitleCase(formData.industry)} Business for Sale`;
+      } else if (formData.hideBusinessName) {
+        return 'Confidential Business Listing';
+      } else {
+        return formData.businessName;
+      }
+    };
 
-    {/* ✅ Business Name */}
-    <h3 className="text-2xl font-semibold mb-2">
-      {formData.hide_business_name
-        ? 'Confidential Business Listing'
-        : formData.business_name || 'Business for Sale'}
-    </h3>
-    <p className="text-gray-600 mb-2">{formData.location}</p>
+    return (
+      <div className="bg-white rounded shadow p-6 space-y-8 font-serif text-gray-900">
+        <h2 className="text-4xl font-bold tracking-tight mb-1">{getListingTitle()}</h2>
+        <p className="text-md text-gray-600">
+          {formData.location_city && formData.location_state
+            ? `${formData.location_city}, ${formData.location_state}`
+            : formData.location}
+        </p>
 
-    {/* ✅ Asking Price */}
-    <p className="text-xl font-bold text-emerald-700 mb-2">
-      Asking Price: {formData.asking_price ? `$${parseFloat(formData.asking_price).toLocaleString()}` : 'Inquire'}
-    </p>
+        {formData.images.length > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
+            {formData.images.map((url, i) => (
+              <div key={i} className="relative">
+                <img
+                  src={url}
+                  alt={`Image ${i + 1}`}
+                  className="rounded-md border h-32 w-full object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updatedImages = formData.images.filter((img) => img !== url);
+                    setFormData((prev) => ({ ...prev, images: updatedImages }));
+                  }}
+                  className="absolute top-1 right-1 bg-red-600 text-white text-xs rounded-full px-2 py-1 hover:bg-red-700"
+                >
+                  ❌
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
-    {/* ✅ Seller Financing Tag */}
-    {formData.consider_seller_financing === 'yes' || formData.consider_seller_financing === 'maybe' ? (
-      <div className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded font-medium mb-4">
-        💰 Seller Financing Possible
+        {/* Financials + Business Details */}
+        <div className="grid md:grid-cols-2 gap-10 text-base mt-6">
+          <div>
+            <h3 className="text-xl font-semibold border-b pb-2 mb-3">Financial Overview</h3>
+            <p><strong>Asking Price:</strong> {formatCurrency(formData.askingPrice)}</p>
+            <p><strong>Annual Revenue:</strong> {formatCurrency(formData.annualRevenue)}</p>
+            <p><strong>SDE:</strong> {formatCurrency(formData.sde)}</p>
+            <p><strong>Annual Profit:</strong> {formatCurrency(formData.annualProfit)}</p>
+            <p><strong>Inventory Value:</strong> {formatCurrency(formData.inventory_value)}</p>
+            <p><strong>Equipment Value:</strong> {formatCurrency(formData.equipment_value)}</p>
+            <p><strong>Includes Inventory:</strong> {formData.includesInventory ? 'Yes' : 'No'}</p>
+            <p><strong>Includes Building:</strong> {formData.includesBuilding ? 'Yes' : 'No'}</p>
+            <p><strong>Real Estate Included:</strong> {formData.real_estate_included ? 'Yes' : 'No'}</p>
+          <p><strong>Years in Business:</strong> {formData.years_in_business || 'Undisclosed'}</p>
+<p><strong>Owner Hours/Week:</strong> {formData.owner_hours_per_week || 'Undisclosed'}</p>
+<p><strong>Seller Financing Considered:</strong>
+  {formData.seller_financing_considered
+    ? formData.seller_financing_considered.charAt(0).toUpperCase() + formData.seller_financing_considered.slice(1)
+    : 'Undisclosed'}
+</p>
+
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Details</h3>
+            <p><strong>Employees:</strong> {formData.employees}</p>
+            <p><strong>Monthly Lease:</strong> {formatCurrency(formData.monthly_lease)}</p>
+            <p><strong>Home-Based:</strong> {formData.home_based ? 'Yes' : 'No'}</p>
+            <p><strong>Relocatable:</strong> {formData.relocatable ? 'Yes' : 'No'}</p>
+            <p><strong>Financing Type:</strong> {formData.financingType.replace('-', ' ')}</p>
+            <p><strong>Customer Type:</strong> {formData.customerType}</p>
+            <p><strong>Owner Involvement:</strong> {formData.ownerInvolvement}</p>
+            <p><strong>Reason for Selling:</strong> {formData.reasonForSelling}</p>
+            <p><strong>Training Offered:</strong> {formData.trainingOffered}</p>
+          </div>
+        </div>
+
+     {/* Description Section */}
+{(formData.aiDescription || formData.businessDescription) && (
+  <div>
+    <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Description</h3>
+    <div className="mb-4">
+      <label className="block font-medium mb-1">Choose which description to publish:</label>
+      <div className="flex items-center gap-6">
+        <label className="flex items-center">
+          <input
+            type="radio"
+            name="descriptionChoice"
+            value="manual"
+            checked={formData.descriptionChoice === 'manual'}
+            onChange={handleChange}
+            className="mr-2"
+          />
+          Written by Seller
+        </label>
+        <label className="flex items-center">
+          <input
+            type="radio"
+            name="descriptionChoice"
+            value="ai"
+            checked={formData.descriptionChoice === 'ai'}
+            onChange={handleChange}
+            className="mr-2"
+          />
+          AI-Enhanced Version
+        </label>
       </div>
-    ) : null}
+    </div>
 
-    {/* ✅ Lease Info */}
-    <p className="text-gray-800">
-      <strong>Monthly Lease Payment for Business Premises:</strong>{' '}
-      {formData.monthly_lease ? `$${parseFloat(formData.monthly_lease).toLocaleString()}` : 'N/A'}
-    </p>
+    <div className="grid md:grid-cols-2 gap-6">
+      <div>
+        <h4 className="font-semibold mb-1 flex justify-between items-center">
+          Written by Seller:
+          <button
+            type="button"
+            onClick={() => openModal('manual')}
+            className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded"
+          >
+            ✏️ Edit
+          </button>
+        </h4>
+        <p className="text-gray-800 whitespace-pre-wrap border p-3 rounded bg-gray-50">
+          {formData.businessDescription || 'No description provided.'}
+        </p>
+      </div>
 
-    {/* ✅ Asking Price Includes Property */}
-    {formData.asking_price_includes_property && (
-      <p className="text-gray-800">🏢 Asking price includes building/property</p>
-    )}
-
-    {/* ✅ Business Description */}
-    <div className="mt-4">
-      <h4 className="text-lg font-semibold mb-2">Business Description:</h4>
-      <p className="text-gray-700">
-        {formData.description_choice === 'ai'
-          ? aiDescription || 'AI description will be generated...'
-          : formData.business_description || 'No description provided yet.'}
-      </p>
+      <div>
+        <h4 className="font-semibold mb-1 flex justify-between items-center">
+          AI-Enhanced Version:
+          <button
+            type="button"
+            onClick={() => openModal('ai')}
+            className="text-xs bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-1 rounded"
+          >
+            ✏️ Edit
+          </button>
+        </h4>
+        <p className="text-gray-800 whitespace-pre-wrap border p-3 rounded bg-gray-50">
+          {formData.aiDescription || 'AI description not yet generated.'}
+        </p>
+      </div>
     </div>
   </div>
 )}
 
-// ✅ Submit Handler
-async function handleSubmit(e) {
-  e.preventDefault();
-  setSubmitting(true);
-
-  const payload = {
-    ...formData,
-    asking_price: parseFloat(formData.asking_price) || null,
-    monthly_lease: parseFloat(formData.monthly_lease) || null,
-    asking_price_includes_property: formData.asking_price_includes_property || false,
-    consider_seller_financing: formData.consider_seller_financing || '',
-    description_choice: formData.description_choice || 'manual',
-    image_urls: uploadedImages,
+        <div className="mt-8 space-y-4">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setPreviewMode(false)}
+              className="bg-gray-300 hover:bg-gray-400 text-black px-5 py-2 rounded"
+            >
+              Edit
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded disabled:opacity-50"
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit Listing'}
+            </button>
+          </div>
+          {isSubmitting && <p className="text-sm text-gray-600">⏳ Please wait while we submit your listing...</p>}
+          {submitSuccess && <p className="text-sm text-green-600">✅ Your listing has been submitted successfully!</p>}
+          {submitError && <p className="text-sm text-red-600">❌ {submitError}</p>}
+        </div>
+         {/* ✨ Edit Description Modal */}
+{showModal && (
+  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
+      <h3 className="text-xl font-bold mb-4">
+        Edit {currentEditType === 'manual' ? 'Seller-Written' : 'AI-Enhanced'} Description
+      </h3>
+      <textarea
+        className="w-full border p-3 rounded mb-4 min-h-[150px]"
+        value={currentEditType === 'manual' ? tempDescription : tempAIDescription}
+        onChange={(e) =>
+          currentEditType === 'manual'
+            ? setTempDescription(e.target.value)
+            : setTempAIDescription(e.target.value)
+        }
+      />
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={closeModal}
+          className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={saveModalChanges}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+        >
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+   
+      </div>
+    );
   };
 
-  const { data, error } = await supabase.from('sellers').insert([payload]);
+  return (
+    <main className="bg-white min-h-screen p-6 font-sans">
+      <Head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+      </Head>
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6 text-center">{previewMode ? 'Listing Preview' : 'Seller Onboarding'}</h1>
+        {previewMode ? renderPreview() : (
+          step === 1 ? (
+            <div className="space-y-4">
+              <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="email" placeholder="Email" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" />
+              <FloatingInput
+  label="Business Name"
+  name="businessName"
+  value={formData.businessName}
+  onChange={handleChange}
+/>
 
-  if (error) {
-    console.error('❌ Error submitting listing:', error);
-    alert('There was a problem submitting your listing.');
-  } else {
-    alert('✅ Your listing has been submitted!');
-    router.push('/thank-you');
-  }
-  setSubmitting(false);
+              <label className="flex items-center"><input name="hideBusinessName" type="checkbox" checked={formData.hideBusinessName} onChange={handleChange} className="mr-2" />Hide Business Name</label>
+              <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
+            </div>
+          ) : step === 2 ? (
+            <div className="space-y-4">
+              <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded" />
+
+              {/* ✅ New City + State Dropdowns */}
+              <input name="location_city" placeholder="City" value={formData.location_city} onChange={handleChange} className="w-full border p-3 rounded" />
+             <select
+  name="location_state"
+  value={formData.location_state}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+
+>
+  <option value="">Select State/Province</option>
+
+  {/* 🇨🇦 Canadian Provinces & Territories */}
+  <option value="Alberta">Alberta</option>
+  <option value="British Columbia">British Columbia</option>
+  <option value="Manitoba">Manitoba</option>
+  <option value="New Brunswick">New Brunswick</option>
+  <option value="Newfoundland and Labrador">Newfoundland and Labrador</option>
+  <option value="Nova Scotia">Nova Scotia</option>
+  <option value="Ontario">Ontario</option>
+  <option value="Prince Edward Island">Prince Edward Island</option>
+  <option value="Quebec">Quebec</option>
+  <option value="Saskatchewan">Saskatchewan</option>
+  <option value="Northwest Territories">Northwest Territories</option>
+  <option value="Nunavut">Nunavut</option>
+  <option value="Yukon">Yukon</option>
+
+  {/* 🇺🇸 US States */}
+  <option value="Alabama">Alabama</option>
+  <option value="Alaska">Alaska</option>
+  <option value="Arizona">Arizona</option>
+  <option value="Arkansas">Arkansas</option>
+  <option value="California">California</option>
+  <option value="Colorado">Colorado</option>
+  <option value="Connecticut">Connecticut</option>
+  <option value="Delaware">Delaware</option>
+  <option value="Florida">Florida</option>
+  <option value="Georgia">Georgia</option>
+  <option value="Hawaii">Hawaii</option>
+  <option value="Idaho">Idaho</option>
+  <option value="Illinois">Illinois</option>
+  <option value="Indiana">Indiana</option>
+  <option value="Iowa">Iowa</option>
+  <option value="Kansas">Kansas</option>
+  <option value="Kentucky">Kentucky</option>
+  <option value="Louisiana">Louisiana</option>
+  <option value="Maine">Maine</option>
+  <option value="Maryland">Maryland</option>
+  <option value="Massachusetts">Massachusetts</option>
+  <option value="Michigan">Michigan</option>
+  <option value="Minnesota">Minnesota</option>
+  <option value="Mississippi">Mississippi</option>
+  <option value="Missouri">Missouri</option>
+  <option value="Montana">Montana</option>
+  <option value="Nebraska">Nebraska</option>
+  <option value="Nevada">Nevada</option>
+  <option value="New Hampshire">New Hampshire</option>
+  <option value="New Jersey">New Jersey</option>
+  <option value="New Mexico">New Mexico</option>
+  <option value="New York">New York</option>
+  <option value="North Carolina">North Carolina</option>
+  <option value="North Dakota">North Dakota</option>
+  <option value="Ohio">Ohio</option>
+  <option value="Oklahoma">Oklahoma</option>
+  <option value="Oregon">Oregon</option>
+  <option value="Pennsylvania">Pennsylvania</option>
+  <option value="Rhode Island">Rhode Island</option>
+  <option value="South Carolina">South Carolina</option>
+  <option value="South Dakota">South Dakota</option>
+  <option value="Tennessee">Tennessee</option>
+  <option value="Texas">Texas</option>
+  <option value="Utah">Utah</option>
+  <option value="Vermont">Vermont</option>
+  <option value="Virginia">Virginia</option>
+  <option value="Washington">Washington</option>
+  <option value="West Virginia">West Virginia</option>
+  <option value="Wisconsin">Wisconsin</option>
+  <option value="Wyoming">Wyoming</option>
+</select>
+<input
+  name="years_in_business"
+  placeholder="Years in Business"
+  value={formData.years_in_business}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+
+<input
+  name="owner_hours_per_week"
+  placeholder="Owner Hours per Week"
+  value={formData.owner_hours_per_week}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+
+<label className="block font-medium text-gray-700">Would you consider seller financing if terms were favorable?</label>
+<select
+  name="seller_financing_considered"
+  value={formData.seller_financing_considered}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+>
+  <option value="">Select</option>
+  <option value="yes">Yes</option>
+  <option value="no">No</option>
+  <option value="maybe">Maybe</option>
+</select>
+
+              <input name="website" placeholder="Website" value={formData.website} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="annualRevenue" placeholder="Annual Revenue" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="annualProfit" placeholder="Annual Profit" value={formData.annualProfit} onChange={handleChange} className="w-full border p-3 rounded" />
+             <input
+  name="sde"
+  placeholder="SDE"
+  value={formData.sde}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+<p className="text-sm text-gray-500 mt-1">
+  Seller’s Discretionary Earnings (SDE) is the total financial benefit to a single owner-operator in a year.
+  Includes net profit <strong>before taxes</strong>, owner’s salary, discretionary expenses, interest, depreciation,
+  and one-time expenses. Commonly used to value small businesses.
+</p>
+
+              <input name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="employees" placeholder="Number of Employees" value={formData.employees} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="monthly_lease" placeholder="Monthly Lease Amount" value={formData.monthly_lease} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="inventory_value" placeholder="Inventory Value" value={formData.inventory_value} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="equipment_value" placeholder="Equipment Value" value={formData.equipment_value} onChange={handleChange} className="w-full border p-3 rounded" />
+              <label className="flex items-center"><input name="includesInventory" type="checkbox" checked={formData.includesInventory} onChange={handleChange} className="mr-2" />Includes Inventory</label>
+              <label className="flex items-center"><input name="includesBuilding" type="checkbox" checked={formData.includesBuilding} onChange={handleChange} className="mr-2" />Includes Building</label>
+              <label className="flex items-center"><input name="real_estate_included" type="checkbox" checked={formData.real_estate_included} onChange={handleChange} className="mr-2" />Real Estate Included</label>
+              <label className="flex items-center"><input name="relocatable" type="checkbox" checked={formData.relocatable} onChange={handleChange} className="mr-2" />Relocatable</label>
+              <label className="flex items-center"><input name="home_based" type="checkbox" checked={formData.home_based} onChange={handleChange} className="mr-2" />Home-Based</label>
+              <select name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded">
+                <option value="buyer-financed">Buyer Financed</option>
+                <option value="seller-financed">Seller Financed</option>
+                <option value="rent-to-own">Rent to Own</option>
+              </select>
+              {renderImages()}
+              <button onClick={() => setStep(3)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
+              {renderBackButton()}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <textarea name="businessDescription" placeholder="Brief business description" value={formData.businessDescription} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="customerType" placeholder="Customer Type" value={formData.customerType} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="ownerInvolvement" placeholder="Owner Involvement" value={formData.ownerInvolvement} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="growthPotential" placeholder="Growth Potential" value={formData.growthPotential} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="reasonForSelling" placeholder="Reason for Selling" value={formData.reasonForSelling} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="trainingOffered" placeholder="Training Offered" value={formData.trainingOffered} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="sentenceSummary" placeholder="1-sentence summary of business" value={formData.sentenceSummary} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="customers" placeholder="Who are your customers?" value={formData.customers} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="bestSellers" placeholder="What are your best-selling products/services?" value={formData.bestSellers} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="customerLove" placeholder="What do customers love most?" value={formData.customerLove} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="repeatCustomers" placeholder="How many are repeat buyers?" value={formData.repeatCustomers} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="keepsThemComing" placeholder="Why do they return?" value={formData.keepsThemComing} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="proudOf" placeholder="Something you're proud of?" value={formData.proudOf} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="adviceToBuyer" placeholder="Advice for future owner?" value={formData.adviceToBuyer} onChange={handleChange} className="w-full border p-3 rounded" />
+              <button onClick={() => setPreviewMode(true)} className="w-full bg-yellow-500 text-white py-3 rounded">Preview My Listing</button>
+              {renderBackButton()}
+            </div>
+          )
+        )}
+      </div>
+    </main>
+  );
 }
 
-// ✅ Main Form
-<form onSubmit={handleSubmit} className="space-y-8">
-  {/* All sections above */}
-  <button
-    type="submit"
-    disabled={submitting}
-    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg"
-  >
-    {submitting ? 'Submitting...' : 'Submit Listing'}
-  </button>
-</form>
-
-// >>> END PART 3 <<<
-
-  
