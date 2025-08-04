@@ -35,7 +35,6 @@ const [tempAIDescription, setTempAIDescription] = useState('');
     location_state: '',
     years_in_business: '',
 owner_hours_per_week: '',
-seller_financing_considered: '',
     website: '',
     annualRevenue: '',
     sde: '',
