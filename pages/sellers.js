@@ -148,112 +148,89 @@ const saveModalChanges = () => {
     setImagePreviews(prev => [...prev, ...previews]);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setSubmitSuccess(false);
-    setSubmitError('');
+const handleSubmit = async () => {
+  try {
+    setSubmitting(true);
 
-    try {
-      const uploadedImageUrls = [];
+    // ✅ Upload images to Supabase Storage
+    const uploadedImageUrls = [];
+    for (const file of formData.images) {
+      const filePath = `seller-${Date.now()}-${file.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('seller-images')
+        .upload(filePath, file);
 
-      // ✅ Upload images and get public URLs
-      for (const file of formData.images) {
-        const filePath = `${Date.now()}-${file.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from('seller-images')
-          .upload(filePath, file);
-
-        if (uploadError) {
-          console.error('Image upload failed:', uploadError.message);
-          setSubmitError('Image upload failed. Please try again.');
-          setIsSubmitting(false);
-          return;
-        }
-
-        const { data: urlData } = supabase.storage
-          .from('seller-images')
-          .getPublicUrl(filePath);
-
-        uploadedImageUrls.push(urlData.publicUrl);
+      if (uploadError) {
+        console.error("❌ Image upload failed:", uploadError.message);
+        alert("Image upload failed. Please try again.");
+        setSubmitting(false);
+        return;
       }
 
-      // ✅ Combine city + state into one field
-      const combinedLocation = formData.location_city && formData.location_state
-        ? `${formData.location_city}, ${formData.location_state}`
-        : formData.location;
+      const { data: publicUrlData } = supabase.storage
+        .from('seller-images')
+        .getPublicUrl(uploadData.path);
 
-      const {
-        images,
-        annualRevenue,
-        annualProfit,
-        sde,
-        askingPrice,
-        employees,
-        monthly_lease,
-        inventory_value,
-        equipment_value,
-        ...rest
-      } = formData;
-
-      const payload = {
-        ...rest,
-        business_name: formData.businessName,
-        location: combinedLocation,
-        annual_revenue: parseFloat(annualRevenue) || 0,
-        annual_profit: parseFloat(annualProfit) || 0,
-        sde: parseFloat(sde) || 0,
-        asking_price: parseFloat(askingPrice) || 0,
-        years_in_business: parseInt(formData.years_in_business) || null,
-owner_hours_per_week: parseInt(formData.owner_hours_per_week) || null,
-
-term_length: parseInt(formData.seller_financing_term_months) || null,
-down_payment: parseFloat(formData.seller_financing_down_payment) || null,
-
-
-        employees: parseInt(employees) || 0,
-        monthly_lease: parseFloat(monthly_lease) || 0,
-        inventory_value: parseFloat(inventory_value) || 0,
-        equipment_value: parseFloat(equipment_value) || 0,
-        image_urls: uploadedImageUrls,
-        original_description: formData.descriptionChoice === 'manual' ? formData.businessDescription : '',
-        ai_description: formData.descriptionChoice === 'ai' ? formData.aiDescription : '',
-        description_choice: formData.descriptionChoice,
-        hide_business_name: formData.hideBusinessName,
-        business_description: formData.businessDescription,
-      };
-
-      let res;
-      if (isEditing && listingId) {
-        res = await fetch(`/api/update-seller-listing?id=${listingId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      } else {
-        res = await fetch('/api/submit-seller-listing', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-      }
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Server error');
-      }
-
-      setSubmitSuccess(true);
-      setIsSubmitting(false);
-      setPreviewMode(false);
-      router.push('/thank-you');
-
-    } catch (err) {
-      console.error('❌ Submission error:', err);
-      setSubmitError(err.message || 'Submission failed');
-      setIsSubmitting(false);
+      uploadedImageUrls.push(publicUrlData.publicUrl);
     }
-  };
+
+    // ✅ Build the payload with only safe values (snake_case + strings)
+    const payload = {
+      name: formData.name,
+      email: formData.email,
+      business_name: formData.businessName,
+      hide_business_name: formData.hideBusinessName,
+      industry: formData.industry,
+      location: formData.location,
+      location_city: formData.location_city,
+      location_state: formData.location_state,
+      years_in_business: formData.years_in_business,
+      owner_hours_per_week: formData.owner_hours_per_week,
+      seller_financing_considered: formData.seller_financing_considered,
+      website: formData.website,
+      annual_revenue: formData.annualRevenue,
+      sde: formData.sde,
+      asking_price: formData.askingPrice,
+      employees: formData.employees,
+      monthly_lease: formData.monthly_lease,
+      inventory_value: formData.inventory_value,
+      equipment_value: formData.equipment_value,
+      includes_inventory: formData.includesInventory,
+      home_based: formData.homeBased,
+      relocatable: formData.relocatable,
+      image_urls: uploadedImageUrls,
+      business_description: formData.useAIDescription
+        ? ''
+        : formData.business_description,
+      ai_description: formData.useAIDescription
+        ? formData.generatedDescription
+        : '',
+      sentence_summary: formData.sentenceSummary,
+      customers: formData.customers,
+      opportunity: formData.opportunity,
+    };
+
+    const response = await fetch('/api/submit-seller-listing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to submit listing.');
+    }
+
+    setSubmitted(true);
+    router.push('/thank-you');
+  } catch (error) {
+    console.error("❌ Submission error:", error);
+    alert("There was an error submitting the listing.");
+  } finally {
+    setSubmitting(false);
+  }
+};
+
 
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
   const renderBackButton = () => (
