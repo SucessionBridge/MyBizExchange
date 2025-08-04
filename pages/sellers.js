@@ -247,7 +247,7 @@ const handleSubmit = async () => {
     console.error("❌ Submission error:", error);
     alert("There was an error submitting the listing.");
   } finally {
-    setSubmitting(false);
+    
   }
 };
 
