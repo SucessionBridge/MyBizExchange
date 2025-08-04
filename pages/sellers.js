@@ -444,11 +444,9 @@ const renderPreview = () => {
     </div>
   </div>
 )}
-   
       </div>
     );
   };
-
   return (
     <main className="bg-white min-h-screen p-6 font-sans">
       <Head>
