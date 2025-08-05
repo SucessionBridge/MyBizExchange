@@ -71,6 +71,8 @@ owner_hours_per_week: '',
     if (previewMode && !formData.aiDescription) {
       const fetchDescription = async () => {
         try {
+         console.log("Payload sent to backend:", payload);
+ 
           const res = await fetch('/api/generate-description', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
