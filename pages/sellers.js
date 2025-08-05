@@ -510,20 +510,33 @@ monthly_lease: Number(formData.monthly_lease) || 0,
             </div>
           ) : step === 2 ? (
             <div className="space-y-4">
-              <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded" />
+ {/* Step 2 inputs */}
 
-              {/* ✅ New City + State Dropdowns */}
-              <input name="location_city" placeholder="City" value={formData.location_city} onChange={handleChange} className="w-full border p-3 rounded" />
-             <select
+<input
+  name="industry"
+  placeholder="Industry"
+  value={formData.industry}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+
+<input
+  name="location_city"
+  placeholder="City"
+  value={formData.location_city}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+/>
+
+<select
   name="location_state"
   value={formData.location_state}
   onChange={handleChange}
   className="w-full border p-3 rounded"
-
 >
   <option value="">Select State/Province</option>
 
-  {/* 🇨🇦 Canadian Provinces & Territories */}
+  {/* Canadian Provinces */}
   <option value="Alberta">Alberta</option>
   <option value="British Columbia">British Columbia</option>
   <option value="Manitoba">Manitoba</option>
@@ -538,7 +551,7 @@ monthly_lease: Number(formData.monthly_lease) || 0,
   <option value="Nunavut">Nunavut</option>
   <option value="Yukon">Yukon</option>
 
-  {/* 🇺🇸 US States */}
+  {/* US States */}
   <option value="Alabama">Alabama</option>
   <option value="Alaska">Alaska</option>
   <option value="Arizona">Arizona</option>
@@ -590,6 +603,7 @@ monthly_lease: Number(formData.monthly_lease) || 0,
   <option value="Wisconsin">Wisconsin</option>
   <option value="Wyoming">Wyoming</option>
 </select>
+
 <input
   type="number"
   name="years_in_business"
@@ -619,18 +633,18 @@ monthly_lease: Number(formData.monthly_lease) || 0,
 
 <input
   type="number"
-  name="annual_revenue"
+  name="annualRevenue"
   placeholder="Annual Revenue"
-  value={formData.annual_revenue}
+  value={formData.annualRevenue}
   onChange={handleChange}
   className="w-full border p-3 rounded"
 />
 
 <input
   type="number"
-  name="annual_profit"
+  name="annualProfit"
   placeholder="Annual Profit"
-  value={formData.annual_profit}
+  value={formData.annualProfit}
   onChange={handleChange}
   className="w-full border p-3 rounded"
 />
@@ -651,9 +665,9 @@ monthly_lease: Number(formData.monthly_lease) || 0,
 
 <input
   type="number"
-  name="asking_price"
+  name="askingPrice"
   placeholder="Asking Price"
-  value={formData.asking_price}
+  value={formData.askingPrice}
   onChange={handleChange}
   className="w-full border p-3 rounded"
 />
@@ -670,7 +684,7 @@ monthly_lease: Number(formData.monthly_lease) || 0,
 <input
   type="number"
   name="monthly_lease"
-  placeholder="Monthly Lease Payment for Business Premises"
+  placeholder="Monthly Lease Amount"
   value={formData.monthly_lease}
   onChange={handleChange}
   className="w-full border p-3 rounded"
@@ -696,13 +710,35 @@ monthly_lease: Number(formData.monthly_lease) || 0,
 
 <label className="flex items-center">
   <input
-    name="asking_price_includes_property"
+    name="includesInventory"
     type="checkbox"
-    checked={formData.asking_price_includes_property || false}
+    checked={formData.includesInventory}
     onChange={handleChange}
     className="mr-2"
   />
-  Does the asking price include building/property?
+  Includes Inventory
+</label>
+
+<label className="flex items-center">
+  <input
+    name="includesBuilding"
+    type="checkbox"
+    checked={formData.includesBuilding}
+    onChange={handleChange}
+    className="mr-2"
+  />
+  Includes Building
+</label>
+
+<label className="flex items-center">
+  <input
+    name="real_estate_included"
+    type="checkbox"
+    checked={formData.real_estate_included}
+    onChange={handleChange}
+    className="mr-2"
+  />
+  Real Estate Included
 </label>
 
 <label className="flex items-center">
@@ -727,21 +763,17 @@ monthly_lease: Number(formData.monthly_lease) || 0,
   Home-Based
 </label>
 
-<label className="block font-medium text-gray-700">Preferred Payment Method</label>
-<p className="text-sm text-gray-500 mb-2">
-  Choose how you would prefer the business to be purchased. This is just your preference,
-  and buyers can still make offers using different terms.
-</p>
 <select
-  name="financing_preference"
-  value={formData.financing_preference}
+  name="financingType"
+  value={formData.financingType}
   onChange={handleChange}
   className="w-full border p-3 rounded"
 >
-  <option value="buyer-financed">Buyer Arranges Own Financing</option>
-  <option value="seller-financed">Seller Financing Available</option>
+  <option value="buyer-financed">Buyer Financed</option>
+  <option value="seller-financed">Seller Financed</option>
   <option value="rent-to-own">Rent to Own</option>
 </select>
+           
 
 
 {/* 🔹 Seller Financing Encouragement Box */}
