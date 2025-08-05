@@ -822,3 +822,4 @@ monthly_lease: Number(formData.monthly_lease) || 0,
       </div>
     </main>
   );
+}  
