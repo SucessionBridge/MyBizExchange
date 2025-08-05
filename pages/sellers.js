@@ -574,21 +574,22 @@ const renderPreview = () => {
   <option value="Wisconsin">Wisconsin</option>
   <option value="Wyoming">Wyoming</option>
 </select>
-<input
-  name="years_in_business"
-  placeholder="Years in Business"
-  value={formData.years_in_business}
-  onChange={handleChange}
-  className="w-full border p-3 rounded"
-/>
-
-<input
-  name="owner_hours_per_week"
-  placeholder="Owner Hours per Week"
-  value={formData.owner_hours_per_week}
-  onChange={handleChange}
-  className="w-full border p-3 rounded"
-/>
+<div>
+  <input
+    name="years_in_business"
+    placeholder="Years in Business"
+    value={formData.years_in_business}
+    onChange={handleChange}
+    className="w-full border p-3 rounded"
+  />
+  <input
+    name="owner_hours_per_week"
+    placeholder="Owner Hours per Week"
+    value={formData.owner_hours_per_week}
+    onChange={handleChange}
+    className="w-full border p-3 rounded"
+  />
+</div>
 
 <label className="block font-medium text-gray-700">Would you consider seller financing if terms were favorable?</label>
 <select
