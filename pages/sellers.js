@@ -230,6 +230,7 @@ const handleSubmit = async () => {
       term_length: formData.term_length || '',
       seller_financing_interest_rate: formData.seller_financing_interest_rate || formData.interest_rate || '',
     };
+console.log("Payload sent to backend:", payload);
 
     const response = await fetch('/api/submit-seller-listing', {
       method: 'POST',
