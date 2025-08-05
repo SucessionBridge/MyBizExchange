@@ -582,7 +582,6 @@ const renderPreview = () => {
   className="w-full border p-3 rounded"
 />
 
-<input
   name="owner_hours_per_week"
   placeholder="Owner Hours per Week"
   value={formData.owner_hours_per_week}
