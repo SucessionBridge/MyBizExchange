@@ -149,7 +149,7 @@ const saveModalChanges = () => {
 
 const handleSubmit = async () => {
   try {
-    setSubmitting(true);
+    setIsSubmitting(true);
 
     // ✅ Upload images to Supabase Storage
     const uploadedImageUrls = [];
@@ -174,61 +174,60 @@ const handleSubmit = async () => {
     }
 
     // ✅ Build the payload with only safe values (snake_case + strings)
-  const payload = {
-  name: formData.name,
-  email: formData.email,
-  business_name: formData.businessName,
-  hide_business_name: formData.hideBusinessName,
-  industry: formData.industry,
-  location: formData.location,
-  location_city: formData.location_city,
-  location_state: formData.location_state,
-  years_in_business: formData.years_in_business,
-  owner_hours_per_week: formData.owner_hours_per_week,
-  seller_financing_considered: formData.seller_financing_considered,
-  website: formData.website,
-  annual_revenue: formData.annualRevenue,
-  sde: formData.sde,
-  asking_price: formData.askingPrice,
-  employees: formData.employees,
-monthly_lease: Number(formData.monthly_lease) || 0,
-
-  inventory_value: formData.inventory_value,
-  equipment_value: formData.equipment_value,
-  includes_inventory: formData.includesInventory,
-  home_based: formData.homeBased,
-  relocatable: formData.relocatable,
-  image_urls: uploadedImageUrls,
-  business_description: formData.useAIDescription ? '' : formData.business_description,
-  ai_description: formData.useAIDescription ? formData.generatedDescription : '',
-  sentence_summary: formData.sentenceSummary,
-  customers: formData.customers,
-  growth_potential: formData.opportunity || '', // this is the fixed mapping
-  marketing_method: formData.marketing_method || '',
-  customer_type: formData.customer_type || '',
-  owner_involvement: formData.owner_involvement || '',
-  can_run_without_owner: formData.can_run_without_owner || false,
-  competitive_edge: formData.competitive_edge || '',
-  competitors: formData.competitors || '',
-  reason_for_selling: formData.reason_for_selling || '',
-  training_offered: formData.training_offered || '',
-  creative_financing: formData.creative_financing || '',
-  willing_to_mentor: formData.willing_to_mentor || false,
-  rent_paid: formData.rent_paid || false,
-  rent_amount: formData.rent_amount || 0,
-  original_description: formData.original_description || '',
-  best_sellers: formData.best_sellers || '',
-  customer_love: formData.customer_love || '',
-  repeat_customers: formData.repeat_customers || '',
-  keeps_them_coming: formData.keeps_them_coming || '',
-  proud_of: formData.proud_of || '',
-  advice_to_buyer: formData.advice_to_buyer || '',
-  auth_id: formData.auth_id || '',
-  financing_preference: formData.financing_preference || '',
-  down_payment: formData.down_payment || '',
-  term_length: formData.term_length || '',
-  seller_financing_interest_rate: formData.seller_financing_interest_rate || formData.interest_rate || '',
-};
+    const payload = {
+      name: formData.name,
+      email: formData.email,
+      business_name: formData.businessName,
+      hide_business_name: formData.hideBusinessName,
+      industry: formData.industry,
+      location: formData.location,
+      location_city: formData.location_city,
+      location_state: formData.location_state,
+      years_in_business: formData.years_in_business,
+      owner_hours_per_week: formData.owner_hours_per_week,
+      seller_financing_considered: formData.seller_financing_considered,
+      website: formData.website,
+      annual_revenue: formData.annualRevenue,
+      sde: formData.sde,
+      asking_price: formData.askingPrice,
+      employees: formData.employees,
+      monthly_lease: Number(formData.monthly_lease) || 0,
+      inventory_value: formData.inventory_value,
+      equipment_value: formData.equipment_value,
+      includes_inventory: formData.includesInventory,
+      home_based: formData.homeBased,
+      relocatable: formData.relocatable,
+      image_urls: uploadedImageUrls,
+      business_description: formData.useAIDescription ? '' : formData.business_description,
+      ai_description: formData.useAIDescription ? formData.generatedDescription : '',
+      sentence_summary: formData.sentenceSummary,
+      customers: formData.customers,
+      growth_potential: formData.opportunity || '',
+      marketing_method: formData.marketing_method || '',
+      customer_type: formData.customer_type || '',
+      owner_involvement: formData.owner_involvement || '',
+      can_run_without_owner: formData.can_run_without_owner || false,
+      competitive_edge: formData.competitive_edge || '',
+      competitors: formData.competitors || '',
+      reason_for_selling: formData.reason_for_selling || '',
+      training_offered: formData.training_offered || '',
+      creative_financing: formData.creative_financing || '',
+      willing_to_mentor: formData.willing_to_mentor || false,
+      rent_paid: formData.rent_paid || false,
+      rent_amount: formData.rent_amount || 0,
+      original_description: formData.original_description || '',
+      best_sellers: formData.best_sellers || '',
+      customer_love: formData.customer_love || '',
+      repeat_customers: formData.repeat_customers || '',
+      keeps_them_coming: formData.keeps_them_coming || '',
+      proud_of: formData.proud_of || '',
+      advice_to_buyer: formData.advice_to_buyer || '',
+      auth_id: formData.auth_id || '',
+      financing_preference: formData.financing_preference || '',
+      down_payment: formData.down_payment || '',
+      term_length: formData.term_length || '',
+      seller_financing_interest_rate: formData.seller_financing_interest_rate || formData.interest_rate || '',
+    };
 
     const response = await fetch('/api/submit-seller-listing', {
       method: 'POST',
@@ -241,16 +240,15 @@ monthly_lease: Number(formData.monthly_lease) || 0,
       throw new Error(errorData.error || 'Failed to submit listing.');
     }
 
-    setSubmitted(true);
+    setSubmitSuccess(true);  // <--- Fixed here
     router.push('/thank-you');
   } catch (error) {
     console.error("❌ Submission error:", error);
     alert("There was an error submitting the listing.");
   } finally {
-    setSubmitting(false);
+    setIsSubmitting(false);
   }
 };
-
 
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
   const renderBackButton = () => (
