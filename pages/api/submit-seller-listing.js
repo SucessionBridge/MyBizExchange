@@ -31,7 +31,6 @@ export default async function handler(req, res) {
     if (!data.location || typeof data.location !== 'string' || data.location.trim() === '') {
       return res.status(400).json({ error: 'Missing or invalid "location" field' });
     }
-    // You can add more required fields and validations here if needed
 
     // Prepare the row to insert with type coercion and fallback defaults
     const row = {
@@ -87,7 +86,8 @@ export default async function handler(req, res) {
       proud_of: data.proud_of || '',
       advice_to_buyer: data.advice_to_buyer || '',
       delete_reason: data.delete_reason || '',
-      auth_id: data.auth_id || '',
+      // FIX HERE: insert null if auth_id missing or empty string (to satisfy UUID constraint)
+      auth_id: data.auth_id && data.auth_id.trim() !== '' ? data.auth_id : null,
       status: data.status || 'active',
       financing_preference: data.financing_preference || '',
       seller_financing_considered: data.seller_financing_considered || '',
