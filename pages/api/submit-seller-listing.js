@@ -13,68 +13,75 @@ export default async function handler(req, res) {
   try {
     const data = req.body;
 
-    console.log("📨 Incoming seller payload:", data);
+    console.log('📨 Incoming seller payload:', data);
 
-    // Basic validation: check required fields
-    if (!data.name || typeof data.name !== 'string' || data.name.trim() === '') {
-      return res.status(400).json({ error: 'Missing or invalid "name" field' });
-    }
-    if (!data.email || typeof data.email !== 'string' || data.email.trim() === '') {
-      return res.status(400).json({ error: 'Missing or invalid "email" field' });
-    }
-    if (!data.business_name || typeof data.business_name !== 'string' || data.business_name.trim() === '') {
-      return res.status(400).json({ error: 'Missing or invalid "business_name" field' });
-    }
-    if (!data.industry || typeof data.industry !== 'string' || data.industry.trim() === '') {
-      return res.status(400).json({ error: 'Missing or invalid "industry" field' });
-    }
-    if (!data.location || typeof data.location !== 'string' || data.location.trim() === '') {
-      return res.status(400).json({ error: 'Missing or invalid "location" field' });
+    // Required fields validation
+    const requiredStrings = ['name', 'email', 'business_name', 'industry', 'location'];
+    for (const field of requiredStrings) {
+      if (!data[field] || typeof data[field] !== 'string' || data[field].trim() === '') {
+        return res.status(400).json({ error: `Missing or invalid "${field}" field` });
+      }
     }
 
-    // Prepare the row to insert with type coercion and fallback defaults
+    // Helper to safely parse booleans from string/boolean/empty
+    const parseBoolean = (val) => {
+      if (val === true || val === false) return val;
+      if (typeof val === 'string') {
+        if (val.toLowerCase() === 'true') return true;
+        if (val.toLowerCase() === 'false') return false;
+      }
+      return false;
+    };
+
+    // Helper to safely parse numbers, fallback to 0 if invalid
+    const parseNumber = (val) => {
+      const n = Number(val);
+      return isNaN(n) ? 0 : n;
+    };
+
+    // Build row with explicit coercion
     const row = {
       name: data.name.trim(),
       email: data.email.trim(),
       business_name: data.business_name.trim(),
       industry: data.industry.trim(),
       location: data.location.trim(),
-      location_city: data.location_city?.trim() || '',
-      location_state: data.location_state?.trim() || '',
-      financing_type: data.financing_type?.trim() || '',
+      location_city: (data.location_city || '').trim(),
+      location_state: (data.location_state || '').trim(),
+      financing_type: (data.financing_type || '').trim(),
       business_description: data.business_description || '',
-      asking_price: Number(data.asking_price) || 0,
-      includes_inventory: Boolean(data.includes_inventory),
-      includes_building: Boolean(data.includes_building),
-      inventory_included: Boolean(data.inventory_included),
-      annual_revenue: Number(data.annual_revenue) || 0,
-      annual_profit: Number(data.annual_profit) || 0,
+      asking_price: parseNumber(data.asking_price),
+      includes_inventory: parseBoolean(data.includes_inventory),
+      includes_building: parseBoolean(data.includes_building),
+      inventory_included: parseBoolean(data.inventory_included),
+      annual_revenue: parseNumber(data.annual_revenue),
+      annual_profit: parseNumber(data.annual_profit),
       original_description: data.original_description || '',
       ai_description: data.ai_description || '',
-      sde: Number(data.sde) || 0,
-      inventory_value: Number(data.inventory_value) || 0,
-      equipment_value: Number(data.equipment_value) || 0,
-      rent: Number(data.rent) || 0,
-      rent_paid: Boolean(data.rent_paid),
-      rent_amount: Number(data.rent_amount) || 0,
-      monthly_lease: Number(data.monthly_lease) || 0,
+      sde: parseNumber(data.sde),
+      inventory_value: parseNumber(data.inventory_value),
+      equipment_value: parseNumber(data.equipment_value),
+      rent: parseNumber(data.rent),
+      rent_paid: parseBoolean(data.rent_paid),
+      rent_amount: parseNumber(data.rent_amount),
+      monthly_lease: parseNumber(data.monthly_lease),
       year_established: data.year_established || '',
-      employees: Number(data.employees) || 0,
-      home_based: Boolean(data.home_based),
-      relocatable: Boolean(data.relocatable),
+      employees: parseNumber(data.employees),
+      home_based: parseBoolean(data.home_based),
+      relocatable: parseBoolean(data.relocatable),
       website: data.website || '',
       customer_type: data.customer_type || '',
       marketing_method: data.marketing_method || '',
       owner_involvement: data.owner_involvement || '',
-      can_run_without_owner: Boolean(data.can_run_without_owner),
+      can_run_without_owner: parseBoolean(data.can_run_without_owner),
       competitive_edge: data.competitive_edge || '',
       competitors: data.competitors || '',
       growth_potential: data.growth_potential || '',
       reason_for_selling: data.reason_for_selling || '',
       training_offered: data.training_offered || '',
       creative_financing: data.creative_financing || '',
-      willing_to_mentor: Boolean(data.willing_to_mentor),
-      hide_business_name: Boolean(data.hide_business_name),
+      willing_to_mentor: parseBoolean(data.willing_to_mentor),
+      hide_business_name: parseBoolean(data.hide_business_name),
       years_in_business: data.years_in_business || '',
       description_choice: data.description_choice || '',
       sentence_summary: data.sentence_summary || '',
@@ -86,8 +93,7 @@ export default async function handler(req, res) {
       proud_of: data.proud_of || '',
       advice_to_buyer: data.advice_to_buyer || '',
       delete_reason: data.delete_reason || '',
-      // FIX HERE: insert null if auth_id missing or empty string (to satisfy UUID constraint)
-      auth_id: data.auth_id && data.auth_id.trim() !== '' ? data.auth_id : null,
+      auth_id: data.auth_id || null, // Set null if empty or missing
       status: data.status || 'active',
       financing_preference: data.financing_preference || '',
       seller_financing_considered: data.seller_financing_considered || '',
@@ -97,6 +103,11 @@ export default async function handler(req, res) {
       interest_rate: data.interest_rate || '',
       image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
     };
+
+    // Nullify auth_id if empty string (to avoid uuid errors)
+    if (!row.auth_id || row.auth_id.trim() === '') {
+      row.auth_id = null;
+    }
 
     const { error } = await supabase.from('sellers').insert([row]);
 
