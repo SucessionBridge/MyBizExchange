@@ -442,14 +442,7 @@ const renderPreview = () => {
     </div>
   </div>
 )}
-      </div>
-    );
-  };
-  return (
-     </div>
-    );
-  };
-  return (
+  
     <main className="bg-white min-h-screen p-6 font-sans">
       <Head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
