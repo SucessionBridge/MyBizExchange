@@ -190,17 +190,17 @@ const payload = {
   location: safeLocation,
   location_city: formData.location_city,
   location_state: formData.location_state,
-  years_in_business: formData.years_in_business,
-  owner_hours_per_week: formData.owner_hours_per_week,
+  years_in_business: Number(formData.years_in_business) || 0,
+  owner_hours_per_week: Number(formData.owner_hours_per_week) || 0,
   seller_financing_considered: formData.seller_financing_considered || '',
   website: formData.website,
-  annual_revenue: formData.annualRevenue,
-  sde: formData.sde || 0,
-  asking_price: formData.askingPrice,
-  employees: formData.employees,
+  annual_revenue: Number(formData.annualRevenue) || 0,
+  sde: Number(formData.sde) || 0,
+  asking_price: Number(formData.askingPrice) || 0,
+  employees: Number(formData.employees) || 0,
   monthly_lease: Number(formData.monthly_lease) || 0,
-  inventory_value: formData.inventory_value || 0,
-  equipment_value: formData.equipment_value || 0,
+  inventory_value: Number(formData.inventory_value) || 0,
+  equipment_value: Number(formData.equipment_value) || 0,
   includes_inventory: Boolean(formData.includesInventory),
   home_based: Boolean(formData.homeBased),
   relocatable: Boolean(formData.relocatable),
@@ -209,8 +209,8 @@ const payload = {
   rent_paid: false,  // Not collected, so default false
   creative_financing: false,  // Not collected, default false
   image_urls: uploadedImageUrls || [],
-  business_description: formData.useAIDescription ? '' : formData.business_description,
-  ai_description: formData.useAIDescription ? formData.generatedDescription : '',
+  business_description: formData.useAIDescription ? '' : (formData.business_description || ''),
+  ai_description: formData.useAIDescription ? (formData.generatedDescription || '') : '',
   sentence_summary: formData.sentenceSummary || '',
   customers: formData.customers || '',
   growth_potential: formData.opportunity || '',
@@ -230,10 +230,11 @@ const payload = {
   advice_to_buyer: formData.advice_to_buyer || '',
   auth_id: formData.auth_id || '',
   financing_preference: formData.financing_preference || '',
-  down_payment: formData.down_payment || '',
-  term_length: formData.term_length || '',
-  seller_financing_interest_rate: formData.seller_financing_interest_rate || formData.interest_rate || '',
+  down_payment: Number(formData.down_payment) || 0,
+  term_length: Number(formData.term_length) || 0,
+  seller_financing_interest_rate: Number(formData.seller_financing_interest_rate || formData.interest_rate) || 0,
 };
+
 
 
 console.log("Payload sent to backend:", payload);
