@@ -182,7 +182,8 @@ const safeLocation = formData.location && formData.location.trim() !== ''
     ? `${formData.location_city.trim()}, ${formData.location_state.trim()}`
     : 'Unknown';
 
-const cleanString = (str) => (!str || str.trim() === '') ? null : str.trim();
+// Helper: convert empty strings to null
+const cleanString = (val) => (typeof val === 'string' && val.trim() === '') ? null : val;
 
 const payload = {
   name: cleanString(formData.name) || 'Unnamed Seller',
@@ -190,7 +191,7 @@ const payload = {
   business_name: cleanString(formData.businessName) || 'Unnamed Business',
   hide_business_name: Boolean(formData.hideBusinessName),
   industry: cleanString(formData.industry) || 'Unknown Industry',
-  location: safeLocation,
+  location: cleanString(safeLocation) || 'Unknown Location',
   location_city: cleanString(formData.location_city),
   location_state: cleanString(formData.location_state),
   years_in_business: Number(formData.years_in_business) || 0,
@@ -212,6 +213,7 @@ const payload = {
   rent_paid: false,
   creative_financing: false,
   image_urls: uploadedImageUrls || [],
+  // Fix these fields strictly: empty string => null
   business_description: formData.useAIDescription ? null : cleanString(formData.business_description),
   ai_description: formData.useAIDescription ? cleanString(formData.generatedDescription) : null,
   sentence_summary: cleanString(formData.sentenceSummary),
@@ -238,11 +240,6 @@ const payload = {
   term_length: Number(formData.term_length) || 0,
   seller_financing_interest_rate: Number(formData.seller_financing_interest_rate || formData.interest_rate) || 0,
 };
-
-console.log("Payload ready for submission:", payload);
-
-
-
 
 console.log("Payload sent to backend:", payload);
 
