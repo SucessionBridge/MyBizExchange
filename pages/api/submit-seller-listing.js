@@ -30,7 +30,7 @@ export default async function handler(req, res) {
         if (val.toLowerCase() === 'true') return true;
         if (val.toLowerCase() === 'false') return false;
       }
-      return false; // default fallback
+      return false; // default fallback to false (avoid null or empty string)
     };
 
     // Helper to parse numbers safely
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
       return isNaN(n) ? 0 : n;
     };
 
-    // Build row for DB insert with explicit parsing
+    // Build row for DB insert with explicit parsing and defaults
     const row = {
       name: data.name.trim(),
       email: data.email.trim(),
@@ -117,3 +117,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server error', detail: err.message });
   }
 }
+
