@@ -509,12 +509,17 @@ console.log("Payload sent to backend:", payload);
             <div className="space-y-4">
               <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="email" placeholder="Email" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" />
-              <FloatingInput
-  label="Business Name"
+             <label htmlFor="businessName" className="block mb-1 font-semibold">
+  Business Name
+</label>
+<input
+  id="businessName"
   name="businessName"
   value={formData.businessName}
   onChange={handleChange}
+  className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
 />
+
 
               <label className="flex items-center"><input name="hideBusinessName" type="checkbox" checked={formData.hideBusinessName} onChange={handleChange} className="mr-2" />Hide Business Name</label>
               <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
