@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
     console.log('📨 Incoming seller payload:', data);
 
-    // Required fields validation
+    // Validate required string fields
     const requiredStrings = ['name', 'email', 'business_name', 'industry', 'location'];
     for (const field of requiredStrings) {
       if (!data[field] || typeof data[field] !== 'string' || data[field].trim() === '') {
@@ -23,27 +23,28 @@ export default async function handler(req, res) {
       }
     }
 
-    // Helper to safely parse booleans from string/boolean/empty
+    // Helper to parse booleans safely
     const parseBoolean = (val) => {
-      if (val === true || val === false) return val;
+      if (typeof val === 'boolean') return val;
       if (typeof val === 'string') {
         if (val.toLowerCase() === 'true') return true;
         if (val.toLowerCase() === 'false') return false;
       }
-      return false;
+      return false; // default fallback
     };
 
-    // Helper to safely parse numbers, fallback to 0 if invalid
+    // Helper to parse numbers safely
     const parseNumber = (val) => {
       const n = Number(val);
       return isNaN(n) ? 0 : n;
     };
 
-    // Build row with explicit coercion
+    // Build row for DB insert with explicit parsing
     const row = {
       name: data.name.trim(),
       email: data.email.trim(),
       business_name: data.business_name.trim(),
+      hide_business_name: parseBoolean(data.hide_business_name),
       industry: data.industry.trim(),
       location: data.location.trim(),
       location_city: (data.location_city || '').trim(),
@@ -81,7 +82,6 @@ export default async function handler(req, res) {
       training_offered: data.training_offered || '',
       creative_financing: data.creative_financing || '',
       willing_to_mentor: parseBoolean(data.willing_to_mentor),
-      hide_business_name: parseBoolean(data.hide_business_name),
       years_in_business: data.years_in_business || '',
       description_choice: data.description_choice || '',
       sentence_summary: data.sentence_summary || '',
@@ -93,7 +93,7 @@ export default async function handler(req, res) {
       proud_of: data.proud_of || '',
       advice_to_buyer: data.advice_to_buyer || '',
       delete_reason: data.delete_reason || '',
-      auth_id: data.auth_id || null, // Set null if empty or missing
+      auth_id: data.auth_id && data.auth_id.trim() !== '' ? data.auth_id : null,
       status: data.status || 'active',
       financing_preference: data.financing_preference || '',
       seller_financing_considered: data.seller_financing_considered || '',
@@ -103,11 +103,6 @@ export default async function handler(req, res) {
       interest_rate: data.interest_rate || '',
       image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
     };
-
-    // Nullify auth_id if empty string (to avoid uuid errors)
-    if (!row.auth_id || row.auth_id.trim() === '') {
-      row.auth_id = null;
-    }
 
     const { error } = await supabase.from('sellers').insert([row]);
 
@@ -122,4 +117,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server error', detail: err.message });
   }
 }
-
