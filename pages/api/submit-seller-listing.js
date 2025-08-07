@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'; 
+import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
     console.log('📨 Incoming seller payload:', data);
 
-    // Validate required string fields
+    // Validate required string fields as before
     const requiredStrings = ['name', 'email', 'business_name', 'industry', 'location'];
     for (const field of requiredStrings) {
       if (!data[field] || typeof data[field] !== 'string' || data[field].trim() === '') {
@@ -23,23 +23,22 @@ export default async function handler(req, res) {
       }
     }
 
-    // Helper to parse booleans safely
+    // Your existing helpers unchanged
     const parseBoolean = (val) => {
       if (typeof val === 'boolean') return val;
       if (typeof val === 'string') {
         if (val.toLowerCase() === 'true') return true;
         if (val.toLowerCase() === 'false') return false;
       }
-      return false; // default fallback to false (avoid null or empty string)
+      return false;
     };
 
-    // Helper to parse numbers safely
     const parseNumber = (val) => {
       const n = Number(val);
       return isNaN(n) ? 0 : n;
     };
 
-    // Build row for DB insert with explicit parsing and defaults
+    // Build row exactly as before, sanitizing numbers and booleans
     const row = {
       name: data.name.trim(),
       email: data.email.trim(),
@@ -80,9 +79,9 @@ export default async function handler(req, res) {
       growth_potential: data.growth_potential || '',
       reason_for_selling: data.reason_for_selling || '',
       training_offered: data.training_offered || '',
-      creative_financing: parseBoolean(data.creative_financing),  // <--- fixed to parse boolean
+      creative_financing: parseBoolean(data.creative_financing),
       willing_to_mentor: parseBoolean(data.willing_to_mentor),
-      years_in_business: data.years_in_business || '',
+      years_in_business: parseNumber(data.years_in_business),
       description_choice: data.description_choice || '',
       sentence_summary: data.sentence_summary || '',
       customers: data.customers || '',
@@ -96,14 +95,37 @@ export default async function handler(req, res) {
       auth_id: data.auth_id && data.auth_id.trim() !== '' ? data.auth_id : null,
       status: data.status || 'active',
       financing_preference: data.financing_preference || '',
-      seller_financing_considered: data.seller_financing_considered || '',
-      down_payment: data.down_payment || '',
-      term_length: data.term_length || '',
-      seller_financing_interest_rate: data.seller_financing_interest_rate || data.interest_rate || '',
-      interest_rate: data.interest_rate || '',
+      seller_financing_considered: parseBoolean(data.seller_financing_considered),
+      down_payment: parseNumber(data.down_payment),
+      term_length: parseNumber(data.term_length),
+      seller_financing_interest_rate: parseNumber(data.seller_financing_interest_rate || data.interest_rate),
+      interest_rate: parseNumber(data.interest_rate),
       image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
     };
 
+    // **LOG EVERY FIELD WITH TYPE BEFORE INSERT**
+    console.log('🔍 Row fields and types before insert:');
+    Object.entries(row).forEach(([key, value]) => {
+      console.log(`  ${key}:`, value, '| type:', typeof value);
+    });
+
+    // **VALIDATION TO CATCH EMPTY STRINGS OR INVALID TYPES**
+    for (const [key, value] of Object.entries(row)) {
+      // Empty string is invalid for numeric or boolean fields in DB
+      if (value === '') {
+        return res.status(400).json({ error: `Empty string detected in field "${key}"` });
+      }
+      // Type check — only allow string, number, boolean, null or array for image_urls
+      if (
+        !['string', 'number', 'boolean'].includes(typeof value) &&
+        value !== null &&
+        !(key === 'image_urls' && Array.isArray(value))
+      ) {
+        return res.status(400).json({ error: `Invalid type for field "${key}": ${typeof value}` });
+      }
+    }
+
+    // Proceed to insert only if validation passed
     const { error } = await supabase.from('sellers').insert([row]);
 
     if (error) {
@@ -117,5 +139,4 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server error', detail: err.message });
   }
 }
-
 
