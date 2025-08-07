@@ -186,9 +186,9 @@ const payload = {
   name: formData.name,
   email: formData.email,
   business_name: formData.businessName,
-  hide_business_name: formData.hideBusinessName,
+  hide_business_name: !!formData.hideBusinessName,   // <-- cast to boolean
   industry: formData.industry,
-  location: safeLocation,   // <-- use safeLocation here
+  location: safeLocation,  
   location_city: formData.location_city,
   location_state: formData.location_state,
   years_in_business: formData.years_in_business,
@@ -202,9 +202,9 @@ const payload = {
   monthly_lease: Number(formData.monthly_lease) || 0,
   inventory_value: formData.inventory_value,
   equipment_value: formData.equipment_value,
-  includes_inventory: formData.includesInventory,
-  home_based: formData.homeBased,
-  relocatable: formData.relocatable,
+  includes_inventory: !!formData.includesInventory,  // <-- cast to boolean
+  home_based: !!formData.homeBased,                  // <-- cast to boolean
+  relocatable: !!formData.relocatable,               // <-- cast to boolean
   image_urls: uploadedImageUrls,
   business_description: formData.useAIDescription ? '' : formData.business_description,
   ai_description: formData.useAIDescription ? formData.generatedDescription : '',
@@ -214,14 +214,14 @@ const payload = {
   marketing_method: formData.marketing_method || '',
   customer_type: formData.customer_type || '',
   owner_involvement: formData.owner_involvement || '',
-  can_run_without_owner: formData.can_run_without_owner || false,
+  can_run_without_owner: !!formData.can_run_without_owner,  // <-- cast to boolean
   competitive_edge: formData.competitive_edge || '',
   competitors: formData.competitors || '',
   reason_for_selling: formData.reason_for_selling || '',
   training_offered: formData.training_offered || '',
   creative_financing: formData.creative_financing || '',
-  willing_to_mentor: formData.willing_to_mentor || false,
-  rent_paid: formData.rent_paid || false,
+  willing_to_mentor: !!formData.willing_to_mentor,    // <-- cast to boolean
+  rent_paid: !!formData.rent_paid,                    // <-- cast to boolean
   rent_amount: formData.rent_amount || 0,
   original_description: formData.original_description || '',
   best_sellers: formData.best_sellers || '',
@@ -236,6 +236,7 @@ const payload = {
   term_length: formData.term_length || '',
   seller_financing_interest_rate: formData.seller_financing_interest_rate || formData.interest_rate || '',
 };
+
 
 console.log("Payload sent to backend:", payload);
 
