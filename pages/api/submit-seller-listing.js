@@ -15,7 +15,7 @@ export default async function handler(req, res) {
 
     console.log('📨 Incoming seller payload:', data);
 
-    // Validate required string fields as before
+    // Validate required string fields
     const requiredStrings = ['name', 'email', 'business_name', 'industry', 'location'];
     for (const field of requiredStrings) {
       if (!data[field] || typeof data[field] !== 'string' || data[field].trim() === '') {
@@ -23,8 +23,9 @@ export default async function handler(req, res) {
       }
     }
 
-    // Your existing helpers unchanged
+    // Helpers
     const parseBoolean = (val) => {
+      if (val === '' || val === null || val === undefined) return false;
       if (typeof val === 'boolean') return val;
       if (typeof val === 'string') {
         if (val.toLowerCase() === 'true') return true;
@@ -34,11 +35,15 @@ export default async function handler(req, res) {
     };
 
     const parseNumber = (val) => {
+      if (val === '' || val === null || val === undefined) return null;
       const n = Number(val);
-      return isNaN(n) ? 0 : n;
+      return isNaN(n) ? null : n;
     };
 
-    // Build row exactly as before, sanitizing numbers and booleans
+    // Ensure financing_type has a valid default
+    const financing_type_value = (data.financing_type && data.financing_type.trim() !== '') ? data.financing_type.trim() : 'buyer-financed';
+
+    // Build row sanitizing values
     const row = {
       name: data.name.trim(),
       email: data.email.trim(),
@@ -48,7 +53,7 @@ export default async function handler(req, res) {
       location: data.location.trim(),
       location_city: (data.location_city || '').trim(),
       location_state: (data.location_state || '').trim(),
-      financing_type: (data.financing_type || '').trim(),
+      financing_type: financing_type_value,
       business_description: data.business_description || '',
       asking_price: parseNumber(data.asking_price),
       includes_inventory: parseBoolean(data.includes_inventory),
@@ -103,19 +108,22 @@ export default async function handler(req, res) {
       image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
     };
 
-    // **LOG EVERY FIELD WITH TYPE BEFORE INSERT**
+    // Log fields and types for debugging
     console.log('🔍 Row fields and types before insert:');
     Object.entries(row).forEach(([key, value]) => {
       console.log(`  ${key}:`, value, '| type:', typeof value);
     });
 
-    // **VALIDATION TO CATCH EMPTY STRINGS OR INVALID TYPES**
-    for (const [key, value] of Object.entries(row)) {
-      // Empty string is invalid for numeric or boolean fields in DB
-      if (value === '') {
-        return res.status(400).json({ error: `Empty string detected in field "${key}"` });
+    // Validate only required string fields for empty strings
+    const requiredStrings = ['name', 'email', 'business_name', 'industry', 'location', 'financing_type'];
+    for (const key of requiredStrings) {
+      if (typeof row[key] !== 'string' || row[key].trim() === '') {
+        return res.status(400).json({ error: `Empty string detected in required field "${key}"` });
       }
-      // Type check — only allow string, number, boolean, null or array for image_urls
+    }
+
+    // Check all fields have valid types
+    for (const [key, value] of Object.entries(row)) {
       if (
         !['string', 'number', 'boolean'].includes(typeof value) &&
         value !== null &&
@@ -125,7 +133,7 @@ export default async function handler(req, res) {
       }
     }
 
-    // Proceed to insert only if validation passed
+    // Insert into Supabase
     const { error } = await supabase.from('sellers').insert([row]);
 
     if (error) {
