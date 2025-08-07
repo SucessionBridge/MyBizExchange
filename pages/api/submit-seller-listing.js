@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'; 
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -80,7 +80,7 @@ export default async function handler(req, res) {
       growth_potential: data.growth_potential || '',
       reason_for_selling: data.reason_for_selling || '',
       training_offered: data.training_offered || '',
-      creative_financing: data.creative_financing || '',
+      creative_financing: parseBoolean(data.creative_financing),  // <--- fixed to parse boolean
       willing_to_mentor: parseBoolean(data.willing_to_mentor),
       years_in_business: data.years_in_business || '',
       description_choice: data.description_choice || '',
@@ -117,4 +117,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server error', detail: err.message });
   }
 }
+
 
