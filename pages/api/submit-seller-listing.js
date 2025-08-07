@@ -15,17 +15,17 @@ export default async function handler(req, res) {
 
     console.log('📨 Incoming seller payload:', data);
 
-    // Validate required string fields
-    const requiredStrings = ['name', 'email', 'business_name', 'industry', 'location'];
+    // Define required string fields once
+    const requiredStrings = ['name', 'email', 'business_name', 'industry', 'location', 'financing_type'];
+    
+    // Validate required string fields for presence and non-empty strings
     for (const field of requiredStrings) {
       if (!data[field] || typeof data[field] !== 'string' || data[field].trim() === '') {
         return res.status(400).json({ error: `Missing or invalid "${field}" field` });
       }
     }
 
-    // Helpers
     const parseBoolean = (val) => {
-      if (val === '' || val === null || val === undefined) return false;
       if (typeof val === 'boolean') return val;
       if (typeof val === 'string') {
         if (val.toLowerCase() === 'true') return true;
@@ -35,15 +35,10 @@ export default async function handler(req, res) {
     };
 
     const parseNumber = (val) => {
-      if (val === '' || val === null || val === undefined) return null;
       const n = Number(val);
-      return isNaN(n) ? null : n;
+      return isNaN(n) ? 0 : n;
     };
 
-    // Ensure financing_type has a valid default
-    const financing_type_value = (data.financing_type && data.financing_type.trim() !== '') ? data.financing_type.trim() : 'buyer-financed';
-
-    // Build row sanitizing values
     const row = {
       name: data.name.trim(),
       email: data.email.trim(),
@@ -53,7 +48,7 @@ export default async function handler(req, res) {
       location: data.location.trim(),
       location_city: (data.location_city || '').trim(),
       location_state: (data.location_state || '').trim(),
-      financing_type: financing_type_value,
+      financing_type: (data.financing_type || '').trim(),
       business_description: data.business_description || '',
       asking_price: parseNumber(data.asking_price),
       includes_inventory: parseBoolean(data.includes_inventory),
@@ -108,22 +103,16 @@ export default async function handler(req, res) {
       image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
     };
 
-    // Log fields and types for debugging
     console.log('🔍 Row fields and types before insert:');
     Object.entries(row).forEach(([key, value]) => {
       console.log(`  ${key}:`, value, '| type:', typeof value);
     });
 
-    // Validate only required string fields for empty strings
-    const requiredStrings = ['name', 'email', 'business_name', 'industry', 'location', 'financing_type'];
-    for (const key of requiredStrings) {
-      if (typeof row[key] !== 'string' || row[key].trim() === '') {
-        return res.status(400).json({ error: `Empty string detected in required field "${key}"` });
-      }
-    }
-
-    // Check all fields have valid types
+    // Check for empty strings in non-string fields
     for (const [key, value] of Object.entries(row)) {
+      if (value === '') {
+        return res.status(400).json({ error: `Empty string detected in field "${key}"` });
+      }
       if (
         !['string', 'number', 'boolean'].includes(typeof value) &&
         value !== null &&
@@ -133,7 +122,6 @@ export default async function handler(req, res) {
       }
     }
 
-    // Insert into Supabase
     const { error } = await supabase.from('sellers').insert([row]);
 
     if (error) {
@@ -147,4 +135,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server error', detail: err.message });
   }
 }
-
