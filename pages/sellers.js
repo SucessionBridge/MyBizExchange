@@ -181,14 +181,13 @@ const safeLocation = formData.location && formData.location.trim() !== ''
   : (formData.location_city && formData.location_state)
     ? `${formData.location_city.trim()}, ${formData.location_state.trim()}`
     : 'Unknown';
-
 const payload = {
   name: formData.name,
   email: formData.email,
   business_name: formData.businessName,
-  hide_business_name: !!formData.hideBusinessName,   // <-- cast to boolean
+  hide_business_name: Boolean(formData.hideBusinessName),
   industry: formData.industry,
-  location: safeLocation,  
+  location: safeLocation,
   location_city: formData.location_city,
   location_state: formData.location_state,
   years_in_business: formData.years_in_business,
@@ -202,9 +201,13 @@ const payload = {
   monthly_lease: Number(formData.monthly_lease) || 0,
   inventory_value: formData.inventory_value,
   equipment_value: formData.equipment_value,
-  includes_inventory: !!formData.includesInventory,  // <-- cast to boolean
-  home_based: !!formData.homeBased,                  // <-- cast to boolean
-  relocatable: !!formData.relocatable,               // <-- cast to boolean
+  includes_inventory: Boolean(formData.includesInventory),
+  home_based: Boolean(formData.homeBased),
+  relocatable: Boolean(formData.relocatable),
+  can_run_without_owner: Boolean(formData.can_run_without_owner),
+  willing_to_mentor: Boolean(formData.willing_to_mentor),
+  rent_paid: Boolean(formData.rent_paid),
+  rent_amount: formData.rent_amount || 0,
   image_urls: uploadedImageUrls,
   business_description: formData.useAIDescription ? '' : formData.business_description,
   ai_description: formData.useAIDescription ? formData.generatedDescription : '',
@@ -214,15 +217,11 @@ const payload = {
   marketing_method: formData.marketing_method || '',
   customer_type: formData.customer_type || '',
   owner_involvement: formData.owner_involvement || '',
-  can_run_without_owner: !!formData.can_run_without_owner,  // <-- cast to boolean
   competitive_edge: formData.competitive_edge || '',
   competitors: formData.competitors || '',
   reason_for_selling: formData.reason_for_selling || '',
   training_offered: formData.training_offered || '',
   creative_financing: formData.creative_financing || '',
-  willing_to_mentor: !!formData.willing_to_mentor,    // <-- cast to boolean
-  rent_paid: !!formData.rent_paid,                    // <-- cast to boolean
-  rent_amount: formData.rent_amount || 0,
   original_description: formData.original_description || '',
   best_sellers: formData.best_sellers || '',
   customer_love: formData.customer_love || '',
