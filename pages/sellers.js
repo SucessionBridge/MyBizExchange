@@ -147,7 +147,6 @@ const saveModalChanges = () => {
     setFormData(prev => ({ ...prev, images: [...prev.images, ...files] }));
     setImagePreviews(prev => [...prev, ...previews]);
   };
-
 const handleSubmit = async () => {
   try {
     setIsSubmitting(true);
@@ -175,88 +174,76 @@ const handleSubmit = async () => {
     }
 
     // ✅ Build the payload with only safe values (snake_case + strings)
-  // Ensure location is set — fallback to city + state if location empty
-const safeLocation = formData.location && formData.location.trim() !== ''
-  ? formData.location
-  : (formData.location_city && formData.location_state)
-    ? `${formData.location_city.trim()}, ${formData.location_state.trim()}`
-    : 'Unknown';
+    // Ensure location is set — fallback to city + state if location empty
+    const safeLocation = formData.location && formData.location.trim() !== ''
+      ? formData.location
+      : (formData.location_city && formData.location_state)
+        ? `${formData.location_city.trim()}, ${formData.location_state.trim()}`
+        : 'Unknown';
 
-// Helper: convert empty strings to null
-const cleanString = (val) => (typeof val === 'string' && val.trim() === '') ? null : val;
+    // Helper: convert empty strings to null
+    const cleanString = (val) => (typeof val === 'string' && val.trim() === '') ? null : val;
 
-const payload = {
-  name: cleanString(formData.name) || 'Unnamed Seller',
-  email: cleanString(formData.email) || 'noemail@example.com',
-  business_name: cleanString(formData.businessName) || 'Unnamed Business',
-  hide_business_name: Boolean(formData.hideBusinessName),
-  industry: cleanString(formData.industry) || 'Unknown Industry',
-  location: cleanString(safeLocation) || 'Unknown Location',
-  location_city: cleanString(formData.location_city),
-  location_state: cleanString(formData.location_state),
-  years_in_business: Number(formData.years_in_business) || 0,
-  owner_hours_per_week: Number(formData.owner_hours_per_week) || 0,
-  seller_financing_considered: cleanString(formData.seller_financing_considered),
-  website: cleanString(formData.website),
-  annual_revenue: Number(formData.annualRevenue) || 0,
-  sde: Number(formData.sde) || 0,
-  asking_price: Number(formData.askingPrice) || 0,
-  employees: Number(formData.employees) || 0,
-  monthly_lease: Number(formData.monthly_lease) || 0,
-  inventory_value: Number(formData.inventory_value) || 0,
-  equipment_value: Number(formData.equipment_value) || 0,
-  includes_inventory: Boolean(formData.includesInventory),
-  home_based: Boolean(formData.homeBased),
-  relocatable: Boolean(formData.relocatable),
-  can_run_without_owner: Boolean(formData.can_run_without_owner),
-  willing_to_mentor: Boolean(formData.willing_to_mentor),
-  rent_paid: false,
-  creative_financing: false,
-  image_urls: uploadedImageUrls || [],
-  // Fix these fields strictly: empty string => null
-  business_description: formData.useAIDescription ? null : cleanString(formData.business_description),
-  ai_description: formData.useAIDescription ? cleanString(formData.generatedDescription) : null,
-  sentence_summary: cleanString(formData.sentenceSummary),
-  customers: cleanString(formData.customers),
-  growth_potential: cleanString(formData.opportunity),
-  marketing_method: cleanString(formData.marketing_method),
-  customer_type: cleanString(formData.customer_type),
-  owner_involvement: cleanString(formData.owner_involvement),
-  competitive_edge: cleanString(formData.competitive_edge),
-  competitors: cleanString(formData.competitors),
-  reason_for_selling: cleanString(formData.reason_for_selling),
-  training_offered: cleanString(formData.training_offered),
-  original_description: cleanString(formData.original_description),
-  best_sellers: cleanString(formData.best_sellers),
-  customer_love: cleanString(formData.customer_love),
-  repeat_customers: cleanString(formData.repeat_customers),
-  keeps_them_coming: cleanString(formData.keeps_them_coming),
-  proud_of: cleanString(formData.proud_of),
-  advice_to_buyer: cleanString(formData.advice_to_buyer),
-  auth_id: cleanString(formData.auth_id),
-  financing_type: cleanString(formData.financing_type) || 'buyer-financed',
-  financing_preference: cleanString(formData.financing_preference),
-  down_payment: Number(formData.down_payment) || 0,
-  term_length: Number(formData.term_length) || 0,
-  seller_financing_interest_rate: Number(formData.seller_financing_interest_rate || formData.interest_rate) || 0,
-};
+    const payload = {
+      name: cleanString(formData.name) || 'Unnamed Seller',
+      email: cleanString(formData.email) || 'noemail@example.com',
+      business_name: cleanString(formData.businessName) || 'Unnamed Business',
+      hide_business_name: Boolean(formData.hideBusinessName),
+      industry: cleanString(formData.industry) || 'Unknown Industry',
+      location: cleanString(safeLocation) || 'Unknown Location',
+      location_city: cleanString(formData.location_city),
+      location_state: cleanString(formData.location_state),
+      years_in_business: Number(formData.years_in_business) || 0,
+      owner_hours_per_week: Number(formData.owner_hours_per_week) || 0,
+      seller_financing_considered: cleanString(formData.seller_financing_considered),
+      website: cleanString(formData.website),
+      annual_revenue: Number(formData.annualRevenue) || 0,
+      sde: Number(formData.sde) || 0,
+      asking_price: Number(formData.askingPrice) || 0,
+      employees: Number(formData.employees) || 0,
+      monthly_lease: Number(formData.monthly_lease) || 0,
+      inventory_value: Number(formData.inventory_value) || 0,
+      equipment_value: Number(formData.equipment_value) || 0,
+      includes_inventory: Boolean(formData.includesInventory),
+      home_based: Boolean(formData.homeBased),
+      relocatable: Boolean(formData.relocatable),
+      can_run_without_owner: Boolean(formData.can_run_without_owner),
+      willing_to_mentor: Boolean(formData.willing_to_mentor),
+      rent_paid: false,
+      creative_financing: false,
+      image_urls: uploadedImageUrls || [],
 
-console.log("Payload sent to backend:", payload);
+      // Fix these fields strictly: empty string => null
+      business_description: formData.useAIDescription ? null : cleanString(formData.business_description),
+      ai_description: formData.useAIDescription ? cleanString(formData.generatedDescription) : null,
+      sentence_summary: cleanString(formData.sentenceSummary),
+      customers: cleanString(formData.customers),
+      growth_potential: cleanString(formData.opportunity),
+      marketing_method: cleanString(formData.marketing_method),
+      customer_type: cleanString(formData.customer_type),
+      owner_involvement: cleanString(formData.owner_involvement),
+      competitive_edge: cleanString(formData.competitive_edge),
+      competitors: cleanString(formData.competitors),
+      reason_for_selling: cleanString(formData.reason_for_selling),
+      training_offered: cleanString(formData.training_offered),
+      original_description: cleanString(formData.original_description),
+      best_sellers: cleanString(formData.best_sellers),
+      customer_love: cleanString(formData.customer_love),
+      repeat_customers: cleanString(formData.repeat_customers),
+      keeps_them_coming: cleanString(formData.keeps_them_coming),
+      proud_of: cleanString(formData.proud_of),
+      advice_to_buyer: cleanString(formData.advice_to_buyer),
+      auth_id: cleanString(formData.auth_id),
+      financing_type: cleanString(formData.financing_type) || 'buyer-financed',
+      financing_preference: cleanString(formData.financing_preference),
+      down_payment: Number(formData.down_payment) || 0,
+      term_length: Number(formData.term_length) || 0,
+      seller_financing_interest_rate: Number(formData.seller_financing_interest_rate || formData.interest_rate) || 0,
+    };
 
+    console.log("Payload sent to backend:", payload);
 
-    const response = await fetch('/api/submit-seller-listing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to submit listing.');
-    }
-
-    setSubmitSuccess(true);  // <--- Fixed here
-    router.push('/thank-you');
+    // ...rest of your submit logic
   } catch (error) {
     console.error("❌ Submission error:", error);
     alert("There was an error submitting the listing.");
@@ -264,6 +251,8 @@ console.log("Payload sent to backend:", payload);
     setIsSubmitting(false);
   }
 };
+
+
 
   const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
   const renderBackButton = () => (
