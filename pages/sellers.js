@@ -151,104 +151,93 @@ const handleSubmit = async () => {
   try {
     setIsSubmitting(true);
 
-    // Upload images if any
+    // Upload images to Supabase Storage
     const uploadedImageUrls = [];
-    if (formData.images && formData.images.length > 0) {
-      for (const file of formData.images) {
-        const filePath = `seller-${Date.now()}-${file.name}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('seller-images')
-          .upload(filePath, file);
+    for (const file of formData.images) {
+      const filePath = `seller-${Date.now()}-${file.name}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('seller-images')
+        .upload(filePath, file);
 
-        if (uploadError) {
-          console.error("❌ Image upload failed:", uploadError.message);
-          alert("Image upload failed. Please try again.");
-          setIsSubmitting(false);
-          return;
-        }
-
-        const { data: publicUrlData } = supabase.storage
-          .from('seller-images')
-          .getPublicUrl(uploadData.path);
-
-        uploadedImageUrls.push(publicUrlData.publicUrl);
+      if (uploadError) {
+        console.error("❌ Image upload failed:", uploadError.message);
+        alert("Image upload failed. Please try again.");
+        setIsSubmitting(false);
+        return;
       }
+
+      const { data: publicUrlData } = supabase.storage
+        .from('seller-images')
+        .getPublicUrl(uploadData.path);
+
+      uploadedImageUrls.push(publicUrlData.publicUrl);
     }
 
-    // Safe location fallback
-    const safeLocation = formData.location && formData.location.trim() !== ''
-      ? formData.location
-      : (formData.location_city && formData.location_state)
-        ? `${formData.location_city.trim()}, ${formData.location_state.trim()}`
-        : 'Unknown';
+    // Helper to convert empty strings to null to keep backend clean
+    const cleanString = (val) => (typeof val === 'string' && val.trim() === '') ? null : val?.trim() || null;
 
-    // Clean empty strings to null
-    const cleanString = (val) => (typeof val === 'string' && val.trim() === '') ? null : val;
-
-    // Prepare payload, mapping EXACTLY from your formData keys
+    // Prepare payload with camelCase keys from formData matched to snake_case backend keys
     const payload = {
       name: cleanString(formData.name) || 'Unnamed Seller',
       email: cleanString(formData.email) || 'noemail@example.com',
       business_name: cleanString(formData.businessName) || 'Unnamed Business',
-      hide_business_name: Boolean(formData.hideBusinessName),
+      hide_business_name: !!formData.hideBusinessName,
       industry: cleanString(formData.industry) || 'Unknown Industry',
-      location: cleanString(safeLocation) || 'Unknown Location',
+      location: cleanString(formData.location) || 
+        (formData.location_city && formData.location_state 
+          ? `${formData.location_city.trim()}, ${formData.location_state.trim()}` 
+          : 'Unknown Location'),
       location_city: cleanString(formData.location_city),
       location_state: cleanString(formData.location_state),
       years_in_business: Number(formData.years_in_business) || 0,
       owner_hours_per_week: Number(formData.owner_hours_per_week) || 0,
-      seller_financing_considered: cleanString(formData.seller_financing_considered),
+      seller_financing_considered: formData.seller_financing_considered ? formData.seller_financing_considered.toString() : null,
       website: cleanString(formData.website),
       annual_revenue: Number(formData.annualRevenue) || 0,
+      annual_profit: Number(formData.annualProfit) || 0,
       sde: Number(formData.sde) || 0,
       asking_price: Number(formData.askingPrice) || 0,
       employees: Number(formData.employees) || 0,
       monthly_lease: Number(formData.monthly_lease) || 0,
       inventory_value: Number(formData.inventory_value) || 0,
       equipment_value: Number(formData.equipment_value) || 0,
-      includes_inventory: Boolean(formData.includesInventory),
-      includes_building: Boolean(formData.includesBuilding),
-      relocatable: Boolean(formData.relocatable),
-      home_based: Boolean(formData.home_based),
-      can_run_without_owner: Boolean(formData.can_run_without_owner),
-      willing_to_mentor: Boolean(formData.willing_to_mentor),
-      rent_paid: false,
-      creative_financing: false,
-      image_urls: uploadedImageUrls,
-
-      // Description fields
+      includes_inventory: !!formData.includesInventory,
+      includes_building: !!formData.includesBuilding,
+      relocatable: !!formData.relocatable,
+      home_based: !!formData.home_based,
+      financing_type: cleanString(formData.financingType) || 'buyer-financed',
       business_description: formData.descriptionChoice === 'manual' ? cleanString(formData.businessDescription) : null,
       ai_description: formData.descriptionChoice === 'ai' ? cleanString(formData.aiDescription) : null,
-      sentence_summary: cleanString(formData.sentenceSummary),
-      customers: cleanString(formData.customers),
-      growth_potential: cleanString(formData.growthPotential),
-      marketing_method: cleanString(formData.marketing_method),
       customer_type: cleanString(formData.customerType),
+      marketing_method: cleanString(formData.marketingMethod),
       owner_involvement: cleanString(formData.ownerInvolvement),
-      competitive_edge: cleanString(formData.competitive_edge),
+      can_run_without_owner: !!formData.can_run_without_owner,
+      competitive_edge: cleanString(formData.competitiveEdge),
       competitors: cleanString(formData.competitors),
+      growth_potential: cleanString(formData.growthPotential),
       reason_for_selling: cleanString(formData.reasonForSelling),
       training_offered: cleanString(formData.trainingOffered),
-      original_description: cleanString(formData.originalDescription),
+      creative_financing: !!formData.creativeFinancing,
+      willing_to_mentor: !!formData.willingToMentor,
+      sentence_summary: cleanString(formData.sentenceSummary),
+      customers: cleanString(formData.customers),
       best_sellers: cleanString(formData.bestSellers),
       customer_love: cleanString(formData.customerLove),
       repeat_customers: cleanString(formData.repeatCustomers),
       keeps_them_coming: cleanString(formData.keepsThemComing),
       proud_of: cleanString(formData.proudOf),
       advice_to_buyer: cleanString(formData.adviceToBuyer),
-
-      auth_id: cleanString(formData.auth_id),
-
-      financing_type: cleanString(formData.financingType) || 'buyer-financed',
-      financing_preference: cleanString(formData.financing_preference),
-      down_payment: Number(formData.down_payment) || 0,
-      term_length: Number(formData.term_length) || 0,
-      seller_financing_interest_rate: Number(formData.seller_financing_interest_rate || formData.interest_rate) || 0,
+      auth_id: cleanString(formData.authId),
+      financing_preference: cleanString(formData.financingPreference),
+      down_payment: Number(formData.downPayment) || 0,
+      term_length: Number(formData.termLength) || 0,
+      seller_financing_interest_rate: Number(formData.sellerFinancingInterestRate || formData.interestRate) || 0,
+      interest_rate: Number(formData.interestRate) || 0,
+      image_urls: uploadedImageUrls,
     };
 
-    console.log("Payload sent to backend:", payload);
+    console.log("📤 Payload to backend:", payload);
 
-    // Send to API endpoint (adjust URL if needed)
     const res = await fetch('/api/submit-seller-listing', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -256,20 +245,23 @@ const handleSubmit = async () => {
     });
 
     if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.message || 'Failed to submit listing');
+      const errData = await res.json();
+      console.error("❌ Submission failed:", errData);
+      setSubmitError(errData.error || 'Unknown error');
+      setIsSubmitting(false);
+      return;
     }
 
     setSubmitSuccess(true);
     setSubmitError('');
+    setIsSubmitting(false);
+
     // Optionally redirect or reset form here:
     // router.push('/thank-you');
 
   } catch (error) {
-    console.error('❌ Submission error:', error);
-    setSubmitError(error.message || 'There was an error submitting the listing.');
-    alert(`Error submitting listing: ${error.message}`);
-  } finally {
+    console.error("❌ Submission error:", error);
+    setSubmitError('Submission error, please try again.');
     setIsSubmitting(false);
   }
 };
