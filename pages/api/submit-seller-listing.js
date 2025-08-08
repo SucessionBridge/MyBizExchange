@@ -15,21 +15,13 @@ export default async function handler(req, res) {
 
     console.log('📨 Incoming seller payload:', data);
 
-    // Define required string fields once
+    // Validate required string fields
     const requiredStrings = ['name', 'email', 'business_name', 'industry', 'location', 'financing_type'];
-    
     for (const field of requiredStrings) {
       if (!data[field] || typeof data[field] !== 'string' || data[field].trim() === '') {
         return res.status(400).json({ error: `Missing or invalid "${field}" field` });
       }
     }
-
-    // New: robust number parser returns null if input is empty, null, or invalid
-    const parseNumberOrNull = (val) => {
-      if (val === '' || val === null || val === undefined) return null;
-      const n = Number(val);
-      return isNaN(n) ? null : n;
-    };
 
     const parseBoolean = (val) => {
       if (typeof val === 'boolean') return val;
@@ -38,6 +30,13 @@ export default async function handler(req, res) {
         if (val.toLowerCase() === 'false') return false;
       }
       return false;
+    };
+
+    const parseNullableNumber = (val) => {
+      if (val === null || val === undefined) return null;
+      if (typeof val === 'string' && val.trim() === '') return null;
+      const n = Number(val);
+      return isNaN(n) ? null : n;
     };
 
     const row = {
@@ -51,23 +50,23 @@ export default async function handler(req, res) {
       location_state: (data.location_state || '').trim(),
       financing_type: (data.financing_type || '').trim(),
       business_description: data.business_description || '',
-      asking_price: parseNumberOrNull(data.asking_price),
+      asking_price: parseNullableNumber(data.asking_price),
       includes_inventory: parseBoolean(data.includes_inventory),
       includes_building: parseBoolean(data.includes_building),
       inventory_included: parseBoolean(data.inventory_included),
-      annual_revenue: parseNumberOrNull(data.annual_revenue),
-      annual_profit: parseNumberOrNull(data.annual_profit),
+      annual_revenue: parseNullableNumber(data.annual_revenue),
+      annual_profit: parseNullableNumber(data.annual_profit),
       original_description: data.original_description || '',
       ai_description: data.ai_description || '',
-      sde: parseNumberOrNull(data.sde),
-      inventory_value: parseNumberOrNull(data.inventory_value),
-      equipment_value: parseNumberOrNull(data.equipment_value),
-      rent: parseNumberOrNull(data.rent),
+      sde: parseNullableNumber(data.sde),
+      inventory_value: parseNullableNumber(data.inventory_value),
+      equipment_value: parseNullableNumber(data.equipment_value),
+      rent: parseNullableNumber(data.rent),
       rent_paid: parseBoolean(data.rent_paid),
-      rent_amount: parseNumberOrNull(data.rent_amount),
-      monthly_lease: parseNumberOrNull(data.monthly_lease),
-      year_established: data.year_established || '',
-      employees: parseNumberOrNull(data.employees),
+      rent_amount: parseNullableNumber(data.rent_amount),
+      monthly_lease: parseNullableNumber(data.monthly_lease),
+      year_established: parseNullableNumber(data.year_established),
+      employees: parseNullableNumber(data.employees),
       home_based: parseBoolean(data.home_based),
       relocatable: parseBoolean(data.relocatable),
       website: data.website || '',
@@ -82,7 +81,7 @@ export default async function handler(req, res) {
       training_offered: data.training_offered || '',
       creative_financing: parseBoolean(data.creative_financing),
       willing_to_mentor: parseBoolean(data.willing_to_mentor),
-      years_in_business: parseNumberOrNull(data.years_in_business),
+      years_in_business: parseNullableNumber(data.years_in_business),
       description_choice: data.description_choice || '',
       sentence_summary: data.sentence_summary || '',
       customers: data.customers || '',
@@ -97,10 +96,10 @@ export default async function handler(req, res) {
       status: data.status || 'active',
       financing_preference: data.financing_preference || '',
       seller_financing_considered: parseBoolean(data.seller_financing_considered),
-      down_payment: parseNumberOrNull(data.down_payment),
-      term_length: parseNumberOrNull(data.term_length),
-      seller_financing_interest_rate: parseNumberOrNull(data.seller_financing_interest_rate || data.interest_rate),
-      interest_rate: parseNumberOrNull(data.interest_rate),
+      down_payment: parseNullableNumber(data.down_payment),
+      term_length: parseNullableNumber(data.term_length),
+      seller_financing_interest_rate: parseNullableNumber(data.seller_financing_interest_rate || data.interest_rate),
+      interest_rate: parseNullableNumber(data.interest_rate),
       image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
     };
 
@@ -114,7 +113,6 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({ success: true });
-
   } catch (err) {
     console.error('❌ Server error:', err);
     return res.status(500).json({ error: 'Server error', detail: err.message });
