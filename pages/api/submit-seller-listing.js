@@ -7,7 +7,7 @@ const supabase = createClient(
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    return res.status(405).json({ error: 'Method Not Allowed, only POST allowed' });
   }
 
   try {
@@ -15,23 +15,23 @@ export default async function handler(req, res) {
 
     console.log('📨 Incoming seller payload:', data);
 
-    // Define required string fields once
+    // Required string fields: must exist, be strings, and not empty after trimming
     const requiredStrings = ['name', 'email', 'business_name', 'industry', 'location', 'financing_type'];
-    
-    // Validate required string fields for presence and non-empty strings
     for (const field of requiredStrings) {
       if (!data[field] || typeof data[field] !== 'string' || data[field].trim() === '') {
-        return res.status(400).json({ error: `Missing or invalid "${field}" field` });
+        return res.status(400).json({ error: `Missing or invalid required field "${field}"` });
       }
     }
 
+    // Utility parsers
     const parseBoolean = (val) => {
       if (typeof val === 'boolean') return val;
       if (typeof val === 'string') {
-        if (val.toLowerCase() === 'true') return true;
-        if (val.toLowerCase() === 'false') return false;
+        const lower = val.toLowerCase();
+        if (lower === 'true') return true;
+        if (lower === 'false') return false;
       }
-      return false;
+      return false; // default fallback
     };
 
     const parseNumber = (val) => {
@@ -39,6 +39,7 @@ export default async function handler(req, res) {
       return isNaN(n) ? 0 : n;
     };
 
+    // Prepare row for insertion with robust parsing and defaults
     const row = {
       name: data.name.trim(),
       email: data.email.trim(),
@@ -48,7 +49,7 @@ export default async function handler(req, res) {
       location: data.location.trim(),
       location_city: (data.location_city || '').trim(),
       location_state: (data.location_state || '').trim(),
-      financing_type: (data.financing_type || '').trim(),
+      financing_type: data.financing_type.trim(),
       business_description: data.business_description || '',
       asking_price: parseNumber(data.asking_price),
       includes_inventory: parseBoolean(data.includes_inventory),
@@ -92,7 +93,7 @@ export default async function handler(req, res) {
       proud_of: data.proud_of || '',
       advice_to_buyer: data.advice_to_buyer || '',
       delete_reason: data.delete_reason || '',
-      auth_id: data.auth_id && data.auth_id.trim() !== '' ? data.auth_id : null,
+      auth_id: data.auth_id && data.auth_id.trim() !== '' ? data.auth_id.trim() : null,
       status: data.status || 'active',
       financing_preference: data.financing_preference || '',
       seller_financing_considered: parseBoolean(data.seller_financing_considered),
@@ -103,35 +104,19 @@ export default async function handler(req, res) {
       image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
     };
 
-    console.log('🔍 Row fields and types before insert:');
-    Object.entries(row).forEach(([key, value]) => {
-      console.log(`  ${key}:`, value, '| type:', typeof value);
-    });
+    console.log('🔍 Prepared row for insertion:', row);
 
-    // Check for empty strings in non-string fields
-    for (const [key, value] of Object.entries(row)) {
-      if (value === '') {
-        return res.status(400).json({ error: `Empty string detected in field "${key}"` });
-      }
-      if (
-        !['string', 'number', 'boolean'].includes(typeof value) &&
-        value !== null &&
-        !(key === 'image_urls' && Array.isArray(value))
-      ) {
-        return res.status(400).json({ error: `Invalid type for field "${key}": ${typeof value}` });
-      }
-    }
-
+    // Insert into Supabase
     const { error } = await supabase.from('sellers').insert([row]);
 
     if (error) {
       console.error('❌ Supabase insert error:', error);
-      return res.status(500).json({ error: 'Insert failed', detail: error.message });
+      return res.status(500).json({ error: 'Database insert failed', detail: error.message });
     }
 
     return res.status(200).json({ success: true });
   } catch (err) {
-    console.error('❌ Server error:', err);
+    console.error('❌ Unexpected server error:', err);
     return res.status(500).json({ error: 'Server error', detail: err.message });
   }
 }
