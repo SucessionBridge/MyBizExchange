@@ -151,39 +151,41 @@ const handleSubmit = async () => {
   try {
     setIsSubmitting(true);
 
-    // ✅ Upload images to Supabase Storage
+    // Upload images if any
     const uploadedImageUrls = [];
-    for (const file of formData.images) {
-      const filePath = `seller-${Date.now()}-${file.name}`;
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('seller-images')
-        .upload(filePath, file);
+    if (formData.images && formData.images.length > 0) {
+      for (const file of formData.images) {
+        const filePath = `seller-${Date.now()}-${file.name}`;
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('seller-images')
+          .upload(filePath, file);
 
-      if (uploadError) {
-        console.error("❌ Image upload failed:", uploadError.message);
-        alert("Image upload failed. Please try again.");
-        setIsSubmitting(false);
-        return;
+        if (uploadError) {
+          console.error("❌ Image upload failed:", uploadError.message);
+          alert("Image upload failed. Please try again.");
+          setIsSubmitting(false);
+          return;
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from('seller-images')
+          .getPublicUrl(uploadData.path);
+
+        uploadedImageUrls.push(publicUrlData.publicUrl);
       }
-
-      const { data: publicUrlData } = supabase.storage
-        .from('seller-images')
-        .getPublicUrl(uploadData.path);
-
-      uploadedImageUrls.push(publicUrlData.publicUrl);
     }
 
-    // ✅ Build the payload with only safe values (snake_case + strings)
-    // Ensure location is set — fallback to city + state if location empty
+    // Safe location fallback
     const safeLocation = formData.location && formData.location.trim() !== ''
       ? formData.location
       : (formData.location_city && formData.location_state)
         ? `${formData.location_city.trim()}, ${formData.location_state.trim()}`
         : 'Unknown';
 
-    // Helper: convert empty strings to null
+    // Clean empty strings to null
     const cleanString = (val) => (typeof val === 'string' && val.trim() === '') ? null : val;
 
+    // Prepare payload, mapping EXACTLY from your formData keys
     const payload = {
       name: cleanString(formData.name) || 'Unnamed Seller',
       email: cleanString(formData.email) || 'noemail@example.com',
@@ -205,36 +207,39 @@ const handleSubmit = async () => {
       inventory_value: Number(formData.inventory_value) || 0,
       equipment_value: Number(formData.equipment_value) || 0,
       includes_inventory: Boolean(formData.includesInventory),
-      home_based: Boolean(formData.homeBased),
+      includes_building: Boolean(formData.includesBuilding),
       relocatable: Boolean(formData.relocatable),
+      home_based: Boolean(formData.home_based),
       can_run_without_owner: Boolean(formData.can_run_without_owner),
       willing_to_mentor: Boolean(formData.willing_to_mentor),
       rent_paid: false,
       creative_financing: false,
-      image_urls: uploadedImageUrls || [],
+      image_urls: uploadedImageUrls,
 
-      // Fix these fields strictly: empty string => null
-      business_description: formData.useAIDescription ? null : cleanString(formData.business_description),
-      ai_description: formData.useAIDescription ? cleanString(formData.generatedDescription) : null,
+      // Description fields
+      business_description: formData.descriptionChoice === 'manual' ? cleanString(formData.businessDescription) : null,
+      ai_description: formData.descriptionChoice === 'ai' ? cleanString(formData.aiDescription) : null,
       sentence_summary: cleanString(formData.sentenceSummary),
       customers: cleanString(formData.customers),
-      growth_potential: cleanString(formData.opportunity),
+      growth_potential: cleanString(formData.growthPotential),
       marketing_method: cleanString(formData.marketing_method),
-      customer_type: cleanString(formData.customer_type),
-      owner_involvement: cleanString(formData.owner_involvement),
+      customer_type: cleanString(formData.customerType),
+      owner_involvement: cleanString(formData.ownerInvolvement),
       competitive_edge: cleanString(formData.competitive_edge),
       competitors: cleanString(formData.competitors),
-      reason_for_selling: cleanString(formData.reason_for_selling),
-      training_offered: cleanString(formData.training_offered),
-      original_description: cleanString(formData.original_description),
-      best_sellers: cleanString(formData.best_sellers),
-      customer_love: cleanString(formData.customer_love),
-      repeat_customers: cleanString(formData.repeat_customers),
-      keeps_them_coming: cleanString(formData.keeps_them_coming),
-      proud_of: cleanString(formData.proud_of),
-      advice_to_buyer: cleanString(formData.advice_to_buyer),
+      reason_for_selling: cleanString(formData.reasonForSelling),
+      training_offered: cleanString(formData.trainingOffered),
+      original_description: cleanString(formData.originalDescription),
+      best_sellers: cleanString(formData.bestSellers),
+      customer_love: cleanString(formData.customerLove),
+      repeat_customers: cleanString(formData.repeatCustomers),
+      keeps_them_coming: cleanString(formData.keepsThemComing),
+      proud_of: cleanString(formData.proudOf),
+      advice_to_buyer: cleanString(formData.adviceToBuyer),
+
       auth_id: cleanString(formData.auth_id),
-      financing_type: cleanString(formData.financing_type) || 'buyer-financed',
+
+      financing_type: cleanString(formData.financingType) || 'buyer-financed',
       financing_preference: cleanString(formData.financing_preference),
       down_payment: Number(formData.down_payment) || 0,
       term_length: Number(formData.term_length) || 0,
@@ -243,10 +248,27 @@ const handleSubmit = async () => {
 
     console.log("Payload sent to backend:", payload);
 
-    // ...rest of your submit logic
+    // Send to API endpoint (adjust URL if needed)
+    const res = await fetch('/api/submit-seller-listing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.message || 'Failed to submit listing');
+    }
+
+    setSubmitSuccess(true);
+    setSubmitError('');
+    // Optionally redirect or reset form here:
+    // router.push('/thank-you');
+
   } catch (error) {
-    console.error("❌ Submission error:", error);
-    alert("There was an error submitting the listing.");
+    console.error('❌ Submission error:', error);
+    setSubmitError(error.message || 'There was an error submitting the listing.');
+    alert(`Error submitting listing: ${error.message}`);
   } finally {
     setIsSubmitting(false);
   }
