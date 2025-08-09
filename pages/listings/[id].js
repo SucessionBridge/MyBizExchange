@@ -72,6 +72,32 @@ export default function ListingDetail() {
     setLoading(false);
   }
 
+  // Parse AI description into titled sections
+  function parseDescriptionSections(description) {
+    if (!description) return [];
+
+    const lines = description
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    const sections = [];
+    let currentSection = { title: '', content: '' };
+
+    lines.forEach((line) => {
+      if (line.endsWith(':')) {
+        if (currentSection.title) sections.push(currentSection);
+        currentSection = { title: line.slice(0, -1), content: '' };
+      } else {
+        currentSection.content += (currentSection.content ? '\n' : '') + line;
+      }
+    });
+
+    if (currentSection.title) sections.push(currentSection);
+
+    return sections;
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!message || !buyer || !listing) return;
@@ -233,11 +259,18 @@ export default function ListingDetail() {
           <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4 border-b-2 border-[#F59E0B] pb-2">
             Business Description
           </h2>
-          <p className="text-gray-800 leading-relaxed text-lg">
-            {listing.description_choice === 'ai'
-              ? listing.ai_description
-              : listing.business_description || 'No description available.'}
-          </p>
+          {listing.description_choice === 'ai' && listing.ai_description ? (
+            parseDescriptionSections(listing.ai_description).map(({ title, content }, i) => (
+              <section key={i} className="mb-6">
+                <h3 className="text-xl font-semibold mb-2">{title}</h3>
+                <p className="whitespace-pre-line text-gray-800 leading-relaxed">{content}</p>
+              </section>
+            ))
+          ) : (
+            <p className="text-gray-800 leading-relaxed text-lg">
+              {listing.business_description || 'No description available.'}
+            </p>
+          )}
         </section>
 
         {/* Business Details */}
@@ -400,4 +433,3 @@ export default function ListingDetail() {
     </main>
   );
 }
-
