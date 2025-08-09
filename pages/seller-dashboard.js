@@ -386,6 +386,17 @@ export default function SellerDashboard() {
                 <button
                   onClick={closeDeleteModal}
                   disabled={isProcessing}
+                  className="bg-gray-300 px-4 py-2 rounded hover:bg-gray-400 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
-
+      </div>
+    </main>
+  );
+}
 
