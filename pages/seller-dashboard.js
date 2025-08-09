@@ -1,4 +1,3 @@
-// pages/seller-dashboard.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from "../lib/supabaseClient";
@@ -24,52 +23,66 @@ export default function SellerDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const router = useRouter();
-  const [showReasonDropdown, setShowReasonDropdown] = useState(false);
+
+  // Modal and deletion state
+  const [showReasonModal, setShowReasonModal] = useState(false);
   const [deletionTargetId, setDeletionTargetId] = useState(null);
   const [deleteReason, setDeleteReason] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // ✅ New state for conversations
+  // Messaging states
   const [messages, setMessages] = useState([]);
   const [replyInput, setReplyInput] = useState({});
   const [sending, setSending] = useState(false);
 
+  // Reasons dropdown options
+  const deleteReasons = [
+    'Business Sold',
+    'Change My Mind',
+    'No Offers',
+    'Temporarily Pausing (Negotiations Ongoing)',
+    'Other',
+  ];
+
   useEffect(() => {
-    const fetchListings = async () => {
-      const {
-        data: { user },
-        error: authError,
-      } = await supabase.auth.getUser();
-
-      if (authError || !user) {
-        setError("You must be logged in to view your listings.");
-        setLoading(false);
-        return;
-      }
-
-      const { data: sellerListings, error: listingError } = await supabase
-        .from('sellers')
-        .select('*')
-        .eq('email', user.email);
-
-      if (listingError) {
-        console.error('Error loading listings:', listingError);
-        setError("There was an issue loading your listings.");
-      } else {
-        setListings(sellerListings);
-        fetchMessages(sellerListings.map(l => l.id));
-      }
-
-      setLoading(false);
-    };
-
     fetchListings();
+
     const interval = setInterval(() => {
       if (listings.length > 0) {
         fetchMessages(listings.map(l => l.id));
       }
-    }, 5000); // auto-refresh messages every 5s
+    }, 5000); // refresh messages every 5s
+
     return () => clearInterval(interval);
   }, []);
+
+  const fetchListings = async () => {
+    setLoading(true);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      setError("You must be logged in to view your listings.");
+      setLoading(false);
+      return;
+    }
+
+    const { data: sellerListings, error: listingError } = await supabase
+      .from('sellers')
+      .select('*')
+      .eq('email', user.email);
+
+    if (listingError) {
+      console.error('Error loading listings:', listingError);
+      setError("There was an issue loading your listings.");
+    } else {
+      setListings(sellerListings);
+      fetchMessages(sellerListings.map(l => l.id));
+    }
+    setLoading(false);
+  };
 
   const fetchMessages = async (listingIds) => {
     if (!listingIds || listingIds.length === 0) return;
@@ -106,39 +119,75 @@ export default function SellerDashboard() {
     setSending(false);
   };
 
-  const handleDeleteClick = (id) => {
-    setDeletionTargetId(id);
-    setShowReasonDropdown(true);
-  };
-
   const formatCurrency = (val) =>
     val ? `$${parseFloat(val).toLocaleString()}` : 'N/A';
 
   const getPublicListingUrl = (id) => `${window.location.origin}/listings/${id}`;
 
-  const handleConfirmDelete = async () => {
+  // --- New: Open deletion modal ---
+  const openDeleteModal = (id) => {
+    setDeletionTargetId(id);
+    setDeleteReason('');
+    setShowReasonModal(true);
+  };
+
+  // --- New: Close deletion modal ---
+  const closeDeleteModal = () => {
+    setShowReasonModal(false);
+    setDeletionTargetId(null);
+    setDeleteReason('');
+  };
+
+  // --- New: Update listing status (deleted, paused, active) ---
+  const updateListingStatus = async (status, reason = '') => {
     if (!deletionTargetId) return;
 
-    const confirmed = window.confirm(
-      `Are you sure you want to delete this listing for reason: "${deleteReason || 'No reason provided'}"?`
-    );
-    if (!confirmed) return;
+    setIsProcessing(true);
+    try {
+      const res = await fetch('/api/update-listing-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listingId: deletionTargetId,
+          status,
+          deleteReason: reason,
+        }),
+      });
+      if (!res.ok) throw new Error('Failed to update listing');
 
-    await supabase
-      .from('sellers')
-      .update({ delete_reason: deleteReason || 'No reason provided' })
-      .eq('id', deletionTargetId);
+      alert(`✅ Listing ${status === 'deleted' ? 'deleted' : status === 'paused' ? 'paused' : 'updated'} successfully.`);
 
-    await supabase
-      .from('sellers')
-      .delete()
-      .eq('id', deletionTargetId);
+      // Refresh listings to reflect changes
+      await fetchListings();
 
-    setListings((prev) => prev.filter((l) => l.id !== deletionTargetId));
-    setShowReasonDropdown(false);
-    setDeleteReason('');
-    setDeletionTargetId(null);
-    alert('✅ Listing deleted successfully.');
+      // Close modal & reset
+      closeDeleteModal();
+    } catch (err) {
+      alert('Error updating listing. Please try again.');
+      console.error(err);
+    }
+    setIsProcessing(false);
+  };
+
+  // --- New: Confirm delete with reason ---
+  const handleConfirmDelete = () => {
+    if (!deleteReason) {
+      alert('Please select a reason for deleting/unlisting.');
+      return;
+    }
+    updateListingStatus('deleted', deleteReason);
+  };
+
+  // --- New: Pause listing temporarily ---
+  const handlePauseListing = (id) => {
+    setDeletionTargetId(id);
+    updateListingStatus('paused', 'Temporarily Pausing (Negotiations Ongoing)');
+  };
+
+  // --- New: Unpause listing ---
+  const handleUnpauseListing = (id) => {
+    setDeletionTargetId(id);
+    updateListingStatus('active', '');
   };
 
   const handleDeletePhoto = async (listingId, imageUrl) => {
@@ -235,17 +284,34 @@ export default function SellerDashboard() {
                     ✏️ Edit Listing
                   </button>
 
-                  {deletionTargetId !== listing.id && (
+                  {listing.status !== 'deleted' && listing.status !== 'paused' && (
+                    <>
+                      <button
+                        onClick={() => openDeleteModal(listing.id)}
+                        className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                      >
+                        🗑️ Delete Listing
+                      </button>
+                      <button
+                        onClick={() => handlePauseListing(listing.id)}
+                        className="bg-orange-500 text-white px-4 py-2 rounded hover:bg-orange-600"
+                      >
+                        ⏸ Pause Listing
+                      </button>
+                    </>
+                  )}
+
+                  {listing.status === 'paused' && (
                     <button
-                      onClick={() => handleDeleteClick(listing.id)}
-                      className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                      onClick={() => handleUnpauseListing(listing.id)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
                     >
-                      🗑️ Delete Listing
+                      ▶️ Unpause Listing
                     </button>
                   )}
                 </div>
 
-                {/* ✅ Conversations */}
+                {/* Conversations */}
                 <div className="mt-6 bg-gray-50 border rounded-lg p-4">
                   <h3 className="font-semibold text-blue-800 mb-2">Messages for this Listing</h3>
                   {messages.filter(m => m.listing_id === listing.id).length === 0 ? (
@@ -293,9 +359,33 @@ export default function SellerDashboard() {
             ))}
           </div>
         )}
-      </div>
-    </main>
-  );
-}
+
+        {/* Delete reason modal */}
+        {showReasonModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-sm w-full shadow-lg">
+              <h2 className="text-xl font-semibold mb-4">Why are you deleting this listing?</h2>
+              <select
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                className="w-full p-2 border rounded mb-4"
+              >
+                <option value="">-- Select a Reason --</option>
+                {deleteReasons.map((reason) => (
+                  <option key={reason} value={reason}>{reason}</option>
+                ))}
+              </select>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={handleConfirmDelete}
+                  disabled={isProcessing}
+                  className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:opacity-50"
+                >
+                  {isProcessing ? 'Processing...' : 'Confirm Delete'}
+                </button>
+                <button
+                  onClick={closeDeleteModal}
+                  disabled={isProcessing}
+
 
 
