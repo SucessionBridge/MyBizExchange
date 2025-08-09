@@ -776,7 +776,11 @@ const handleSubmit = async () => {
   Home-Based
 </label>
 
+<label htmlFor="financingType" className="block font-semibold mb-1">
+  Financing Preference
+</label>
 <select
+  id="financingType"
   name="financingType"
   value={formData.financingType}
   onChange={handleChange}
@@ -786,6 +790,11 @@ const handleSubmit = async () => {
   <option value="seller-financed">Seller Financed</option>
   <option value="rent-to-own">Rent to Own</option>
 </select>
+<p className="text-xs text-gray-500 mt-1">
+  Select your preferred financing option for the buyer.
+  This helps match your listing with buyers interested in these terms.
+</p>
+
            
 
 
@@ -793,9 +802,8 @@ const handleSubmit = async () => {
 <div className="bg-gray-50 p-4 rounded border mt-4">
   <h3 className="font-semibold mb-2">Seller Financing Option</h3>
   <p className="text-sm text-gray-600 mb-2">
-    Offering seller financing can help you sell faster and attract more buyers.
-    You set the terms, including down payment and interest. Even selecting
-    “Maybe” gives you more exposure to qualified buyers who are serious.
+    Offering seller financing can help you sell faster and attract more qualified buyers.
+    You set the terms, including down payment and interest rate. Even selecting “Maybe” increases your exposure.
   </p>
   <select
     name="seller_financing_considered"
@@ -809,33 +817,42 @@ const handleSubmit = async () => {
     <option value="no">No</option>
   </select>
 
-  {/* 🔹 Extra fields appear only if Yes or Maybe is selected */}
   {(formData.seller_financing_considered === 'yes' || formData.seller_financing_considered === 'maybe') && (
     <div className="mt-3 space-y-2">
       <input
         name="down_payment"
+        type="number"
         placeholder="Typical Down Payment (%)"
         value={formData.down_payment || ''}
         onChange={handleChange}
         className="w-full border p-2 rounded"
+        min={0}
+        max={100}
       />
       <input
         name="interest_rate"
+        type="number"
         placeholder="Interest Rate (%)"
         value={formData.interest_rate || ''}
         onChange={handleChange}
         className="w-full border p-2 rounded"
+        min={0}
+        max={100}
+        step="0.01"
       />
       <input
         name="term_length"
+        type="number"
         placeholder="Term Length (Years)"
         value={formData.term_length || ''}
         onChange={handleChange}
         className="w-full border p-2 rounded"
+        min={0}
       />
     </div>
   )}
 </div>
+
 
 
 
