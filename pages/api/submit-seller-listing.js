@@ -5,6 +5,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Helper function to generate a random 4-digit number and prefix "SB-"
+function generateAdId() {
+  const randomNum = Math.floor(1000 + Math.random() * 9000); // 4 digit number between 1000-9999
+  return `SB-${randomNum}`;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -38,70 +44,74 @@ export default async function handler(req, res) {
       const n = Number(val);
       return isNaN(n) ? null : n;
     };
-const row = {
-  name: data.name.trim(),
-  email: data.email.trim(),
-  business_name: data.business_name.trim(),
-  hide_business_name: parseBoolean(data.hide_business_name),
-  industry: data.industry.trim(),
-  location: data.location.trim(),
-  location_city: (data.location_city || '').trim(),
-  location_state: (data.location_state || '').trim(),
-  financing_type: (data.financing_type || '').trim(),
-  business_description: data.business_description || '',
-  asking_price: parseNullableNumber(data.asking_price),
-  includes_inventory: parseBoolean(data.includes_inventory),
-  includes_building: parseBoolean(data.includes_building),
-  inventory_included: parseBoolean(data.inventory_included),
-  annual_revenue: parseNullableNumber(data.annual_revenue),
-  annual_profit: parseNullableNumber(data.annual_profit),
-  original_description: data.original_description || '',
-  ai_description: data.ai_description || '',
-  sde: parseNullableNumber(data.sde),
-  inventory_value: parseNullableNumber(data.inventory_value),
-  equipment_value: parseNullableNumber(data.equipment_value),
-  rent: parseNullableNumber(data.rent),
-  rent_paid: parseBoolean(data.rent_paid),
-  rent_amount: parseNullableNumber(data.rent_amount),
-  monthly_lease: parseNullableNumber(data.monthly_lease),
-  year_established: parseNullableNumber(data.year_established),
-  employees: parseNullableNumber(data.employees),
-  home_based: parseBoolean(data.home_based),
-  relocatable: parseBoolean(data.relocatable),
-  website: data.website || '',
-  
-  // Updated customer fields:
-  customer_profile: data.customer_profile || '',
-  best_sellers: data.best_sellers || '',
-  
-  marketing_method: data.marketing_method || '',
-  owner_involvement: data.owner_involvement || '',
-  can_run_without_owner: parseBoolean(data.can_run_without_owner),
-  competitive_edge: data.competitive_edge || '',
-  competitors: data.competitors || '',
-  growth_potential: data.growth_potential || '',
-  reason_for_selling: data.reason_for_selling || '',
-  training_offered: data.training_offered || '',
-  creative_financing: parseBoolean(data.creative_financing),
-  willing_to_mentor: parseBoolean(data.willing_to_mentor),
-  years_in_business: parseNullableNumber(data.years_in_business),
-  description_choice: data.description_choice || '',
-  sentence_summary: data.sentence_summary || '',
-  proud_of: data.proud_of || '',
-  advice_to_buyer: data.advice_to_buyer || '',
-  delete_reason: data.delete_reason || '',
-  auth_id: data.auth_id && data.auth_id.trim() !== '' ? data.auth_id : null,
-  status: data.status || 'active',
-  financing_preference: data.financing_preference || '',
-  seller_financing_considered: parseBoolean(data.seller_financing_considered),
-  down_payment: parseNullableNumber(data.down_payment),
-  term_length: parseNullableNumber(data.term_length),
-  seller_financing_interest_rate: parseNullableNumber(data.seller_financing_interest_rate || data.interest_rate),
-  interest_rate: parseNullableNumber(data.interest_rate),
-  image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
-};
 
-   
+    // Generate Ad ID for this listing
+    const adId = generateAdId();
+
+    const row = {
+      name: data.name.trim(),
+      email: data.email.trim(),
+      business_name: data.business_name.trim(),
+      hide_business_name: parseBoolean(data.hide_business_name),
+      industry: data.industry.trim(),
+      location: data.location.trim(),
+      location_city: (data.location_city || '').trim(),
+      location_state: (data.location_state || '').trim(),
+      financing_type: (data.financing_type || '').trim(),
+      business_description: data.business_description || '',
+      asking_price: parseNullableNumber(data.asking_price),
+      includes_inventory: parseBoolean(data.includes_inventory),
+      includes_building: parseBoolean(data.includes_building),
+      inventory_included: parseBoolean(data.inventory_included),
+      annual_revenue: parseNullableNumber(data.annual_revenue),
+      annual_profit: parseNullableNumber(data.annual_profit),
+      original_description: data.original_description || '',
+      ai_description: data.ai_description || '',
+      sde: parseNullableNumber(data.sde),
+      inventory_value: parseNullableNumber(data.inventory_value),
+      equipment_value: parseNullableNumber(data.equipment_value),
+      rent: parseNullableNumber(data.rent),
+      rent_paid: parseBoolean(data.rent_paid),
+      rent_amount: parseNullableNumber(data.rent_amount),
+      monthly_lease: parseNullableNumber(data.monthly_lease),
+      year_established: parseNullableNumber(data.year_established),
+      employees: parseNullableNumber(data.employees),
+      home_based: parseBoolean(data.home_based),
+      relocatable: parseBoolean(data.relocatable),
+      website: data.website || '',
+
+      // Updated customer fields:
+      customer_profile: data.customer_profile || '',
+      best_sellers: data.best_sellers || '',
+
+      marketing_method: data.marketing_method || '',
+      owner_involvement: data.owner_involvement || '',
+      can_run_without_owner: parseBoolean(data.can_run_without_owner),
+      competitive_edge: data.competitive_edge || '',
+      competitors: data.competitors || '',
+      growth_potential: data.growth_potential || '',
+      reason_for_selling: data.reason_for_selling || '',
+      training_offered: data.training_offered || '',
+      creative_financing: parseBoolean(data.creative_financing),
+      willing_to_mentor: parseBoolean(data.willing_to_mentor),
+      years_in_business: parseNullableNumber(data.years_in_business),
+      description_choice: data.description_choice || '',
+      sentence_summary: data.sentence_summary || '',
+      proud_of: data.proud_of || '',
+      advice_to_buyer: data.advice_to_buyer || '',
+      delete_reason: data.delete_reason || '',
+      auth_id: data.auth_id && data.auth_id.trim() !== '' ? data.auth_id : null,
+      status: data.status || 'active',
+      financing_preference: data.financing_preference || '',
+      seller_financing_considered: parseBoolean(data.seller_financing_considered),
+      down_payment: parseNullableNumber(data.down_payment),
+      term_length: parseNullableNumber(data.term_length),
+      seller_financing_interest_rate: parseNullableNumber(data.seller_financing_interest_rate || data.interest_rate),
+      interest_rate: parseNullableNumber(data.interest_rate),
+      image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
+
+      ad_id: adId, // <-- added unique Ad ID here
+    };
 
     console.log('🔍 Prepared row for insertion:', row);
 
@@ -112,7 +122,7 @@ const row = {
       return res.status(500).json({ error: 'Insert failed', detail: error.message });
     }
 
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, ad_id: adId });
   } catch (err) {
     console.error('❌ Server error:', err);
     return res.status(500).json({ error: 'Server error', detail: err.message });
