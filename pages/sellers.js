@@ -647,7 +647,9 @@ const handleSubmit = async () => {
   onChange={handleChange}
   className="w-full border p-3 rounded"
 />
-
+<p className="text-xs text-gray-500 mt-1">
+  Your website URL helps buyers learn more about your business. For privacy and security, it will only be visible to logged-in users on SuccessionBridge. This helps protect your contact details and ensures only serious buyers can reach you.
+</p>
 <input
   type="number"
   name="annualRevenue"
