@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import supabase from '../../lib/supabaseClient'; // Adjust path if needed
+import supabase from '../lib/supabaseClient';
+
 import Link from 'next/link';
 
 export default function ListingsPage() {
