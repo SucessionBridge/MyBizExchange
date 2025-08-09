@@ -22,96 +22,93 @@ export default function SellerWizard() {
 const [currentEditType, setCurrentEditType] = useState('manual'); // 'manual' or 'ai'
 const [tempDescription, setTempDescription] = useState('');
 const [tempAIDescription, setTempAIDescription] = useState('');
- 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    businessName: '',
-    hideBusinessName: false,
-    industry: '',
-    location: '',
-    location_city: '',
-    location_state: '',
-    years_in_business: '',
-owner_hours_per_week: '',
-    website: '',
-    annualRevenue: '',
-    sde: '',
-    askingPrice: '',
-    employees: '',
-    monthly_lease: '',
-    inventory_value: '',
-    equipment_value: '',
-    includesInventory: false,
-    includesBuilding: false,
-    relocatable: false,
-    home_based: false,
-    financingType: 'buyer-financed',
-    businessDescription: '',
-    aiDescription: '',
-    descriptionChoice: 'manual',
-    ownerInvolvement: '',
-    growthPotential: '',
-    reasonForSelling: '',
-    trainingOffered: '',
-    sentenceSummary: '',
-    customers: '',
-    bestSellers: '',
-     customerProfile: '',
-    repeatCustomers: '',
-    keepsThemComing: '',
-    proudOf: '',
-    adviceToBuyer: '',
-    annualProfit: '',
-    images: []
-  });
+ const [formData, setFormData] = useState({
+  name: '',
+  email: '',
+  businessName: '',
+  hideBusinessName: false,
+  industry: '',
+  location: '',
+  location_city: '',
+  location_state: '',
+  years_in_business: '',
+  owner_hours_per_week: '',
+  website: '',
+  annualRevenue: '',
+  sde: '',
+  askingPrice: '',
+  employees: '',
+  monthly_lease: '',
+  inventory_value: '',
+  equipment_value: '',
+  includesInventory: false,
+  includesBuilding: false,
+  relocatable: false,
+  home_based: false,
+  financingType: 'buyer-financed',
+  businessDescription: '',
+  aiDescription: '',
+  descriptionChoice: 'manual',
+  ownerInvolvement: '',
+  growthPotential: '',
+  reasonForSelling: '',
+  trainingOffered: '',
+  sentenceSummary: '',
+  customers: '',
+  bestSellers: '',
+  customerProfile: '',
+  repeatCustomers: '',
+  keepsThemComing: '',
+  proudOf: '',
+  adviceToBuyer: '',
+  annualProfit: '',
+  images: []
+});
 
-  useEffect(() => {
-    if (previewMode && !formData.aiDescription) {
-      const fetchDescription = async () => {
-        try {
-        
-          const res = await fetch('/api/generate-description', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({
-  sentenceSummary: formData.sentenceSummary,
-  customers: formData.customers,
-  bestSellers: formData.bestSellers,
-  customerLove: formData.customerLove,
-  repeatCustomers: formData.repeatCustomers,
-  keepsThemComing: formData.keepsThemComing,
-  ownerInvolvement: formData.ownerInvolvement,
-  opportunity: formData.growthPotential,
-  proudOf: formData.proudOf,
-  adviceToBuyer: formData.adviceToBuyer,
-  businessName: formData.businessName,
-  industry: formData.industry,
-  location: formData.location || `${formData.location_city}, ${formData.location_state}`,
-  annualRevenue: formData.annualRevenue,
-  annualProfit: formData.annualProfit,
-  includesInventory: formData.includesInventory,
-  includesBuilding: formData.includesBuilding
-})
-          });
+useEffect(() => {
+  if (previewMode && !formData.aiDescription) {
+    const fetchDescription = async () => {
+      try {
+      
+        const res = await fetch('/api/generate-description', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sentenceSummary: formData.sentenceSummary,
+            customerProfile: formData.customerProfile,   // <-- replaced multiple customer fields with this single field
+            bestSellers: formData.bestSellers,
+            // Removed customerLove, repeatCustomers, keepsThemComing here
+            ownerInvolvement: formData.ownerInvolvement,
+            opportunity: formData.growthPotential,
+            proudOf: formData.proudOf,
+            adviceToBuyer: formData.adviceToBuyer,
+            businessName: formData.businessName,
+            industry: formData.industry,
+            location: formData.location || `${formData.location_city}, ${formData.location_state}`,
+            annualRevenue: formData.annualRevenue,
+            annualProfit: formData.annualProfit,
+            includesInventory: formData.includesInventory,
+            includesBuilding: formData.includesBuilding
+          })
+        });
 
-          if (!res.ok) {
-            const err = await res.json();
-            console.error('AI description error:', err.message);
-            return;
-          }
-
-          const data = await res.json();
-          setFormData(prev => ({ ...prev, aiDescription: data.description }));
-        } catch (err) {
-          console.error('AI fetch failed:', err);
+        if (!res.ok) {
+          const err = await res.json();
+          console.error('AI description error:', err.message);
+          return;
         }
-      };
-      fetchDescription();
-    }
-  }, [previewMode]);
 
-  const handleChange = (e) => {
+        const data = await res.json();
+        setFormData(prev => ({ ...prev, aiDescription: data.description }));
+      } catch (err) {
+        console.error('AI fetch failed:', err);
+      }
+    };
+    fetchDescription();
+  }
+}, [previewMode]);
+
+ const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
@@ -219,11 +216,11 @@ const handleSubmit = async () => {
       creative_financing: !!formData.creativeFinancing,
       willing_to_mentor: !!formData.willingToMentor,
       sentence_summary: cleanString(formData.sentenceSummary),
-     customer_profile: cleanString(formData.customerProfile),
+      
+      // Updated customer fields — only these two now:
+      customer_profile: cleanString(formData.customerProfile),
       best_sellers: cleanString(formData.bestSellers),
-      customer_love: cleanString(formData.customerLove),
-      repeat_customers: cleanString(formData.repeatCustomers),
-      keeps_them_coming: cleanString(formData.keepsThemComing),
+
       proud_of: cleanString(formData.proudOf),
       advice_to_buyer: cleanString(formData.adviceToBuyer),
       auth_id: cleanString(formData.authId),
