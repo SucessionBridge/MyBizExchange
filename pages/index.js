@@ -1,10 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import supabase from "../lib/supabaseClient";
 import Link from "next/link";
 
 export default function Home() {
   const router = useRouter();
+  const [featuredListings, setFeaturedListings] = useState([]);
 
   useEffect(() => {
     const checkUserAndRedirect = async () => {
@@ -35,6 +36,22 @@ export default function Home() {
     };
 
     checkUserAndRedirect();
+
+    // Fetch featured listings
+    const fetchFeaturedListings = async () => {
+      const { data, error } = await supabase
+        .from('sellers')
+        .select('id, business_name, location, asking_price, ad_id')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (!error && data) {
+        setFeaturedListings(data);
+      }
+    };
+
+    fetchFeaturedListings();
   }, [router]);
 
   return (
@@ -175,8 +192,35 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Featured Listings Section */}
+        <section className="bg-white rounded-xl p-10 mb-12 border border-gray-200 shadow-sm">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-3xl font-semibold text-[#2E3A59] mb-6 text-center">Featured Listings</h2>
+            {featuredListings.length === 0 ? (
+              <p className="text-center text-gray-600">No listings available at the moment.</p>
+            ) : (
+              <ul className="space-y-4">
+                {featuredListings.map((listing) => (
+                  <li key={listing.id} className="border rounded p-4 hover:shadow-lg transition-shadow">
+                    <a href={`/listings/${listing.id}`} className="text-xl font-semibold text-blue-600 hover:underline">
+                      {listing.business_name || 'Unnamed Business'}
+                    </a>
+                    <p className="text-gray-700">{listing.location}</p>
+                    <p className="text-green-700 font-semibold">
+                      Asking Price: {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire'}
+                    </p>
+                    <p className="text-sm text-gray-500">Ad ID: <strong>{listing.ad_id || 'N/A'}</strong></p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
+
       </div>
     </main>
   );
 }
+
+
 
