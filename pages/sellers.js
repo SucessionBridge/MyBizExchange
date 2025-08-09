@@ -710,7 +710,10 @@ const handleSubmit = async () => {
   onChange={handleChange}
   className="w-full border p-3 rounded"
 />
-
+<p className="text-xs text-gray-500 mt-1">
+  For leased premises only. Please enter how much rent you pay monthly for your business location.
+  (Exclude equipment or vehicle leases.)
+</p>
 <input
   type="number"
   name="inventory_value"
