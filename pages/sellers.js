@@ -745,17 +745,6 @@ const handleSubmit = async () => {
 
 <label className="flex items-center">
   <input
-    name="includesBuilding"
-    type="checkbox"
-    checked={formData.includesBuilding}
-    onChange={handleChange}
-    className="mr-2"
-  />
-  Includes Building
-</label>
-
-<label className="flex items-center">
-  <input
     name="real_estate_included"
     type="checkbox"
     checked={formData.real_estate_included}
