@@ -37,27 +37,40 @@ export default async function handler(req, res) {
   }
 
   const prompt = `
-Write a professional, buyer-friendly business-for-sale listing paragraph (max 150 words) using the following info:
+You are a professional business broker writing a buyer-friendly business-for-sale listing description.
 
-• Business Name: ${businessName || "N/A"}
-• Location: ${location || "N/A"}
-• Industry: ${industry}
-• Summary: ${sentenceSummary}
-• Customers: ${customers}
-• Best Sellers: ${bestSellers || "N/A"}
-• What customers love: ${customerLove || "N/A"}
-• Repeat Customer Info: ${repeatCustomers || "N/A"}
-• Why they return: ${keepsThemComing || "N/A"}
-• Owner involvement: ${ownerInvolvement || "N/A"}
-• What makes it a good opportunity: ${opportunity}
-• Something the owner is proud of: ${proudOf || "N/A"}
-• Advice for the next owner: ${adviceToBuyer || "N/A"}
-• Annual Revenue: $${annualRevenue || "N/A"}
-• Annual Profit: $${annualProfit || "N/A"}
-• Includes Inventory: ${includesInventory}
-• Includes Building: ${includesBuilding}
+Using the information below, write a detailed description broken into multiple paragraphs with clear headings:
 
-Tone: Clear, confident, persuasive. Format: One concise paragraph. Avoid bullet points or repetition.
+Overview:
+Financial Summary:
+What’s Included:
+Why Buy This Business:
+Investment Snapshot:
+
+Separate each section with a blank line.
+
+Here is the information:
+
+Business Name: ${businessName || "N/A"}
+Location: ${location || "N/A"}
+Industry: ${industry}
+Summary: ${sentenceSummary}
+Customers: ${customers}
+Best Sellers: ${bestSellers || "N/A"}
+What customers love: ${customerLove || "N/A"}
+Repeat Customer Info: ${repeatCustomers || "N/A"}
+Why they return: ${keepsThemComing || "N/A"}
+Owner involvement: ${ownerInvolvement || "N/A"}
+What makes it a good opportunity: ${opportunity}
+Something the owner is proud of: ${proudOf || "N/A"}
+Advice for the next owner: ${adviceToBuyer || "N/A"}
+Annual Revenue: $${annualRevenue || "N/A"}
+Annual Profit: $${annualProfit || "N/A"}
+Includes Inventory: ${includesInventory}
+Includes Building: ${includesBuilding}
+
+Tone: Clear, confident, persuasive.
+Format: Use headings and paragraphs. No bullet points.
 `;
 
   try {
@@ -92,3 +105,4 @@ Tone: Clear, confident, persuasive. Format: One concise paragraph. Avoid bullet 
     res.status(500).json({ error: 'AI generation failed', detail: error.message });
   }
 }
+
