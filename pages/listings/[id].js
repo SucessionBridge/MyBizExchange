@@ -11,6 +11,7 @@ export default function ListingDetail() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
+  const [attachment, setAttachment] = useState(null); // Add attachment state
 
   const toTitleCase = (str) =>
     str
@@ -71,41 +72,41 @@ export default function ListingDetail() {
     setLoading(false);
   }
 
- async function handleSubmit(e) {
-  e.preventDefault();
-  if (!message || !buyer || !listing) return;
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!message || !buyer || !listing) return;
 
-  const formData = new FormData();
-  formData.append('message', message);
-  formData.append('seller_id', listing.auth_id);
-  formData.append('listing_id', listing.id);
-  formData.append('buyer_name', buyer.name || buyer.full_name || buyer.email);
-  formData.append('buyer_email', buyer.email);
-  formData.append('topic', 'business-inquiry');
-  formData.append('extension', 'successionbridge');
+    const formData = new FormData();
+    formData.append('message', message);
+    formData.append('seller_id', listing.auth_id);
+    formData.append('listing_id', listing.id);
+    formData.append('buyer_name', buyer.name || buyer.full_name || buyer.email);
+    formData.append('buyer_email', buyer.email);
+    formData.append('topic', 'business-inquiry');
+    formData.append('extension', 'successionbridge');
 
-  if (attachment) formData.append('attachment', attachment); // ✅ Add file
+    if (attachment) formData.append('attachment', attachment); // ✅ Add file
 
-  try {
-    const response = await fetch('/api/send-message', {
-      method: 'POST',
-      body: formData,
-    });
+    try {
+      const response = await fetch('/api/send-message', {
+        method: 'POST',
+        body: formData,
+      });
 
-    const result = await response.json();
-    if (!response.ok) {
-      alert('Message failed to send.');
-    } else {
-      alert('✅ Message sent to the seller!');
-      setMessage('');
-      setAttachment(null);
-      setSuccess(true);
+      const result = await response.json();
+      if (!response.ok) {
+        alert('Message failed to send.');
+      } else {
+        alert('✅ Message sent to the seller!');
+        setMessage('');
+        setAttachment(null);
+        setSuccess(true);
+      }
+    } catch (err) {
+      console.error('❌ Error sending message:', err);
+      alert('Something went wrong.');
     }
-  } catch (err) {
-    console.error('❌ Error sending message:', err);
-    alert('Something went wrong.');
   }
-}
 
   async function handleSaveListing() {
     if (!buyer) {
@@ -160,7 +161,7 @@ export default function ListingDetail() {
           ← Back to Marketplace
         </a>
 
-        {/* ✅ Hero */}
+        {/* Hero */}
         <div className="relative w-full h-72 md:h-96 rounded-2xl overflow-hidden shadow-lg">
           <img src={mainImage} alt="Business" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-end p-8">
@@ -175,63 +176,59 @@ export default function ListingDetail() {
           </div>
         </div>
 
-        {/* ✅ Financial Highlights */}
-<section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-  <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-6 border-b-2 border-[#F59E0B] pb-2">
-    Financial Highlights
-  </h2>
+        {/* Financial Highlights */}
+        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+          <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-6 border-b-2 border-[#F59E0B] pb-2">
+            Financial Highlights
+          </h2>
 
-  <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-    <div className="text-3xl md:text-4xl font-bold text-emerald-700">
-      Asking Price: {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire'}
-    </div>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+            <div className="text-3xl md:text-4xl font-bold text-emerald-700">
+              Asking Price: {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire'}
+            </div>
 
-    {/* ✅ Show Green Seller Financing Tag if Yes/Maybe */}
-    {(listing.seller_financing_considered === 'yes' || listing.seller_financing_considered === 'maybe') && (
-      <span className="mt-4 md:mt-0 inline-block bg-green-100 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
-        💰 Seller Financing Terms Available on Request
-      </span>
-    )}
-{listing.seller_financing_considered &&
-  ['yes', 'maybe'].includes(listing.seller_financing_considered.toLowerCase()) && (
-    <span className="mt-4 md:mt-0 inline-block bg-green-50 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
-      Seller Financing Possible
-    </span>
-)}
+            {(listing.seller_financing_considered === 'yes' || listing.seller_financing_considered === 'maybe') && (
+              <span className="mt-4 md:mt-0 inline-block bg-green-100 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
+                💰 Seller Financing Terms Available on Request
+              </span>
+            )}
+            {listing.seller_financing_considered &&
+              ['yes', 'maybe'].includes(listing.seller_financing_considered.toLowerCase()) && (
+                <span className="mt-4 md:mt-0 inline-block bg-green-50 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
+                  Seller Financing Possible
+                </span>
+            )}
+          </div>
 
-  
-  </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-gray-800">
+            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+              <p className="text-xs uppercase text-gray-500 font-semibold">Annual Revenue</p>
+              <p className="text-lg font-bold">{listing.annual_revenue ? `$${listing.annual_revenue.toLocaleString()}` : 'N/A'}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+              <p className="text-xs uppercase text-gray-500 font-semibold">Annual Profit</p>
+              <p className="text-lg font-bold">{listing.annual_profit ? `$${listing.annual_profit.toLocaleString()}` : 'N/A'}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+              <p className="text-xs uppercase text-gray-500 font-semibold">SDE</p>
+              <p className="text-lg font-bold">{listing.sde ? `$${listing.sde.toLocaleString()}` : 'N/A'}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+              <p className="text-xs uppercase text-gray-500 font-semibold">Inventory Value</p>
+              <p className="text-lg font-bold">{listing.inventory_value ? `$${listing.inventory_value.toLocaleString()}` : 'N/A'}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+              <p className="text-xs uppercase text-gray-500 font-semibold">Equipment Value</p>
+              <p className="text-lg font-bold">{listing.equipment_value ? `$${listing.equipment_value.toLocaleString()}` : 'N/A'}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
+              <p className="text-xs uppercase text-gray-500 font-semibold">Employees</p>
+              <p className="text-lg font-bold">{listing.employees || 'N/A'}</p>
+            </div>
+          </div>
+        </section>
 
-  <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-gray-800">
-    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-      <p className="text-xs uppercase text-gray-500 font-semibold">Annual Revenue</p>
-      <p className="text-lg font-bold">{listing.annual_revenue ? `$${listing.annual_revenue.toLocaleString()}` : 'N/A'}</p>
-    </div>
-    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-      <p className="text-xs uppercase text-gray-500 font-semibold">Annual Profit</p>
-      <p className="text-lg font-bold">{listing.annual_profit ? `$${listing.annual_profit.toLocaleString()}` : 'N/A'}</p>
-    </div>
-    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-      <p className="text-xs uppercase text-gray-500 font-semibold">SDE</p>
-      <p className="text-lg font-bold">{listing.sde ? `$${listing.sde.toLocaleString()}` : 'N/A'}</p>
-    </div>
-    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-      <p className="text-xs uppercase text-gray-500 font-semibold">Inventory Value</p>
-      <p className="text-lg font-bold">{listing.inventory_value ? `$${listing.inventory_value.toLocaleString()}` : 'N/A'}</p>
-    </div>
-    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-      <p className="text-xs uppercase text-gray-500 font-semibold">Equipment Value</p>
-      <p className="text-lg font-bold">{listing.equipment_value ? `$${listing.equipment_value.toLocaleString()}` : 'N/A'}</p>
-    </div>
-    <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-      <p className="text-xs uppercase text-gray-500 font-semibold">Employees</p>
-      <p className="text-lg font-bold">{listing.employees || 'N/A'}</p>
-    </div>
-  </div>
-</section>
-
-
-        {/* ✅ Business Description */}
+        {/* Business Description */}
         <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
           <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4 border-b-2 border-[#F59E0B] pb-2">
             Business Description
@@ -243,7 +240,7 @@ export default function ListingDetail() {
           </p>
         </section>
 
-        {/* ✅ Business Details */}
+        {/* Business Details */}
         <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
           <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4 border-b-2 border-[#F59E0B] pb-2">
             Business Details
@@ -269,11 +266,35 @@ export default function ListingDetail() {
               <p className="text-xs uppercase text-gray-500 font-semibold">Financing Type</p>
               <p className="text-lg font-bold">{listing.financing_type?.replace(/-/g, ' ') || 'N/A'}</p>
             </div>
-           
+
+            {/* Website - show only if logged-in buyer */}
+            <div className="bg-gray-50 p-4 rounded-lg shadow-sm md:col-span-2">
+              <p className="text-xs uppercase text-gray-500 font-semibold">Website</p>
+              {buyer ? (
+                listing.website ? (
+                  <p className="text-lg font-bold">
+                    <a
+                      href={listing.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      {listing.website}
+                    </a>
+                  </p>
+                ) : (
+                  <p className="text-lg font-bold italic text-gray-500">Website not provided</p>
+                )
+              ) : (
+                <p className="text-lg font-bold italic text-red-600">
+                  Login to view website details
+                </p>
+              )}
+            </div>
           </div>
         </section>
 
-        {/* ✅ Additional Photos */}
+        {/* Additional Photos */}
         {otherImages.length > 0 && (
           <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
             <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4 border-b-2 border-[#F59E0B] pb-2">
@@ -286,14 +307,16 @@ export default function ListingDetail() {
                   src={url}
                   alt={`Business ${idx + 2}`}
                   className="w-full h-44 object-cover rounded-lg"
-                  onError={(e) => { e.target.src = '/placeholder-listing.jpg'; }}
+                  onError={(e) => {
+                    e.target.src = '/placeholder-listing.jpg';
+                  }}
                 />
               ))}
             </div>
           </section>
         )}
 
-        {/* ✅ AI Enhanced Deal Maker */}
+        {/* AI Enhanced Deal Maker */}
         {buyer && (
           <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
             <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4">
@@ -312,7 +335,7 @@ export default function ListingDetail() {
           </section>
         )}
 
-        {/* ✅ Buyer Actions */}
+        {/* Buyer Actions */}
         {buyer ? (
           <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
             <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4">Contact Seller</h2>
@@ -328,12 +351,12 @@ export default function ListingDetail() {
                   onChange={(e) => setMessage(e.target.value)}
                   required
                 />
-                 <input
-  type="file"
-  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png"
-  onChange={(e) => setAttachment(e.target.files[0])}
-  className="block mt-2"
-/>   
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png"
+                  onChange={(e) => setAttachment(e.target.files[0])}
+                  className="block mt-2"
+                />
                 <div className="flex flex-wrap gap-3">
                   <button
                     type="submit"
@@ -377,3 +400,4 @@ export default function ListingDetail() {
     </main>
   );
 }
+
