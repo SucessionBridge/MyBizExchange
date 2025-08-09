@@ -50,7 +50,6 @@ owner_hours_per_week: '',
     businessDescription: '',
     aiDescription: '',
     descriptionChoice: 'manual',
-    customerType: '',
     ownerInvolvement: '',
     growthPotential: '',
     reasonForSelling: '',
@@ -58,7 +57,7 @@ owner_hours_per_week: '',
     sentenceSummary: '',
     customers: '',
     bestSellers: '',
-    customerLove: '',
+     customerProfile: '',
     repeatCustomers: '',
     keepsThemComing: '',
     proudOf: '',
@@ -208,7 +207,7 @@ const handleSubmit = async () => {
       financing_type: cleanString(formData.financingType) || 'buyer-financed',
       business_description: formData.descriptionChoice === 'manual' ? cleanString(formData.businessDescription) : null,
       ai_description: formData.descriptionChoice === 'ai' ? cleanString(formData.aiDescription) : null,
-      customer_type: cleanString(formData.customerType),
+     
       marketing_method: cleanString(formData.marketingMethod),
       owner_involvement: cleanString(formData.ownerInvolvement),
       can_run_without_owner: !!formData.can_run_without_owner,
@@ -220,7 +219,7 @@ const handleSubmit = async () => {
       creative_financing: !!formData.creativeFinancing,
       willing_to_mentor: !!formData.willingToMentor,
       sentence_summary: cleanString(formData.sentenceSummary),
-      customers: cleanString(formData.customers),
+     customer_profile: cleanString(formData.customerProfile),
       best_sellers: cleanString(formData.bestSellers),
       customer_love: cleanString(formData.customerLove),
       repeat_customers: cleanString(formData.repeatCustomers),
@@ -863,13 +862,21 @@ const handleSubmit = async () => {
           ) : (
             <div className="space-y-4">
               <textarea name="businessDescription" placeholder="Brief business description" value={formData.businessDescription} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="customerType" placeholder="Customer Type" value={formData.customerType} onChange={handleChange} className="w-full border p-3 rounded" />
+            
               <input name="ownerInvolvement" placeholder="Owner Involvement" value={formData.ownerInvolvement} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="growthPotential" placeholder="Growth Potential" value={formData.growthPotential} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="reasonForSelling" placeholder="Reason for Selling" value={formData.reasonForSelling} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="trainingOffered" placeholder="Training Offered" value={formData.trainingOffered} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="sentenceSummary" placeholder="1-sentence summary of business" value={formData.sentenceSummary} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="customers" placeholder="Who are your customers?" value={formData.customers} onChange={handleChange} className="w-full border p-3 rounded" />
+             <textarea
+  name="customerProfile"
+  placeholder="Describe your typical customers (type, demographics, preferences)"
+  value={formData.customerProfile}
+  onChange={handleChange}
+  className="w-full border p-3 rounded"
+  rows={3}
+/>
+
               <input name="bestSellers" placeholder="What are your best-selling products/services?" value={formData.bestSellers} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="customerLove" placeholder="What do customers love most?" value={formData.customerLove} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="repeatCustomers" placeholder="How many are repeat buyers?" value={formData.repeatCustomers} onChange={handleChange} className="w-full border p-3 rounded" />
