@@ -197,6 +197,7 @@ export default function ListingDetail() {
                   ? 'Confidential Business Listing'
                   : listing.business_name || `${listing.industry} Business`
               )}
+              <p className="text-sm text-gray-400 font-mono mb-2">Ad ID: {listing.ad_id}</p>
             </h1>
             <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
           </div>
@@ -433,3 +434,4 @@ export default function ListingDetail() {
     </main>
   );
 }
+
