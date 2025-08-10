@@ -20,7 +20,7 @@ export default function BuyerOnboarding() {
     willingToRelocate: 'No',
     city: '',
     stateOrProvince: '',
-    video: null,
+    video: null, // can be video OR image file
     budgetForPurchase: '',
     priority_one: '',
     priority_two: '',
@@ -67,6 +67,7 @@ export default function BuyerOnboarding() {
           priority_two: existingProfile.priority_two || '',
           priority_three: existingProfile.priority_three || ''
         }));
+        // If you already have media stored, you could also prefill a preview here.
       }
     };
     checkExistingProfile();
@@ -80,10 +81,18 @@ export default function BuyerOnboarding() {
 
   const handleVideoUpload = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setFormData(prev => ({ ...prev, video: file }));
-      setVideoPreview(URL.createObjectURL(file));
+    if (!file) return;
+
+    // quick client-side guardrails (optional)
+    const maxMB = 50; // keep generous; you can lower this
+    if (file.size > maxMB * 1024 * 1024) {
+      setErrorMessage(`File too large. Max ${maxMB}MB.`);
+      return;
     }
+
+    setErrorMessage('');
+    setFormData(prev => ({ ...prev, video: file }));
+    setVideoPreview(URL.createObjectURL(file));
   };
 
   const validateForm = () => {
@@ -98,12 +107,49 @@ export default function BuyerOnboarding() {
     return true;
   };
 
+  // Upload media to Supabase Storage (if provided)
+  const uploadIntroMedia = async (userId) => {
+    if (!formData.video) return { url: null, type: null }; // nothing to upload
+
+    try {
+      setIsUploading(true);
+      const file = formData.video;
+      const ext = file.name?.split('.').pop()?.toLowerCase() || (file.type.startsWith('image') ? 'jpg' : 'mp4');
+      const kind = file.type.startsWith('image') ? 'image' : 'video';
+      const path = `buyers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+      const { error: upErr } = await supabase.storage
+        .from('buyer-media')
+        .upload(path, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type || (kind === 'image' ? 'image/jpeg' : 'video/mp4')
+        });
+
+      if (upErr) {
+        console.error('Upload error:', upErr);
+        setErrorMessage('Upload failed. Please try a smaller file or a different format.');
+        return { url: null, type: null };
+      }
+
+      const { data: pub } = supabase.storage.from('buyer-media').getPublicUrl(path);
+      return { url: pub.publicUrl || null, type: kind };
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return alert('You must be logged in to submit.');
 
+    // 1) Upload media if provided
+    const { url: introUrl, type: introType } = await uploadIntroMedia(user.id);
+
+    // 2) Build payload
     const payload = {
       auth_id: user.id,
       name: formData.name,
@@ -120,25 +166,48 @@ export default function BuyerOnboarding() {
       budget_for_purchase: formData.budgetForPurchase,
       priority_one: formData.priority_one,
       priority_two: formData.priority_two,
-      priority_three: formData.priority_three
+      priority_three: formData.priority_three,
+      // 👇 add these columns to your `buyers` table:
+      intro_media_url: introUrl,
+      intro_media_type: introType, // 'image' | 'video' | null
     };
 
+    // 3) Save/update profile
     if (existingId) {
-      await supabase.from('buyers').update(payload).eq('id', existingId);
+      const { error } = await supabase.from('buyers').update(payload).eq('id', existingId);
+      if (error) {
+        console.error(error);
+        setErrorMessage('Could not update your profile right now.');
+        return;
+      }
     } else {
-      await supabase.from('buyers').insert([payload]);
+      const { error } = await supabase.from('buyers').insert([payload]);
+      if (error) {
+        console.error(error);
+        setErrorMessage('Could not create your profile right now.');
+        return;
+      }
     }
+
     router.push('/buyer-dashboard');
   };
 
   return (
-    <main className="min-h-screen bg-blue-50 p-8">
-      <div className="max-w-2xl mx-auto bg-white p-6 rounded shadow">
-        <h1 className="text-3xl font-bold mb-6 text-center">
+    <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
+      <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center">
           {existingId ? 'Edit Buyer Profile' : 'Buyer Onboarding'}
         </h1>
 
-        {errorMessage && <p className="text-red-500 mb-4">{errorMessage}</p>}
+        {/* Trust banner – emphasize for seller financing */}
+        <div className="mt-3 mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4">
+          <p className="text-sm text-amber-900">
+            <strong>Optional but recommended:</strong> add a short video or photo introduction.
+            This is <em>only shared with sellers you contact</em>. It’s especially important if you’re requesting <strong>seller financing</strong>—sellers want to know who they’re trusting with their business.
+          </p>
+        </div>
+
+        {errorMessage && <p className="text-red-600 mb-4">{errorMessage}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
@@ -177,7 +246,7 @@ export default function BuyerOnboarding() {
               className="w-full border p-3 rounded text-black" />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Available Capital</label>
               <input type="number" name="capitalInvestment" value={formData.capitalInvestment}
@@ -221,50 +290,56 @@ export default function BuyerOnboarding() {
             </select>
           </div>
 
-         <div>
-  <label className="block text-sm font-medium mb-1">Upload Intro Video or Photo</label>
-  <input
-    type="file"
-    accept="video/*,image/*"
-    onChange={handleVideoUpload}
-    className="w-full border p-3 rounded"
-  />
-  <p className="text-xs text-gray-500 mt-1">
-    Record a 30–60s video OR upload a clear photo. Sellers are more likely to trust buyers who show their face.
-  </p>
+          {/* Intro media (video OR photo) */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Upload Intro Video or Photo</label>
+            <input
+              type="file"
+              accept="video/*,image/*"
+              onChange={handleVideoUpload}
+              className="w-full border p-3 rounded"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Record a 30–60s video OR upload a clear photo. <strong>Only shared with sellers you contact.</strong>
+            </p>
 
-  {videoPreview && (
-    <div className="mt-3">
-      {formData.video?.type?.startsWith('image') ? (
-        <img src={videoPreview} alt="Preview" className="w-48 rounded border" />
-      ) : (
-        <video width="200" controls className="rounded border">
-          <source src={videoPreview} />
-        </video>
-      )}
+            {videoPreview && (
+              <div className="mt-3">
+                {formData.video?.type?.startsWith('image') ? (
+                  <img src={videoPreview} alt="Preview" className="w-48 rounded border" />
+                ) : (
+                  <video width="240" controls className="rounded border">
+                    <source src={videoPreview} />
+                  </video>
+                )}
 
-      <button
-        type="button"
-        onClick={() => {
-          setFormData(prev => ({ ...prev, video: null }));
-          setVideoPreview(null);
-        }}
-        className="mt-2 text-sm text-red-600 hover:underline block"
-      >
-        Remove file
-      </button>
-    </div>
-  )}
-</div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, video: null }));
+                    setVideoPreview(null);
+                  }}
+                  className="mt-2 text-sm text-red-600 hover:underline block"
+                >
+                  Remove file
+                </button>
+              </div>
+            )}
+          </div>
 
-
-          <button type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold">
-            {existingId ? 'Update Buyer Profile' : 'Submit Buyer Profile'}
+          <button
+            type="submit"
+            disabled={isUploading}
+            className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold disabled:opacity-60"
+          >
+            {isUploading
+              ? 'Uploading...'
+              : existingId ? 'Update Buyer Profile' : 'Submit Buyer Profile'}
           </button>
         </form>
       </div>
     </main>
   );
 }
+
  
