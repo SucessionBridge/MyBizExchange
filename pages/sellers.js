@@ -202,6 +202,7 @@ const handleSubmit = async () => {
       relocatable: !!formData.relocatable,
       home_based: !!formData.home_based,
       financing_type: cleanString(formData.financingType) || 'buyer-financed',
+      description_choice: formData.descriptionChoice,
       business_description: formData.descriptionChoice === 'manual' ? cleanString(formData.businessDescription) : null,
       ai_description: formData.descriptionChoice === 'ai' ? cleanString(formData.aiDescription) : null,
      
