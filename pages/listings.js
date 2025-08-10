@@ -170,7 +170,6 @@ export default function Listings() {
 
       if (debouncedTerm !== '') {
         if (looksLikeAd) {
-          // If user is typing an ad number but hasn't submitted yet, we can narrow to that ad
           const adNum = adMatch[1];
           query = query.eq('ad_id', adNum);
         } else {
@@ -244,7 +243,6 @@ export default function Listings() {
           return; // stop; we navigated
         } else {
           setSearchError(`No listing found for Ad #${adNum}. Showing search results instead.`);
-          // fall through to normal search results
         }
       } catch (err) {
         console.error('Ad lookup failed:', err);
@@ -273,25 +271,26 @@ export default function Listings() {
 
         {/* 🔍 Unified Search (keywords or Ad #) */}
         <form onSubmit={handleSearchSubmit} className="max-w-xl mx-auto mb-2">
-          <div className="flex items-center space-x-3">
+          {/* Responsive grid prevents the Clear button from drifting on mobile */}
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-3">
             <input
               type="text"
               placeholder="Search listings or Ad #"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="flex-grow px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#1E3A8A] focus:border-[#1E3A8A]"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#1E3A8A] focus:border-[#1E3A8A]"
               aria-label="Search listings or by Ad number"
             />
             <button
               type="submit"
-              className="bg-[#1E3A8A] text-white px-5 py-3 rounded-lg font-semibold hover:bg-[#0f2357] transition"
+              className="w-full sm:w-auto bg-[#1E3A8A] text-white px-5 py-3 rounded-lg font-semibold hover:bg-[#0f2357] transition"
             >
               Search
             </button>
             <button
               type="button"
               onClick={() => { setSearchTerm(''); setDebouncedTerm(''); setSearchError(''); }}
-              className="bg-gray-100 text-gray-800 px-4 py-3 rounded-lg hover:bg-gray-200 border"
+              className="w-full sm:w-auto bg-gray-100 text-gray-800 px-4 py-3 rounded-lg hover:bg-gray-200 border"
               aria-label="Clear search"
             >
               Clear
@@ -330,14 +329,15 @@ export default function Listings() {
             ))}
           </div>
 
-          <div className="flex justify-center space-x-4">
+          {/* Buttons: stack on mobile to avoid overlap, row on sm+ */}
+          <div className="flex flex-col sm:flex-row sm:justify-center gap-3">
             <Link href="/buyer-onboarding">
-              <a className="bg-[#1E3A8A] hover:bg-[#0f2357] text-white px-6 py-3 rounded-lg font-semibold shadow">
+              <a className="w-full sm:w-auto text-center bg-[#1E3A8A] hover:bg-[#0f2357] text-white px-6 py-3 rounded-lg font-semibold shadow">
                 Create Buyer Profile
               </a>
             </Link>
             <Link href="/login">
-              <a className="bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold border">
+              <a className="w-full sm:w-auto text-center bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold border">
                 Login
               </a>
             </Link>
@@ -374,4 +374,3 @@ export default function Listings() {
     </div>
   );
 }
-
