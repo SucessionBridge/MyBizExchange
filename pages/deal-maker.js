@@ -70,10 +70,11 @@ export default function DealMaker() {
       }
 
       const data = await res.json();
-      // Ensure we can split on "Deal N:" headings
-      const rawDeals = (data.summary || '').split(/Deal \d:/).filter(Boolean);
-      const formatted = rawDeals.map((d, i) => `Deal ${i + 1}:${d.trim()}`);
-      setDeals(formatted);
+      const parsed = parseDeals(data.summary || '');
+      if (!parsed.length) {
+        setError('The AI response did not include any recognizable deals. Please try again.');
+      }
+      setDeals(parsed);
     } catch (err) {
       console.error('❌ Deal generation error:', err);
       setError('Something went wrong while generating deals.');
@@ -307,6 +308,62 @@ export default function DealMaker() {
       )}
     </main>
   );
+}
+
+/** ------- robust deal parser so "Deal 1" never disappears ------- */
+function parseDeals(text) {
+  if (!text) return [];
+  const t = String(text).replace(/\r/g, '');
+
+  // Primary: match headings like "Deal 1:", "**Deal 1:**", "### Deal 1:", etc.
+  const headerRe = /(^|\n)\s*(?:\*\*|__|###?\s*)?\s*Deal\s*(\d+)\s*(?:[:：.\-)]\s*)/gi;
+  const matches = [];
+  let m;
+  while ((m = headerRe.exec(t)) !== null) {
+    const headingIndex = m.index + (m[1] ? m[1].length : 0);
+    matches.push({
+      num: Number(m[2]),
+      headingIndex,
+      contentStart: headerRe.lastIndex,
+    });
+  }
+  if (matches.length) {
+    const out = [];
+    for (let i = 0; i < matches.length; i++) {
+      const start = matches[i].contentStart;
+      const end = i + 1 < matches.length ? matches[i + 1].headingIndex : t.length;
+      const content = t.slice(start, end).trim();
+      if (content) out.push(`Deal ${matches[i].num}:${content}`);
+    }
+    return out;
+  }
+
+  // Fallback: "Option 1:" or "1)"/"1." style
+  const altRe = /(^|\n)\s*(?:\*\*|__|###?\s*)?\s*(?:Deal|Option)?\s*(\d+)\s*[\):：.\-]\s*/gi;
+  const altMatches = [];
+  let a;
+  while ((a = altRe.exec(t)) !== null) {
+    const headingIndex = a.index + (a[1] ? a[1].length : 0);
+    altMatches.push({
+      num: Number(a[2]),
+      headingIndex,
+      contentStart: altRe.lastIndex,
+    });
+  }
+  if (altMatches.length) {
+    const out = [];
+    for (let i = 0; i < altMatches.length; i++) {
+      const start = altMatches[i].contentStart;
+      const end = i + 1 < altMatches.length ? altMatches[i + 1].headingIndex : t.length;
+      const content = t.slice(start, end).trim();
+      if (content) out.push(`Deal ${altMatches[i].num}:${content}`);
+    }
+    return out;
+  }
+
+  // Last resort: one big deal
+  const clean = t.trim();
+  return clean ? [`Deal 1:${clean}`] : [];
 }
 
 /** ------- helpers for recap (minimal, client-side) ------- */
