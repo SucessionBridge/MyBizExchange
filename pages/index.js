@@ -177,20 +177,19 @@ export default function Home() {
                           : placeholder;
 
                       return (
-                       <Link key={listing.id} href={`/listings/${listing.id}`}>
+    <Link key={listing.id} href={`/listings/${listing.id}`}>
   <a
     data-card
     className="
       relative z-10 snap-center shrink-0 w-[90vw] max-w-[420px]
-      rounded-xl bg-white p-2
-      outline outline-2 outline-blue-400
-      shadow-lg
-      md:p-0 md:outline-none md:shadow-none
-      transition-shadow
+      rounded-xl overflow-hidden bg-white
+      ring-1 ring-gray-400 border border-gray-300 shadow-md
+      md:ring-0 md:border md:border-gray-200 md:shadow-none
+      hover:shadow-lg transition-shadow
+      focus:outline-none
     "
   >
-    {/* Image container shares radius and hides overflow */}
-    <div className="overflow-hidden rounded-lg bg-gray-50">
+    <div className="overflow-hidden bg-gray-50">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={cover}
@@ -201,7 +200,7 @@ export default function Home() {
       />
     </div>
 
-    <div className="p-3">
+    <div className="p-4">
       <h3 className="text-[17px] font-semibold text-blue-700 leading-snug line-clamp-2">
         {listing.business_name || 'Unnamed Business'}
       </h3>
@@ -223,6 +222,7 @@ export default function Home() {
     </div>
   </a>
 </Link>
+       
  
                       );
                     })}
