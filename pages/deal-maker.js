@@ -55,11 +55,13 @@ export default function DealMaker() {
     setDeals([]);
 
     try {
+      // 👇 robust flag + passed to API
+      const allowSellerCarry = computeAllowSellerCarry(listing);
+
       const res = await fetch('/api/generate-deal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // send your raw rows exactly as before
-        body: JSON.stringify({ listing, buyer }),
+        body: JSON.stringify({ listing, buyer, allowSellerCarry }),
       });
 
       if (!res.ok) {
@@ -111,13 +113,11 @@ export default function DealMaker() {
     return <div className="p-8 text-center text-gray-600">Loading deal maker...</div>;
   }
 
-  // Seller carry allowed? (yes/maybe = true, no = false)
-  const allowSellerCarry = ['yes','maybe'].includes(
-    String(listing?.seller_financing_considered || '').toLowerCase()
-  );
+  // ✅ use the same robust rule in UI + recap
+  const allowSellerCarry = computeAllowSellerCarry(listing);
 
   // Recap numbers so the buyer understands what they're sending
-  const recap = computeRecap(listing, buyer);
+  const recap = computeRecap(listing, buyer, allowSellerCarry);
 
   return (
     <main className="bg-gray-50 min-h-screen py-8 px-4">
@@ -188,48 +188,13 @@ export default function DealMaker() {
               </div>
             )}
 
-            {/* When seller says NO to seller financing, show options instead of the single button */}
-            {!allowSellerCarry && (
-              <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                <div className="font-semibold">This seller isn’t offering seller financing</div>
-                <p className="mt-1">Choose an option below:</p>
-
-                <div className="mt-3 flex flex-col sm:flex-row gap-2">
-                  {/* Option A: bank/investor-funded structures (your existing flow) */}
-                  <button
-                    onClick={generateDeals}
-                    disabled={loading}
-                    className="inline-flex justify-center items-center rounded-md bg-emerald-600 px-4 py-2.5 text-white hover:bg-emerald-700 disabled:bg-emerald-300"
-                  >
-                    {loading ? 'Generating…' : 'Generate Bank-Funded Options'}
-                  </button>
-
-                  {/* Option B: browse seller-financed listings */}
-                  <a
-                    href="/listings?seller_financing=yes-or-maybe"
-                    className="inline-flex justify-center items-center rounded-md border border-gray-300 bg-white px-4 py-2.5 text-gray-800 hover:bg-gray-50"
-                  >
-                    Find Seller-Financed Listings
-                  </a>
-                </div>
-
-                <ul className="mt-3 list-disc pl-5 text-[12px] text-amber-900/90">
-                  <li>Bank-funded deals typically combine buyer equity + bank/SBA/conventional loan.</li>
-                  <li>Seller-financed listings can allow lower cash down and more flexible terms.</li>
-                </ul>
-              </div>
-            )}
-
-            {/* Default path (seller says Yes/Maybe) */}
-            {allowSellerCarry && (
-              <button
-                onClick={generateDeals}
-                disabled={loading}
-                className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 mb-6"
-              >
-                {loading ? 'Generating Deals…' : 'Generate 3 Deal Options'}
-              </button>
-            )}
+            <button
+              onClick={generateDeals}
+              disabled={loading}
+              className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 mb-6"
+            >
+              {loading ? 'Generating Deals...' : (allowSellerCarry ? 'Generate 3 Deal Options' : 'Generate Bank-Funded Options')}
+            </button>
 
             {loading && (
               <div className="flex justify-center items-center py-6">
@@ -320,12 +285,6 @@ export default function DealMaker() {
               )}
             </div>
 
-            {/* Note for no-carry sellers */}
-            {!allowSellerCarry && (
-              <div className="mr-auto text-sm text-gray-600">
-                Note: This seller is not offering seller financing. The proposal you’re sending is cash-at-close.
-              </div>
-            )}
             <div className="mt-4 flex justify-end gap-3">
               <button
                 onClick={() => setReviewOpen(false)}
@@ -412,8 +371,31 @@ function parseDeals(text) {
   return clean ? [`Deal 1:${clean}`] : [];
 }
 
+/** ------- shared helper: does this listing allow seller carry? ------- */
+function computeAllowSellerCarry(listing) {
+  const sfRaw = String(
+    listing?.seller_financing_considered ?? listing?.sellerFinancingConsidered ?? ''
+  ).toLowerCase().trim();
+  const byFlag = ['yes', 'maybe', 'true', '1'].includes(sfRaw);
+
+  const ftRaw = String(
+    listing?.financing_type ?? listing?.financingType ?? ''
+  ).toLowerCase();
+  const ftNorm = ftRaw.replace(/\s+/g, '-'); // "Seller Financed" -> "seller-financed"
+  const byType = /seller/.test(ftNorm) || /owner/.test(ftNorm) || /rent/.test(ftNorm);
+
+  // If seller entered note terms, assume carry is acceptable
+  const hasTerms =
+    Number(listing?.down_payment) > 0 ||
+    Number(listing?.term_length) > 0 ||
+    Number(listing?.interest_rate) > 0 ||
+    Number(listing?.seller_financing_interest_rate) > 0;
+
+  return byFlag || byType || hasTerms;
+}
+
 /** ------- helpers for recap (minimal, client-side) ------- */
-function computeRecap(listing, buyer) {
+function computeRecap(listing, buyer, allowSellerCarry) {
   const num = (v) => (v === 0 || v) ? (Number.isFinite(Number(v)) ? Number(v) : null) : null;
   const money = (n) => (n == null ? 'N/A' : `$${Number(n).toLocaleString()}`);
 
@@ -453,12 +435,8 @@ function computeRecap(listing, buyer) {
     else gapBucket = 'far';
   }
 
-  // If seller said NO to carry, do not suggest bridge/credits in recap
-  const sellerCarryAllowed = ['yes','maybe'].includes(
-    String(listing?.seller_financing_considered || '').toLowerCase()
-  );
-
-  let useBridge = (!sellerCarryAllowed ? false : ((downOk === false) || gapBucket === 'moderate' || gapBucket === 'far'));
+  // Respect allowSellerCarry in all suggestions
+  let useBridge = (allowSellerCarry && ((downOk === false) || gapBucket === 'moderate' || gapBucket === 'far'));
   let bridgeMonths = 18;
   if (useBridge && ask && downShort != null) {
     const shortPct = (downShort / ask) * 100;
@@ -466,10 +444,10 @@ function computeRecap(listing, buyer) {
     else if (shortPct <= 5 && gapBucket === 'near') bridgeMonths = 12;
   }
 
-  // Equity-credit suggestion if shortfall is modest (≤12% of price) AND seller allows carry
+  // Equity-credit suggestion if shortfall is modest (≤12% of price) AND carry is allowed
   let equityCreditMonthly = 0;
   let equityCreditCap = 0;
-  if (sellerCarryAllowed && useBridge && ask && requiredDown != null && capital != null) {
+  if (allowSellerCarry && useBridge && ask && requiredDown != null && capital != null) {
     const shortNow = Math.max(0, requiredDown - capital);
     const shortPctOfPrice = ask ? (shortNow / ask) * 100 : 0;
     if (shortNow > 0 && shortPctOfPrice <= 12) {
@@ -493,4 +471,5 @@ function computeRecap(listing, buyer) {
     money,
   };
 }
+
 
