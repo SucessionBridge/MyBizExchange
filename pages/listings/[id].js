@@ -186,23 +186,26 @@ export default function ListingDetail() {
         >
           ← Back to Marketplace
         </a>
+  
+{/* Hero */}
+<div className="relative w-full h-72 md:h-96 rounded-2xl overflow-hidden shadow-lg">
+  <img src={mainImage} alt="Business" className="w-full h-full object-cover" />
+  <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-end p-8">
+    <h1 className="text-4xl md:text-5xl font-serif font-bold text-white drop-shadow-lg">
+      {toTitleCase(
+        listing.hide_business_name
+          ? 'Confidential Business Listing'
+          : listing.business_name || `${listing.industry} Business`
+      )}
+    </h1>
+    <p className="bg-black bg-opacity-60 text-white px-3 py-1 rounded text-sm font-mono inline-block mt-2">
+      Ad ID: {listing.ad_id}
+    </p>
+    <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
+  </div>
+</div>
 
-        {/* Hero */}
-        <div className="relative w-full h-72 md:h-96 rounded-2xl overflow-hidden shadow-lg">
-          <img src={mainImage} alt="Business" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-end p-8">
-            <h1 className="text-4xl md:text-5xl font-serif font-bold text-white drop-shadow-lg">
-              {toTitleCase(
-                listing.hide_business_name
-                  ? 'Confidential Business Listing'
-                  : listing.business_name || `${listing.industry} Business`
-              )}
-              <p className="text-sm text-gray-400 font-mono mb-2">Ad ID: {listing.ad_id}</p>
-            </h1>
-            <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
-          </div>
-        </div>
-
+       
         {/* Financial Highlights */}
         <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
           <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-6 border-b-2 border-[#F59E0B] pb-2">
