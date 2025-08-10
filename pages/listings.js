@@ -155,20 +155,24 @@ export default function Listings() {
           asking_price,
           financing_type,
           created_at,
-          ad_id
+          ad_id,
+          status
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .eq('status', 'active'); // Only active listings
 
       if (debouncedTerm !== '') {
         if (isAdIdSearch) {
           query = query.eq('ad_id', debouncedTerm.toUpperCase());
         } else {
-          // Search by multiple text fields if not an Ad ID
           query = query.or(
             `business_name.ilike.%${debouncedTerm}%,industry.ilike.%${debouncedTerm}%,location.ilike.%${debouncedTerm}%,business_description.ilike.%${debouncedTerm}%,ai_description.ilike.%${debouncedTerm}%`
           );
         }
       }
+
+      // Ensure we still filter by active status after search filters
+      query = query.eq('status', 'active');
 
       const { data, error } = await query;
 
@@ -308,4 +312,3 @@ export default function Listings() {
     </div>
   );
 }
-
