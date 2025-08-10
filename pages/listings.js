@@ -329,15 +329,15 @@ export default function Listings() {
             ))}
           </div>
 
-          {/* Buttons: stack on mobile to avoid overlap, row on sm+ */}
-          <div className="flex flex-col sm:flex-row sm:justify-center gap-3">
+          {/* Buttons: **grid** to avoid any overlap on mobile; row on sm+ */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Link href="/buyer-onboarding">
-              <a className="w-full sm:w-auto text-center bg-[#1E3A8A] hover:bg-[#0f2357] text-white px-6 py-3 rounded-lg font-semibold shadow">
+              <a className="block w-full text-center bg-[#1E3A8A] hover:bg-[#0f2357] text-white px-6 py-3 rounded-lg font-semibold shadow">
                 Create Buyer Profile
               </a>
             </Link>
             <Link href="/login">
-              <a className="w-full sm:w-auto text-center bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold border">
+              <a className="block w-full text-center bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold border">
                 Login
               </a>
             </Link>
@@ -374,3 +374,4 @@ export default function Listings() {
     </div>
   );
 }
+
