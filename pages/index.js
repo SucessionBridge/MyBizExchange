@@ -178,9 +178,11 @@ export default function Home() {
                         <Link key={listing.id} href={`/listings/${listing.id}`}>
                           <a
                             data-card
-                            className="snap-center shrink-0 w-[90vw] max-w-[420px] rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow"
+                            className="snap-center shrink-0 w-[90vw] max-w-[420px] rounded-xl overflow-hidden 
+ring-1 ring-gray-200 shadow-sm md:ring-0 md:shadow-none 
+border border-gray-200 bg-white hover:shadow-md transition-shadow"
                           >
-                            <div className="bg-gray-100 overflow-hidden">
+                            <div className="bg-gray-50 md:bg-gray-100 overflow-hidden">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={cover}
@@ -387,3 +389,4 @@ export default function Home() {
     </main>
   );
 }
+
