@@ -1,5 +1,5 @@
 
-}// pages/buyer-onboarding.js
+// pages/buyer-onboarding.js
 import { useRouter } from 'next/router';
 import supabase from "../lib/supabaseClient";
 import React, { useState, useEffect } from 'react';
