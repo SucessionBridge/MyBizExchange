@@ -177,51 +177,59 @@ export default function Home() {
                           : placeholder;
 
                       return (
-    <Link key={listing.id} href={`/listings/${listing.id}`}>
-  <a
-    data-card
-    className="
-      relative z-10 snap-center shrink-0 w-[90vw] max-w-[420px]
-      rounded-xl overflow-hidden bg-white
-      ring-1 ring-gray-400 border border-gray-300 shadow-md
-      md:ring-0 md:border md:border-gray-200 md:shadow-none
-      hover:shadow-lg transition-shadow
-      focus:outline-none
-    "
-  >
-    <div className="overflow-hidden bg-gray-50">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={cover}
-        alt={listing.business_name || 'Business listing'}
-        className="block w-full h-auto aspect-[4/3] object-cover object-center"
-        loading="lazy"
-        onError={(e) => { e.currentTarget.src = placeholder; }}
-      />
-    </div>
-
-    <div className="p-4">
-      <h3 className="text-[17px] font-semibold text-blue-700 leading-snug line-clamp-2">
-        {listing.business_name || 'Unnamed Business'}
-      </h3>
-      <div className="mt-2 flex items-center justify-between">
-        <p className="text-[15px] font-semibold text-gray-900">
-          {listing.asking_price ? `$${Number(listing.asking_price).toLocaleString()}` : 'Inquire'}
-        </p>
-        <p className="text-[14px] text-gray-600 truncate max-w-[55%] text-right">
-          {listing.location || 'Location undisclosed'}
-        </p>
+   <div
+  key={listing.id}
+  data-card
+  className="
+    snap-center shrink-0 w-[90vw] max-w-[420px]
+    p-1 rounded-2xl bg-gray-300/40
+    md:p-0 md:bg-transparent
+  "
+>
+  <Link href={`/listings/${listing.id}`}>
+    <a
+      className="
+        block rounded-xl overflow-hidden
+        bg-white border border-gray-400 shadow-md
+        md:border md:border-gray-200 md:shadow-none
+        hover:shadow-lg transition-shadow focus:outline-none
+      "
+    >
+      <div className="bg-gray-50 overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={cover}
+          alt={listing.business_name || 'Business listing'}
+          className="block w-full h-auto aspect-[4/3] object-cover object-center"
+          loading="lazy"
+          onError={(e) => { e.currentTarget.src = placeholder; }}
+        />
       </div>
-      {listing.ad_id ? (
-        <div className="mt-2">
-          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-            Ad #{listing.ad_id}
-          </span>
+
+      <div className="p-4">
+        <h3 className="text-[17px] font-semibold text-blue-700 leading-snug line-clamp-2">
+          {listing.business_name || 'Unnamed Business'}
+        </h3>
+        <div className="mt-2 flex items-center justify-between">
+          <p className="text-[15px] font-semibold text-gray-900">
+            {listing.asking_price ? `$${Number(listing.asking_price).toLocaleString()}` : 'Inquire'}
+          </p>
+          <p className="text-[14px] text-gray-600 truncate max-w-[55%] text-right">
+            {listing.location || 'Location undisclosed'}
+          </p>
         </div>
-      ) : null}
-    </div>
-  </a>
-</Link>
+        {listing.ad_id ? (
+          <div className="mt-2">
+            <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+              Ad #{listing.ad_id}
+            </span>
+          </div>
+        ) : null}
+      </div>
+    </a>
+  </Link>
+</div>
+
        
  
                       );
