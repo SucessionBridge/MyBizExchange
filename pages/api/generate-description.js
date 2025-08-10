@@ -7,7 +7,7 @@ export default async function handler(req, res) {
 
   const {
     sentenceSummary,
-    customers,
+    customerProfile,    // updated here
     bestSellers,
     customerLove,
     repeatCustomers,
@@ -25,8 +25,8 @@ export default async function handler(req, res) {
     includesBuilding
   } = req.body;
 
-  // Better error messaging
-  const requiredFields = { sentenceSummary, customers, opportunity, industry };
+  // Better error messaging with updated field name
+  const requiredFields = { sentenceSummary, customerProfile, opportunity, industry };
   const missing = Object.entries(requiredFields).filter(([_, v]) => !v);
   if (missing.length > 0) {
     return res.status(400).json({ error: `Missing required fields: ${missing.map(([k]) => k).join(', ')}` });
@@ -55,7 +55,7 @@ Business Name: ${businessName || "N/A"}
 Location: ${location || "N/A"}
 Industry: ${industry}
 Summary: ${sentenceSummary}
-Customers: ${customers}
+Customers: ${customerProfile}
 Best Sellers: ${bestSellers || "N/A"}
 What customers love: ${customerLove || "N/A"}
 Repeat Customer Info: ${repeatCustomers || "N/A"}
@@ -105,4 +105,3 @@ Format: Use headings and paragraphs. No bullet points.
     res.status(500).json({ error: 'AI generation failed', detail: error.message });
   }
 }
-
