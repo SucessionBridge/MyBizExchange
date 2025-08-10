@@ -7,7 +7,7 @@ export default function Home() {
   const router = useRouter();
   const [featuredListings, setFeaturedListings] = useState([]);
 
-  // Mobile carousel helpers (BizBuySell-style)
+  // Mobile carousel helpers
   const [activeSlide, setActiveSlide] = useState(0);
   const carouselRef = useRef(null);
 
@@ -66,7 +66,7 @@ export default function Home() {
         .select("id, business_name, location, asking_price, ad_id, image_urls")
         .eq("status", "active")
         .order("created_at", { ascending: false })
-        .limit(6);
+        .limit(8);
 
       if (!error && data) {
         setFeaturedListings(data);
@@ -80,7 +80,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937] font-sans">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-7xl mx-auto">{/* widened for 4-up grid */}
 
         {/* ✅ Hero Section */}
         <section
@@ -127,7 +127,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ⭐️ Featured Listings — BizBuySell-style mobile, clean desktop grid */}
+        {/* ⭐️ Featured Listings — BizBuySell-style mobile; 4-up desktop */}
         <section className="bg-white rounded-xl p-6 sm:p-8 mb-16 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
             <h2 className="text-2xl sm:text-3xl font-semibold text-[#2E3A59]">Featured Listings</h2>
@@ -140,14 +140,11 @@ export default function Home() {
             <p className="text-center text-gray-600">No listings available at the moment.</p>
           ) : (
             <>
-              {/* Mobile carousel: single big card, 4:3 image, blue title, price + location row */}
+              {/* Mobile carousel */}
               <div className="md:hidden">
                 <div className="relative -mx-4 px-4">
-                  {/* edge fades */}
                   <div className="pointer-events-none absolute left-0 top-0 h-full w-6 bg-gradient-to-r from-white to-transparent" />
                   <div className="pointer-events-none absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-white to-transparent" />
-
-                  {/* nav buttons */}
                   <button
                     type="button"
                     onClick={() => scrollByCard(-1)}
@@ -193,12 +190,9 @@ export default function Home() {
                             </div>
 
                             <div className="p-4">
-                              {/* Title in blue like BizBuySell; two-line clamp */}
                               <h3 className="text-[17px] font-semibold text-blue-700 leading-snug line-clamp-2">
                                 {listing.business_name || "Unnamed Business"}
                               </h3>
-
-                              {/* Price + Location row */}
                               <div className="mt-2 flex items-center justify-between">
                                 <p className="text-[15px] font-semibold text-gray-900">
                                   {listing.asking_price
@@ -209,8 +203,6 @@ export default function Home() {
                                   {listing.location || "Location undisclosed"}
                                 </p>
                               </div>
-
-                              {/* Ad pill, subtle */}
                               {listing.ad_id ? (
                                 <div className="mt-2">
                                   <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
@@ -225,7 +217,6 @@ export default function Home() {
                     })}
                   </div>
 
-                  {/* dots */}
                   <div className="mt-3 flex items-center justify-center gap-1.5">
                     {featuredListings.map((_, i) => (
                       <span
@@ -239,8 +230,8 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Desktop grid – clean cards */}
-              <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Desktop grid — now 4 across on lg */}
+              <div className="hidden md:grid grid-cols-3 lg:grid-cols-4 gap-5">
                 {featuredListings.map((listing) => {
                   const cover =
                     Array.isArray(listing.image_urls) && listing.image_urls.length > 0
@@ -259,23 +250,23 @@ export default function Home() {
                             loading="lazy"
                           />
                         </div>
-                        <div className="p-4">
-                          <h3 className="text-lg font-semibold text-blue-700 line-clamp-2 min-h-[48px]">
+                        <div className="p-3">{/* tighter padding to fit 4-up */}
+                          <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
                             {listing.business_name || "Unnamed Business"}
                           </h3>
-                          <div className="mt-2 flex items-center justify-between">
-                            <p className="text-base font-semibold text-gray-900">
+                          <div className="mt-1.5 flex items-center justify-between">
+                            <p className="text-[14px] font-semibold text-gray-900">
                               {listing.asking_price
                                 ? `$${Number(listing.asking_price).toLocaleString()}`
                                 : "Inquire"}
                             </p>
-                            <p className="text-sm text-gray-600 truncate max-w-[60%] text-right">
+                            <p className="text-[13px] text-gray-600 truncate max-w-[60%] text-right">
                               {listing.location || "Location undisclosed"}
                             </p>
                           </div>
                           {listing.ad_id ? (
-                            <div className="mt-2">
-                              <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                            <div className="mt-1.5">
+                              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700">
                                 Ad #{listing.ad_id}
                               </span>
                             </div>
