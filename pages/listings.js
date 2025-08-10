@@ -70,6 +70,11 @@ function ListingCard({ listing, index, onSave, saved }) {
           {(listing.location || 'Unknown')} • {(listing.industry || 'Unspecified')}
         </p>
 
+        {/* Display Ad ID */}
+        <p className="text-sm text-gray-500 font-mono mb-2">
+          Ad ID: <strong>{listing.ad_id || 'N/A'}</strong>
+        </p>
+
         <p className="text-sm text-gray-700 line-clamp-3 leading-relaxed mb-4">
           {description || 'No description provided.'}
         </p>
@@ -117,15 +122,22 @@ export default function Listings() {
   const [debouncedTerm, setDebouncedTerm] = useState('');
   const [savedIds, setSavedIds] = useState([]);
   const [buyerEmail, setBuyerEmail] = useState(null);
+  const [error, setError] = useState('');
 
+  // Debounce search input
   useEffect(() => {
-    const handler = setTimeout(() => setDebouncedTerm(searchTerm), 500);
+    const handler = setTimeout(() => setDebouncedTerm(searchTerm.trim()), 500);
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
   useEffect(() => {
     async function fetchListings() {
       setLoading(true);
+      setError('');
+
+      // If search term looks like Ad ID, query by exact ad_id
+      const isAdIdSearch = /^SB-\d+$/i.test(debouncedTerm);
+
       let query = supabase
         .from('sellers')
         .select(`
@@ -142,19 +154,31 @@ export default function Listings() {
           annual_profit,
           asking_price,
           financing_type,
-          created_at
+          created_at,
+          ad_id
         `)
         .order('created_at', { ascending: false });
 
-      if (debouncedTerm.trim() !== '') {
-        query = query.or(
-          `business_name.ilike.%${debouncedTerm}%,industry.ilike.%${debouncedTerm}%,location.ilike.%${debouncedTerm}%,business_description.ilike.%${debouncedTerm}%,ai_description.ilike.%${debouncedTerm}%`
-        );
+      if (debouncedTerm !== '') {
+        if (isAdIdSearch) {
+          query = query.eq('ad_id', debouncedTerm.toUpperCase());
+        } else {
+          // Search by multiple text fields if not an Ad ID
+          query = query.or(
+            `business_name.ilike.%${debouncedTerm}%,industry.ilike.%${debouncedTerm}%,location.ilike.%${debouncedTerm}%,business_description.ilike.%${debouncedTerm}%,ai_description.ilike.%${debouncedTerm}%`
+          );
+        }
       }
 
       const { data, error } = await query;
-      if (error) console.error('❌ Error fetching listings:', error);
-      else setListings(data);
+
+      if (error) {
+        console.error('❌ Error fetching listings:', error);
+        setError('Error loading listings.');
+        setListings([]);
+      } else {
+        setListings(data);
+      }
       setLoading(false);
     }
 
@@ -199,14 +223,21 @@ export default function Listings() {
         </p>
 
         {/* 🔍 Search */}
-        <div className="max-w-xl mx-auto mb-8">
+        <div className="max-w-xl mx-auto mb-8 flex items-center space-x-4">
           <input
             type="text"
-            placeholder="Search by name, industry, location..."
+            placeholder="Search by name, industry, location or Ad ID (e.g. SB-1234)..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#1E3A8A] focus:border-[#1E3A8A]"
+            className="flex-grow px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#1E3A8A] focus:border-[#1E3A8A]"
           />
+          <button
+            onClick={() => setSearchTerm('')}
+            className="bg-gray-300 text-gray-800 px-4 py-3 rounded-lg hover:bg-gray-400"
+            aria-label="Clear search"
+          >
+            Clear
+          </button>
         </div>
 
         {/* 🔓 Unlock Section */}
@@ -246,6 +277,8 @@ export default function Listings() {
             </Link>
           </div>
         </div>
+
+        {error && <p className="text-center text-red-600 mb-6">{error}</p>}
 
         {loading ? (
           <p className="text-center text-gray-600">Loading listings...</p>
