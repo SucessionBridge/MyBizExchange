@@ -78,10 +78,11 @@ export default function Home() {
     fetchFeaturedListings();
   }, [router]);
 
+  const placeholder = "/images/placeholders/listing-placeholder.jpg";
+
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937] font-sans">
-      <div className="max-w-7xl mx-auto">{/* widened for 4-up grid */}
-
+      <div className="max-w-7xl mx-auto">
         {/* ✅ Hero Section */}
         <section
           className="relative w-full bg-cover bg-center text-center mb-20 py-24"
@@ -127,7 +128,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ⭐️ Featured Listings — BizBuySell-style mobile; 4-up desktop */}
+        {/* ⭐️ Featured Listings — mobile carousel; 4-up desktop with polish */}
         <section className="bg-white rounded-xl p-6 sm:p-8 mb-16 border border-gray-200 shadow-sm">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
             <h2 className="text-2xl sm:text-3xl font-semibold text-[#2E3A59]">Featured Listings</h2>
@@ -171,7 +172,7 @@ export default function Home() {
                       const cover =
                         Array.isArray(listing.image_urls) && listing.image_urls.length > 0
                           ? listing.image_urls[0]
-                          : "/images/placeholders/listing-placeholder.jpg";
+                          : placeholder;
 
                       return (
                         <Link key={listing.id} href={`/listings/${listing.id}`}>
@@ -184,8 +185,9 @@ export default function Home() {
                               <img
                                 src={cover}
                                 alt={listing.business_name || "Business listing"}
-                                className="w-full h-auto aspect-[4/3] object-cover"
+                                className="w-full h-auto aspect-[4/3] object-cover object-center"
                                 loading="lazy"
+                                onError={(e) => { e.currentTarget.src = placeholder; }}
                               />
                             </div>
 
@@ -230,27 +232,28 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Desktop grid — now 4 across on lg */}
+              {/* Desktop grid — 4 across, hover lift + shadow polish */}
               <div className="hidden md:grid grid-cols-3 lg:grid-cols-4 gap-5">
                 {featuredListings.map((listing) => {
                   const cover =
                     Array.isArray(listing.image_urls) && listing.image_urls.length > 0
                       ? listing.image_urls[0]
-                      : "/images/placeholders/listing-placeholder.jpg";
+                      : placeholder;
 
                   return (
                     <Link key={listing.id} href={`/listings/${listing.id}`}>
-                      <a className="group block rounded-xl overflow-hidden border border-gray-200 bg-white hover:shadow-lg transition-shadow">
+                      <a className="group block rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-xl">
                         <div className="bg-gray-100 overflow-hidden">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={cover}
                             alt={listing.business_name || "Business listing"}
-                            className="w-full h-auto aspect-[4/3] object-cover group-hover:scale-[1.01] transition-transform duration-300"
+                            className="w-full h-auto aspect-[4/3] object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
                             loading="lazy"
+                            onError={(e) => { e.currentTarget.src = placeholder; }}
                           />
                         </div>
-                        <div className="p-3">{/* tighter padding to fit 4-up */}
+                        <div className="p-3">
                           <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
                             {listing.business_name || "Unnamed Business"}
                           </h3>
@@ -276,6 +279,15 @@ export default function Home() {
                     </Link>
                   );
                 })}
+              </div>
+
+              {/* View all featured button (under grid/carousel) */}
+              <div className="mt-6 text-center">
+                <Link href="/listings">
+                  <a className="inline-block rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition">
+                    View all featured
+                  </a>
+                </Link>
               </div>
             </>
           )}
@@ -365,7 +377,6 @@ export default function Home() {
             </Link>
           </div>
         </section>
-
       </div>
 
       {/* Global CSS (hide mobile scrollbar) */}
