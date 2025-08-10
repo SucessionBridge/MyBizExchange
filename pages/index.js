@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import supabase from "../lib/supabaseClient";
 import Link from "next/link";
@@ -6,6 +6,15 @@ import Link from "next/link";
 export default function Home() {
   const router = useRouter();
   const [featuredListings, setFeaturedListings] = useState([]);
+  const carouselRef = useRef(null);
+
+  const scrollByCard = (dir) => {
+    const el = carouselRef.current;
+    if (!el) return;
+    const card = el.querySelector("[data-card]");
+    const amount = card ? card.clientWidth + 16 : 320; // card width + gap
+    el.scrollBy({ left: dir * amount, behavior: "smooth" });
+  };
 
   useEffect(() => {
     const checkUserAndRedirect = async () => {
@@ -37,17 +46,19 @@ export default function Home() {
 
     checkUserAndRedirect();
 
-    // Fetch featured listings
+    // Fetch featured listings (includes photos)
     const fetchFeaturedListings = async () => {
       const { data, error } = await supabase
         .from('sellers')
-        .select('id, business_name, location, asking_price, ad_id')
+        .select('id, business_name, location, asking_price, ad_id, image_urls')
         .eq('status', 'active')
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(6);
 
       if (!error && data) {
         setFeaturedListings(data);
+      } else {
+        console.warn("⚠️ Failed to fetch featured listings:", error?.message);
       }
     };
 
@@ -67,7 +78,7 @@ export default function Home() {
             <h1 
               className="text-4xl sm:text-5xl font-serif font-bold text-[#2E3A59] leading-tight"
             >
-              Millions of boomer‑owned businesses are changing hands. Many will close without a buyer.
+              Millions of boomer-owned businesses are changing hands. Many will close without a buyer.
             </h1>
             <p 
               className="mt-4 text-xl font-semibold text-[#2E3A59] max-w-2xl mx-auto"
@@ -105,6 +116,140 @@ export default function Home() {
               <p>SuccessionBridge was built to give business owners that same advantage — connecting sellers and buyers directly without relying on expensive brokers.</p>
             </div>
           </div>
+        </section>
+
+        {/* ⭐️ Featured Listings (moved here; mobile carousel + desktop grid) */}
+        <section className="bg-white rounded-xl p-8 mb-16 border border-gray-200 shadow-sm">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-3xl font-semibold text-[#2E3A59]">Featured Listings</h2>
+            <Link href="/listings">
+              <a className="text-[#14B8A6] hover:underline font-semibold">See all listings →</a>
+            </Link>
+          </div>
+
+          {featuredListings.length === 0 ? (
+            <p className="text-center text-gray-600">No listings available at the moment.</p>
+          ) : (
+            <>
+              {/* Mobile carousel */}
+              <div className="md:hidden">
+                <div className="relative">
+                  {/* nav buttons */}
+                  <button
+                    type="button"
+                    onClick={() => scrollByCard(-1)}
+                    aria-label="Previous"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 border border-gray-200 shadow p-2"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => scrollByCard(1)}
+                    aria-label="Next"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 border border-gray-200 shadow p-2"
+                  >
+                    ›
+                  </button>
+
+                  <div
+                    ref={carouselRef}
+                    className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2"
+                  >
+                    {featuredListings.map((listing) => {
+                      const cover = Array.isArray(listing.image_urls) && listing.image_urls.length > 0
+                        ? listing.image_urls[0]
+                        : "/images/placeholders/listing-placeholder.jpg"; // add this file to /public/images/placeholders/
+
+                      return (
+                        <Link key={listing.id} href={`/listings/${listing.id}`}>
+                          <a
+                            data-card
+                            className="snap-start shrink-0 w-[85%] sm:w-[70%] rounded-xl overflow-hidden border border-gray-200 bg-white hover:shadow-lg transition-shadow"
+                          >
+                            <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={cover}
+                                alt={listing.business_name || "Business listing"}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            </div>
+                            <div className="p-4">
+                              <div className="flex items-start justify-between">
+                                <h3 className="text-base font-semibold text-[#2E3A59] line-clamp-1">
+                                  {listing.business_name || "Unnamed Business"}
+                                </h3>
+                                {listing.ad_id ? (
+                                  <span className="ml-3 shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700">
+                                    Ad #{listing.ad_id}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <p className="mt-1 text-sm text-gray-600 line-clamp-1">
+                                {listing.location || "Location undisclosed"}
+                              </p>
+                              <p className="mt-2 text-sm font-semibold text-green-700">
+                                {listing.asking_price
+                                  ? `Asking: $${Number(listing.asking_price).toLocaleString()}`
+                                  : "Inquire for price"}
+                              </p>
+                            </div>
+                          </a>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop grid */}
+              <div className="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-6">
+                {featuredListings.map((listing) => {
+                  const cover = Array.isArray(listing.image_urls) && listing.image_urls.length > 0
+                    ? listing.image_urls[0]
+                    : "/images/placeholders/listing-placeholder.jpg";
+
+                  return (
+                    <Link key={listing.id} href={`/listings/${listing.id}`}>
+                      <a className="group block rounded-xl overflow-hidden border border-gray-200 bg-white hover:shadow-lg transition-shadow">
+                        <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={cover}
+                            alt={listing.business_name || "Business listing"}
+                            className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="p-4">
+                          <div className="flex items-start justify-between">
+                            <h3 className="text-lg font-semibold text-[#2E3A59] line-clamp-1">
+                              {listing.business_name || "Unnamed Business"}
+                            </h3>
+                            {listing.ad_id ? (
+                              <span className="ml-3 shrink-0 rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                                Ad #{listing.ad_id}
+                              </span>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-sm text-gray-600 line-clamp-1">
+                            {listing.location || "Location undisclosed"}
+                          </p>
+                          <p className="mt-2 text-base font-semibold text-green-700">
+                            {listing.asking_price
+                              ? `Asking: $${Number(listing.asking_price).toLocaleString()}`
+                              : "Inquire for price"}
+                          </p>
+                        </div>
+                      </a>
+                    </Link>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </section>
 
         {/* ✅ How It Works Section */}
@@ -189,31 +334,6 @@ export default function Home() {
                 Browse Businesses
               </a>
             </Link>
-          </div>
-        </section>
-
-        {/* Featured Listings Section */}
-        <section className="bg-white rounded-xl p-10 mb-12 border border-gray-200 shadow-sm">
-          <div className="max-w-4xl mx-auto">
-            <h2 className="text-3xl font-semibold text-[#2E3A59] mb-6 text-center">Featured Listings</h2>
-            {featuredListings.length === 0 ? (
-              <p className="text-center text-gray-600">No listings available at the moment.</p>
-            ) : (
-              <ul className="space-y-4">
-                {featuredListings.map((listing) => (
-                  <li key={listing.id} className="border rounded p-4 hover:shadow-lg transition-shadow">
-                    <a href={`/listings/${listing.id}`} className="text-xl font-semibold text-blue-600 hover:underline">
-                      {listing.business_name || 'Unnamed Business'}
-                    </a>
-                    <p className="text-gray-700">{listing.location}</p>
-                    <p className="text-green-700 font-semibold">
-                      Asking Price: {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire'}
-                    </p>
-                    <p className="text-sm text-gray-500">Ad ID: <strong>{listing.ad_id || 'N/A'}</strong></p>
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
         </section>
 
