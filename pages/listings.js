@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import supabase from '../lib/supabaseClient';
 import Link from 'next/link';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import { BookmarkIcon as OutlineBookmark } from '@heroicons/react/24/outline';
 import { BookmarkIcon as SolidBookmark } from '@heroicons/react/24/solid';
 
@@ -34,10 +35,10 @@ function ListingCard({ listing, index, onSave, saved }) {
         <img
           src={imageUrl}
           alt={`${displayName} image`}
-          className="w-full h-52 object-cover"
+          className="w-full h-52 object-cover object-center"
           onError={(e) => {
-            e.target.onerror = null;
-            e.target.src = '/placeholder.png';
+            e.currentTarget.onerror = null;
+            e.currentTarget.src = '/placeholder.png';
           }}
         />
       ) : (
@@ -116,27 +117,33 @@ function ListingCard({ listing, index, onSave, saved }) {
 }
 
 export default function Listings() {
+  const router = useRouter();
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
+  const [searchError, setSearchError] = useState(''); // inline errors (e.g., Ad not found)
+
   const [savedIds, setSavedIds] = useState([]);
   const [buyerEmail, setBuyerEmail] = useState(null);
   const [error, setError] = useState('');
 
-  // Debounce search input
+  // Debounce search input for normal keyword queries
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedTerm(searchTerm.trim()), 500);
     return () => clearTimeout(handler);
   }, [searchTerm]);
 
+  // Fetch listings based on debouncedTerm (keyword search or ad filter fallback)
   useEffect(() => {
     async function fetchListings() {
       setLoading(true);
       setError('');
 
-      // If search term looks like Ad ID, query by exact ad_id
-      const isAdIdSearch = /^SB-\d+$/i.test(debouncedTerm);
+      // Detect if the debounced term looks like an ad number (digits), e.g., SB-1234 / SB1234 / 1234
+      const adMatch = debouncedTerm.match(/(\d{2,10})$/); // last 2–10 digits
+      const looksLikeAd = !!adMatch && /^[A-Z\s\-]*\d+$/i.test(debouncedTerm);
 
       let query = supabase
         .from('sellers')
@@ -159,20 +166,19 @@ export default function Listings() {
           status
         `)
         .order('created_at', { ascending: false })
-        .eq('status', 'active'); // Only active listings
+        .eq('status', 'active');
 
       if (debouncedTerm !== '') {
-        if (isAdIdSearch) {
-          query = query.eq('ad_id', debouncedTerm.toUpperCase());
+        if (looksLikeAd) {
+          // If user is typing an ad number but hasn't submitted yet, we can narrow to that ad
+          const adNum = adMatch[1];
+          query = query.eq('ad_id', adNum);
         } else {
           query = query.or(
             `business_name.ilike.%${debouncedTerm}%,industry.ilike.%${debouncedTerm}%,location.ilike.%${debouncedTerm}%,business_description.ilike.%${debouncedTerm}%,ai_description.ilike.%${debouncedTerm}%`
           );
         }
       }
-
-      // Ensure we still filter by active status after search filters
-      query = query.eq('status', 'active');
 
       const { data, error } = await query;
 
@@ -211,6 +217,45 @@ export default function Listings() {
     }
   }
 
+  // Unified search submit: try Ad # redirect first, else normal search
+  const handleSearchSubmit = async (e) => {
+    e.preventDefault();
+    setSearchError('');
+
+    const raw = (searchTerm || '').trim().toUpperCase();
+    if (!raw) return;
+
+    // Try to extract trailing digits as Ad # (supports SB-1234, SB1234, 1234)
+    const match = raw.match(/(\d{2,10})$/);
+    if (match) {
+      const adNum = match[1];
+
+      try {
+        const { data, error } = await supabase
+          .from('sellers')
+          .select('id')
+          .eq('ad_id', adNum)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data?.id) {
+          router.push(`/listings/${data.id}`);
+          return; // stop; we navigated
+        } else {
+          setSearchError(`No listing found for Ad #${adNum}. Showing search results instead.`);
+          // fall through to normal search results
+        }
+      } catch (err) {
+        console.error('Ad lookup failed:', err);
+        setSearchError('Sorry, something went wrong with Ad # search. Showing keyword results instead.');
+      }
+    }
+
+    // Normal keyword search fallback (just force the debounce immediately)
+    setDebouncedTerm(searchTerm.trim());
+  };
+
   return (
     <div className="bg-gray-50 min-h-screen">
       <Head>
@@ -226,23 +271,40 @@ export default function Listings() {
           Discover businesses for sale and make your next big move with SuccessionBridge.
         </p>
 
-        {/* 🔍 Search */}
-        <div className="max-w-xl mx-auto mb-8 flex items-center space-x-4">
-          <input
-            type="text"
-            placeholder="Search by name, industry, location or Ad ID (e.g. SB-1234)..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-grow px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#1E3A8A] focus:border-[#1E3A8A]"
-          />
-          <button
-            onClick={() => setSearchTerm('')}
-            className="bg-gray-300 text-gray-800 px-4 py-3 rounded-lg hover:bg-gray-400"
-            aria-label="Clear search"
-          >
-            Clear
-          </button>
-        </div>
+        {/* 🔍 Unified Search (keywords or Ad #) */}
+        <form onSubmit={handleSearchSubmit} className="max-w-xl mx-auto mb-2">
+          <div className="flex items-center space-x-3">
+            <input
+              type="text"
+              placeholder="Search listings or Ad #"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-grow px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-[#1E3A8A] focus:border-[#1E3A8A]"
+              aria-label="Search listings or by Ad number"
+            />
+            <button
+              type="submit"
+              className="bg-[#1E3A8A] text-white px-5 py-3 rounded-lg font-semibold hover:bg-[#0f2357] transition"
+            >
+              Search
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSearchTerm(''); setDebouncedTerm(''); setSearchError(''); }}
+              className="bg-gray-100 text-gray-800 px-4 py-3 rounded-lg hover:bg-gray-200 border"
+              aria-label="Clear search"
+            >
+              Clear
+            </button>
+          </div>
+          {/* Tip + inline errors */}
+          <div className="mt-2 text-center">
+            <p className="text-xs text-gray-500">
+              Tip: you can enter <span className="font-mono">SB-5553</span> or just <span className="font-mono">5553</span>.
+            </p>
+            {searchError && <p className="text-xs text-red-600 mt-1">{searchError}</p>}
+          </div>
+        </form>
 
         {/* 🔓 Unlock Section */}
         <div className="bg-white rounded-2xl shadow-lg p-8 mb-10 max-w-3xl mx-auto text-center border border-gray-100">
@@ -312,3 +374,4 @@ export default function Listings() {
     </div>
   );
 }
+
