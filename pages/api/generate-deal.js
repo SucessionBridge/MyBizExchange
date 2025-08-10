@@ -4,7 +4,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { listing, buyer } = req.body || {};
+  const { listing, buyer, allowSellerCarry } = req.body || {};
   if (!listing || !buyer) {
     return res.status(400).json({ error: "Missing listing or buyer data." });
   }
@@ -42,17 +42,35 @@ export default async function handler(req, res) {
     n(buyer.offer_price) ??
     null;
 
-  // Seller financing stance
-  const sfRaw =
-    (listing.seller_financing_considered ||
-      listing.sellerFinancingConsidered ||
-      "").toString().toLowerCase();
+  // ---------------- Seller financing stance (robust) ----------------
+  // 1) Respect explicit client override if provided
+  const clientOverride =
+    typeof allowSellerCarry === "boolean" ? allowSellerCarry : null;
 
-  // Allow seller-carry only if explicitly yes/maybe OR financing_type says seller-financed
-  const sellerCarryAllowed =
-    sfRaw === "yes" ||
-    sfRaw === "maybe" ||
-    (String(listing.financing_type || "").toLowerCase() === "seller-financed");
+  // 2) Detect from listing fields/synonyms
+  const sfRaw = String(
+    listing.seller_financing_considered ?? listing.sellerFinancingConsidered ?? ""
+  ).toLowerCase().trim();
+
+  const ftRaw = String(
+    listing.financing_type ?? listing.financingType ?? ""
+  ).toLowerCase();
+  const ftNorm = ftRaw.replace(/\s+/g, "-"); // "Seller Financed" -> "seller-financed"
+
+  const hasTerms =
+    n(listing.down_payment) > 0 ||
+    n(listing.down_payment_pct) > 0 ||
+    n(listing.term_length) > 0 ||
+    n(listing.interest_rate) > 0 ||
+    n(listing.seller_financing_interest_rate) > 0;
+
+  const inferredCarry =
+    ["yes", "maybe", "true", "1"].includes(sfRaw) ||
+    /seller|owner|carry|note/.test(ftNorm) ||
+    /rent/.test(ftNorm) || // rent-to-own style
+    hasTerms;
+
+  const sellerCarryAllowed = clientOverride !== null ? clientOverride : inferredCarry;
 
   // Simple context lines the model can use
   const fitLines = [
@@ -105,7 +123,9 @@ OUTPUT RULES
   - **Payments** (rough monthly, optional if conventional/SBA)
   - **Why it works for both** (1–2 short lines)
   - **Key protections** (e.g., bank covenants, DSCR expectations)
-${sellerCarryAllowed ? "• If seller financing is acceptable, at least one deal can include a seller note or short bridge-to-bank. Otherwise, do not include any seller-carry." : "• Do not include any seller-carry structures."}
+${sellerCarryAllowed
+  ? "• If seller financing is acceptable, at least one deal can include a seller note or short bridge-to-bank."
+  : "• Do not include any seller-carry structures."}
 `.trim();
 
   try {
