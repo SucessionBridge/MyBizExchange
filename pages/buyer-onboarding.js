@@ -217,9 +217,26 @@ export default function BuyerOnboarding() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <p className="bg-gray-100 p-3 rounded text-sm text-gray-700">
-              {formData.email}
+            
+  <label className="block text-sm font-medium mb-1">Email</label>
+  <input
+    type="email"
+    name="email"
+    value={formData.email}
+    onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
+    disabled={!!session}                 // if logged in, lock it to auth email
+    className={`w-full border p-3 rounded text-black ${
+      session ? 'bg-gray-100 cursor-not-allowed' : ''
+    }`}
+    placeholder="you@example.com"
+  />
+  <p className="text-[11px] text-gray-500 mt-1">
+    {session
+      ? 'Email is set from your account.'
+      : 'No account detected — you can type your email.'}
+  </p>
+</div>
+
             </p>
           </div>
 
