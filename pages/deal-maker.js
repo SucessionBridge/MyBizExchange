@@ -111,6 +111,11 @@ export default function DealMaker() {
     return <div className="p-8 text-center text-gray-600">Loading deal maker...</div>;
   }
 
+  // Seller carry allowed? (yes/maybe = true, no = false)
+  const allowSellerCarry = ['yes','maybe'].includes(
+    String(listing?.seller_financing_considered || '').toLowerCase()
+  );
+
   // Recap numbers so the buyer understands what they're sending
   const recap = computeRecap(listing, buyer);
 
@@ -183,13 +188,48 @@ export default function DealMaker() {
               </div>
             )}
 
-            <button
-              onClick={generateDeals}
-              disabled={loading}
-              className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 mb-6"
-            >
-              {loading ? 'Generating Deals...' : 'Generate 3 Deal Options'}
-            </button>
+            {/* When seller says NO to seller financing, show options instead of the single button */}
+            {!allowSellerCarry && (
+              <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                <div className="font-semibold">This seller isn’t offering seller financing</div>
+                <p className="mt-1">Choose an option below:</p>
+
+                <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                  {/* Option A: bank/investor-funded structures (your existing flow) */}
+                  <button
+                    onClick={generateDeals}
+                    disabled={loading}
+                    className="inline-flex justify-center items-center rounded-md bg-emerald-600 px-4 py-2.5 text-white hover:bg-emerald-700 disabled:bg-emerald-300"
+                  >
+                    {loading ? 'Generating…' : 'Generate Bank-Funded Options'}
+                  </button>
+
+                  {/* Option B: browse seller-financed listings */}
+                  <a
+                    href="/listings?seller_financing=yes-or-maybe"
+                    className="inline-flex justify-center items-center rounded-md border border-gray-300 bg-white px-4 py-2.5 text-gray-800 hover:bg-gray-50"
+                  >
+                    Find Seller-Financed Listings
+                  </a>
+                </div>
+
+                <ul className="mt-3 list-disc pl-5 text-[12px] text-amber-900/90">
+                  <li>Bank-funded deals typically combine buyer equity + bank/SBA/conventional loan.</li>
+                  <li>Seller-financed listings can allow lower cash down and more flexible terms.</li>
+                </ul>
+              </div>
+            )}
+
+            {/* Default path (seller says Yes/Maybe) */}
+            {allowSellerCarry && (
+              <button
+                onClick={generateDeals}
+                disabled={loading}
+                className="w-full bg-emerald-600 text-white py-3 rounded-lg font-semibold hover:bg-emerald-700 mb-6"
+              >
+                {loading ? 'Generating Deals…' : 'Generate 3 Deal Options'}
+              </button>
+            )}
 
             {loading && (
               <div className="flex justify-center items-center py-6">
@@ -280,6 +320,12 @@ export default function DealMaker() {
               )}
             </div>
 
+            {/* Note for no-carry sellers */}
+            {!allowSellerCarry && (
+              <div className="mr-auto text-sm text-gray-600">
+                Note: This seller is not offering seller financing. The proposal you’re sending is cash-at-close.
+              </div>
+            )}
             <div className="mt-4 flex justify-end gap-3">
               <button
                 onClick={() => setReviewOpen(false)}
@@ -407,7 +453,12 @@ function computeRecap(listing, buyer) {
     else gapBucket = 'far';
   }
 
-  const useBridge = (downOk === false) || gapBucket === 'moderate' || gapBucket === 'far';
+  // If seller said NO to carry, do not suggest bridge/credits in recap
+  const sellerCarryAllowed = ['yes','maybe'].includes(
+    String(listing?.seller_financing_considered || '').toLowerCase()
+  );
+
+  let useBridge = (!sellerCarryAllowed ? false : ((downOk === false) || gapBucket === 'moderate' || gapBucket === 'far'));
   let bridgeMonths = 18;
   if (useBridge && ask && downShort != null) {
     const shortPct = (downShort / ask) * 100;
@@ -415,10 +466,10 @@ function computeRecap(listing, buyer) {
     else if (shortPct <= 5 && gapBucket === 'near') bridgeMonths = 12;
   }
 
-  // Equity-credit suggestion if shortfall is modest (≤12% of price)
+  // Equity-credit suggestion if shortfall is modest (≤12% of price) AND seller allows carry
   let equityCreditMonthly = 0;
   let equityCreditCap = 0;
-  if (useBridge && ask && requiredDown != null && capital != null) {
+  if (sellerCarryAllowed && useBridge && ask && requiredDown != null && capital != null) {
     const shortNow = Math.max(0, requiredDown - capital);
     const shortPctOfPrice = ask ? (shortNow / ask) * 100 : 0;
     if (shortNow > 0 && shortPctOfPrice <= 12) {
@@ -442,3 +493,4 @@ function computeRecap(listing, buyer) {
     money,
   };
 }
+
