@@ -237,9 +237,6 @@ export default function BuyerOnboarding() {
   </p>
 </div>
 
-            </p>
-          </div>
-
           <div>
             <label className="block text-sm font-medium mb-1">Financing Type</label>
             <select name="financingType" value={formData.financingType} onChange={handleChange}
