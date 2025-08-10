@@ -128,177 +128,175 @@ export default function Home() {
           </div>
         </section>
 
-      {/* ⭐️ Featured Listings — mobile carousel; 4-up desktop with polish */}
-<section className="bg-white rounded-xl p-6 sm:p-8 mb-16 border border-gray-200 shadow-sm">
-  <div className="flex items-center justify-between mb-4 sm:mb-6">
-    <h2 className="text-2xl sm:text-3xl font-semibold text-[#2E3A59]">Featured Listings</h2>
-    <Link href="/listings">
-      <a className="text-[#14B8A6] hover:underline font-semibold text-sm sm:text-base">See all →</a>
-    </Link>
-  </div>
+        {/* ⭐️ Featured Listings — mobile carousel; 4-up desktop with polish */}
+        <section className="bg-white rounded-xl p-6 sm:p-8 mb-16 border border-gray-200 shadow-sm">
+          <div className="flex items-center justify-between mb-4 sm:mb-6">
+            <h2 className="text-2xl sm:text-3xl font-semibold text-[#2E3A59]">Featured Listings</h2>
+            <Link href="/listings">
+              <a className="text-[#14B8A6] hover:underline font-semibold text-sm sm:text-base">See all →</a>
+            </Link>
+          </div>
 
-  {featuredListings.length === 0 ? (
-    <p className="text-center text-gray-600">No listings available at the moment.</p>
-  ) : (
-    <>
-      {/* Mobile carousel */}
-      <div className="md:hidden">
-        <div className="relative -mx-4 px-4">
-          {/* ↓ Put gradients behind the cards */}
-          <div className="pointer-events-none absolute left-0 top-0 h-full w-6 z-0 bg-gradient-to-r from-white to-transparent" />
-          <div className="pointer-events-none absolute right-0 top-0 h-full w-6 z-0 bg-gradient-to-l from-white to-transparent" />
+          {featuredListings.length === 0 ? (
+            <p className="text-center text-gray-600">No listings available at the moment.</p>
+          ) : (
+            <>
+              {/* Mobile carousel */}
+              <div className="md:hidden">
+                <div className="relative -mx-4 px-4">
+                  {/* ↓ gradients put behind the cards so borders aren’t hidden */}
+                  <div className="pointer-events-none absolute left-0 top-0 h-full w-6 z-0 bg-gradient-to-r from-white to-transparent" />
+                  <div className="pointer-events-none absolute right-0 top-0 h-full w-6 z-0 bg-gradient-to-l from-white to-transparent" />
 
-          <button
-            type="button"
-            onClick={() => scrollByCard(-1)}
-            aria-label="Previous"
-            className="absolute left-3 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 border border-gray-200 shadow p-2"
-          >
-            ‹
-          </button>
-          <button
-            type="button"
-            onClick={() => scrollByCard(1)}
-            aria-label="Next"
-            className="absolute right-3 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 border border-gray-200 shadow p-2"
-          >
-            ›
-          </button>
-
-          <div
-            ref={carouselRef}
-            onScroll={onCarouselScroll}
-            className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 no-scrollbar"
-          >
-            {featuredListings.map((listing) => {
-              const cover =
-                Array.isArray(listing.image_urls) && listing.image_urls.length > 0
-                  ? listing.image_urls[0]
-                  : placeholder;
-
-              return (
-                <Link key={listing.id} href={`/listings/${listing.id}`}>
-                  <a
-                    data-card
-                    /* ↑ Bring cards above gradients + draw an INSET ring so it can't be covered */
-                    className="relative z-10 snap-center shrink-0 w-[90vw] max-w-[420px] rounded-xl overflow-hidden
-                               ring-inset ring-1 ring-gray-300 shadow-md md:ring-0 md:shadow-none
-                               border border-gray-200 bg-white hover:shadow-lg transition-shadow"
+                  <button
+                    type="button"
+                    onClick={() => scrollByCard(-1)}
+                    aria-label="Previous"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 border border-gray-200 shadow p-2"
                   >
-                    {/* subtle contrast behind white/placeholder images (mobile only) */}
-                    <div className="bg-slate-50 md:bg-gray-100 overflow-hidden">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={cover}
-                        alt={listing.business_name || "Business listing"}
-                        className="w-full h-auto aspect-[4/3] object-cover object-center"
-                        loading="lazy"
-                        onError={(e) => { e.currentTarget.src = placeholder; }}
-                      />
-                    </div>
+                    ‹
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => scrollByCard(1)}
+                    aria-label="Next"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 z-10 rounded-full bg-white/90 border border-gray-200 shadow p-2"
+                  >
+                    ›
+                  </button>
 
-                    <div className="p-4">
-                      <h3 className="text-[17px] font-semibold text-blue-700 leading-snug line-clamp-2">
-                        {listing.business_name || "Unnamed Business"}
-                      </h3>
-                      <div className="mt-2 flex items-center justify-between">
-                        <p className="text-[15px] font-semibold text-gray-900">
-                          {listing.asking_price
-                            ? `$${Number(listing.asking_price).toLocaleString()}`
-                            : "Inquire"}
-                        </p>
-                        <p className="text-[14px] text-gray-600 truncate max-w-[55%] text-right">
-                          {listing.location || "Location undisclosed"}
-                        </p>
-                      </div>
-                      {listing.ad_id ? (
-                        <div className="mt-2">
-                          <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
-                            Ad #{listing.ad_id}
-                          </span>
+                  <div
+                    ref={carouselRef}
+                    onScroll={onCarouselScroll}
+                    className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory pb-2 no-scrollbar"
+                  >
+                    {featuredListings.map((listing) => {
+                      const cover =
+                        Array.isArray(listing.image_urls) && listing.image_urls.length > 0
+                          ? listing.image_urls[0]
+                          : placeholder;
+
+                      return (
+                        <Link key={listing.id} href={`/listings/${listing.id}`}>
+                          <a
+                            data-card
+                            className="relative z-10 snap-center shrink-0 w-[90vw] max-w-[420px] rounded-xl overflow-hidden
+                                       border-2 border-gray-400 shadow-lg
+                                       md:border md:border-gray-200 md:shadow-none
+                                       bg-gray-50 md:bg-white hover:shadow-xl transition-shadow"
+                          >
+                            <div className="bg-slate-50 md:bg-gray-100 overflow-hidden">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={cover}
+                                alt={listing.business_name || "Business listing"}
+                                className="w-full h-auto aspect-[4/3] object-cover object-center"
+                                loading="lazy"
+                                onError={(e) => { e.currentTarget.src = placeholder; }}
+                              />
+                            </div>
+
+                            <div className="p-4">
+                              <h3 className="text-[17px] font-semibold text-blue-700 leading-snug line-clamp-2">
+                                {listing.business_name || "Unnamed Business"}
+                              </h3>
+                              <div className="mt-2 flex items-center justify-between">
+                                <p className="text-[15px] font-semibold text-gray-900">
+                                  {listing.asking_price
+                                    ? `$${Number(listing.asking_price).toLocaleString()}`
+                                    : "Inquire"}
+                                </p>
+                                <p className="text-[14px] text-gray-600 truncate max-w-[55%] text-right">
+                                  {listing.location || "Location undisclosed"}
+                                </p>
+                              </div>
+                              {listing.ad_id ? (
+                                <div className="mt-2">
+                                  <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                                    Ad #{listing.ad_id}
+                                  </span>
+                                </div>
+                              ) : null}
+                            </div>
+                          </a>
+                        </Link>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-center gap-1.5">
+                    {featuredListings.map((_, i) => (
+                      <span
+                        key={i}
+                        className={`h-1.5 rounded-full transition-all ${
+                          i === activeSlide ? "w-4 bg-gray-800" : "w-2 bg-gray-300"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop grid — 4 across, hover lift + shadow polish */}
+              <div className="hidden md:grid grid-cols-3 lg:grid-cols-4 gap-5">
+                {featuredListings.map((listing) => {
+                  const cover =
+                    Array.isArray(listing.image_urls) && listing.image_urls.length > 0
+                      ? listing.image_urls[0]
+                      : placeholder;
+
+                  return (
+                    <Link key={listing.id} href={`/listings/${listing.id}`}>
+                      <a className="group block rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-xl">
+                        <div className="bg-gray-100 overflow-hidden">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={cover}
+                            alt={listing.business_name || "Business listing"}
+                            className="w-full h-auto aspect-[4/3] object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
+                            loading="lazy"
+                            onError={(e) => { e.currentTarget.src = placeholder; }}
+                          />
                         </div>
-                      ) : null}
-                    </div>
+                        <div className="p-3">
+                          <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
+                            {listing.business_name || "Unnamed Business"}
+                          </h3>
+                          <div className="mt-1.5 flex items-center justify-between">
+                            <p className="text-[14px] font-semibold text-gray-900">
+                              {listing.asking_price
+                                ? `$${Number(listing.asking_price).toLocaleString()}`
+                                : "Inquire"}
+                            </p>
+                            <p className="text-[13px] text-gray-600 truncate max-w-[60%] text-right">
+                              {listing.location || "Location undisclosed"}
+                            </p>
+                          </div>
+                          {listing.ad_id ? (
+                            <div className="mt-1.5">
+                              <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700">
+                                Ad #{listing.ad_id}
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
+                      </a>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* View all featured button (under grid/carousel) */}
+              <div className="mt-6 text-center">
+                <Link href="/listings">
+                  <a className="inline-block rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition">
+                    View all featured
                   </a>
                 </Link>
-              );
-            })}
-          </div>
-
-          <div className="mt-3 flex items-center justify-center gap-1.5">
-            {featuredListings.map((_, i) => (
-              <span
-                key={i}
-                className={`h-1.5 rounded-full transition-all ${
-                  i === activeSlide ? "w-4 bg-gray-800" : "w-2 bg-gray-300"
-                }`}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Desktop grid — unchanged */}
-      <div className="hidden md:grid grid-cols-3 lg:grid-cols-4 gap-5">
-        {featuredListings.map((listing) => {
-          const cover =
-            Array.isArray(listing.image_urls) && listing.image_urls.length > 0
-              ? listing.image_urls[0]
-              : placeholder;
-
-          return (
-            <Link key={listing.id} href={`/listings/${listing.id}`}>
-              <a className="group block rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-xl">
-                <div className="bg-gray-100 overflow-hidden">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={cover}
-                    alt={listing.business_name || "Business listing"}
-                    className="w-full h-auto aspect-[4/3] object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
-                    loading="lazy"
-                    onError={(e) => { e.currentTarget.src = placeholder; }}
-                  />
-                </div>
-                <div className="p-3">
-                  <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
-                    {listing.business_name || "Unnamed Business"}
-                  </h3>
-                  <div className="mt-1.5 flex items-center justify-between">
-                    <p className="text-[14px] font-semibold text-gray-900">
-                      {listing.asking_price
-                        ? `$${Number(listing.asking_price).toLocaleString()}`
-                        : "Inquire"}
-                    </p>
-                    <p className="text-[13px] text-gray-600 truncate max-w-[60%] text-right">
-                      {listing.location || "Location undisclosed"}
-                    </p>
-                  </div>
-                  {listing.ad_id ? (
-                    <div className="mt-1.5">
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-700">
-                        Ad #{listing.ad_id}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-              </a>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* View all featured button */}
-      <div className="mt-6 text-center">
-        <Link href="/listings">
-          <a className="inline-block rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition">
-            View all featured
-          </a>
-        </Link>
-      </div>
-    </>
-  )}
-</section>
-
+              </div>
+            </>
+          )}
+        </section>
 
         {/* ✅ How It Works Section */}
         <section className="grid md:grid-cols-2 gap-8 items-center bg-white rounded-xl p-10 mb-16 shadow-md">
