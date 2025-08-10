@@ -1,4 +1,5 @@
-// pages/buyer-onboarding.js
+
+}// pages/buyer-onboarding.js
 import { useRouter } from 'next/router';
 import supabase from "../lib/supabaseClient";
 import React, { useState, useEffect } from 'react';
@@ -84,7 +85,7 @@ export default function BuyerOnboarding() {
     if (!file) return;
 
     // quick client-side guardrails (optional)
-    const maxMB = 50; // keep generous; you can lower this
+    const maxMB = 50;
     if (file.size > maxMB * 1024 * 1024) {
       setErrorMessage(`File too large. Max ${maxMB}MB.`);
       return;
@@ -107,9 +108,9 @@ export default function BuyerOnboarding() {
     return true;
   };
 
-  // Upload media to Supabase Storage (if provided)
+  // Upload media to Supabase Storage (if provided) — using existing 'buyers-videos' bucket
   const uploadIntroMedia = async (userId) => {
-    if (!formData.video) return { url: null, type: null }; // nothing to upload
+    if (!formData.video) return { url: null, type: null };
 
     try {
       setIsUploading(true);
@@ -119,7 +120,7 @@ export default function BuyerOnboarding() {
       const path = `buyers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
       const { error: upErr } = await supabase.storage
-        .from('buyer-media')
+        .from('buyers-videos') // <-- your existing bucket
         .upload(path, file, {
           cacheControl: '3600',
           upsert: false,
@@ -132,7 +133,7 @@ export default function BuyerOnboarding() {
         return { url: null, type: null };
       }
 
-      const { data: pub } = supabase.storage.from('buyer-media').getPublicUrl(path);
+      const { data: pub } = supabase.storage.from('buyers-videos').getPublicUrl(path);
       return { url: pub.publicUrl || null, type: kind };
     } finally {
       setIsUploading(false);
@@ -149,7 +150,7 @@ export default function BuyerOnboarding() {
     // 1) Upload media if provided
     const { url: introUrl, type: introType } = await uploadIntroMedia(user.id);
 
-    // 2) Build payload
+    // 2) Build payload (save media URL into intro_video_url for now)
     const payload = {
       auth_id: user.id,
       name: formData.name,
@@ -167,9 +168,8 @@ export default function BuyerOnboarding() {
       priority_one: formData.priority_one,
       priority_two: formData.priority_two,
       priority_three: formData.priority_three,
-      // 👇 add these columns to your `buyers` table:
-      intro_media_url: introUrl,
-      intro_media_type: introType, // 'image' | 'video' | null
+      // Save whatever was uploaded (video or image) here for now
+      intro_video_url: introUrl || null,
     };
 
     // 3) Save/update profile
@@ -268,40 +268,21 @@ export default function BuyerOnboarding() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Rank Your Top 3 Priorities</label>
-            <p className="text-xs text-gray-500 mb-2">Select what matters most when buying a business. This helps us match you to listings.</p>
-            <select name="priority_one" value={formData.priority_one} onChange={handleChange} className="w-full border p-3 rounded mb-2">
-              <option value="">Select 1st Priority</option>
-              <option value="price">Price</option>
-              <option value="industry">Industry</option>
-              <option value="location">Location</option>
-            </select>
-            <select name="priority_two" value={formData.priority_two} onChange={handleChange} className="w-full border p-3 rounded mb-2">
-              <option value="">Select 2nd Priority</option>
-              <option value="price">Price</option>
-              <option value="industry">Industry</option>
-              <option value="location">Location</option>
-            </select>
-            <select name="priority_three" value={formData.priority_three} onChange={handleChange} className="w-full border p-3 rounded">
-              <option value="">Select 3rd Priority</option>
-              <option value="price">Price</option>
-              <option value="industry">Industry</option>
-              <option value="location">Location</option>
-            </select>
-          </div>
+            <label className="block text-sm font-medium">Upload Intro Video or Photo</label>
 
-          {/* Intro media (video OR photo) */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Upload Intro Video or Photo</label>
-            <input
-              type="file"
-              accept="video/*,image/*"
-              onChange={handleVideoUpload}
-              className="w-full border p-3 rounded"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Record a 30–60s video OR upload a clear photo. <strong>Only shared with sellers you contact.</strong>
-            </p>
+            {/* file input + helper text grouped tightly */}
+            <div className="mt-1 space-y-1">
+              <input
+                type="file"
+                accept="video/*,image/*"
+                onChange={handleVideoUpload}
+                className="w-full border p-3 rounded"
+              />
+              <p className="text-[11px] leading-4 text-gray-600 -mt-1">
+                Record a 30–60s video or upload a clear photo. <strong>Only shown to sellers you contact.</strong>
+                <em className="block">Tip: If you’re pursuing seller financing, this really helps.</em>
+              </p>
+            </div>
 
             {videoPreview && (
               <div className="mt-3">
@@ -341,5 +322,6 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
+
 
  
