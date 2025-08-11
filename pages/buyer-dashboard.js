@@ -273,104 +273,115 @@ const { error: insertErr } = await supabase.from('messages').insert([{
             </div>
           )}
 
-          {/* ✅ Conversations (threaded, one composer per listing) */}
-          <div className="bg-white p-6 rounded-xl shadow">
-            <h2 className="text-xl font-semibold text-blue-800 mb-4">Your Conversations</h2>
-            {loadingMessages ? (
-              <p>Loading conversations...</p>
-            ) : listingIds.length === 0 ? (
-              <p className="text-gray-600">You haven't sent or received any messages yet.</p>
-            ) : (
-              listingIds.map((lid) => {
-                const thread = (threadsByListing[lid] || []).slice().sort(
-                  (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-                );
-                const lastMsg = thread[thread.length - 1];
-                const sellerId = lastMsg?.seller_id || thread[0]?.seller_id || null;
+         {/* ✅ Conversations (threaded, one composer per listing) */}
+<div className="bg-white p-6 rounded-xl shadow">
+  <h2 className="text-xl font-semibold text-blue-800 mb-4">Your Conversations</h2>
+  {loadingMessages ? (
+    <p>Loading conversations...</p>
+  ) : listingIds.length === 0 ? (
+    <p className="text-gray-600">You haven't sent or received any messages yet.</p>
+  ) : (
+    listingIds.map((lid) => {
+      const thread = (threadsByListing[lid] || [])
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      const lastMsg = thread[thread.length - 1];
+      const sellerId = lastMsg?.seller_id || thread[0]?.seller_id || null;
 
-                return (
-                  <div key={lid} className="mb-6 border rounded-xl p-3 bg-gray-50">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm text-gray-600">Listing #{lid}</p>
-                      <button
-                        onClick={() => router.push(`/listings/${lid}`)}
-                        className="text-blue-600 hover:underline text-xs"
-                      >
-                        View Listing
-                      </button>
+      return (
+        <div key={lid} className="mb-6 border rounded-xl p-3 bg-gray-50">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-gray-600">Listing #{lid}</p>
+            <button
+              onClick={() => router.push(`/listings/${lid}`)}
+              className="text-blue-600 hover:underline text-xs"
+            >
+              View Listing
+            </button>
+          </div>
+
+          {/* Thread bubbles */}
+          <div className="space-y-2">
+            {thread.map((msg) => (
+              <div key={msg.id}>
+                <div
+                  className={`p-2 rounded-lg ${
+                    msg.from_seller === true
+                      ? "bg-green-100 text-green-900"
+                      : "bg-blue-100 text-blue-900"
+                  }`}
+                >
+                  <strong>
+                    {msg.from_seller === true ? "Seller" : "You"}:
+                  </strong>{" "}
+                  {msg.message}
+                </div>
+
+                {Array.isArray(msg.attachments) &&
+                  msg.attachments.length > 0 && (
+                    <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {msg.attachments.map((att, i) => (
+                        <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
+                      ))}
                     </div>
-{/* Thread bubbles */}
-<div className="space-y-2">
-  {thread.map((msg) => (
-    <div key={msg.id}>
-      <div
-        className={`p-2 rounded-lg ${
-          msg.from_seller === true
-            ? "bg-green-100 text-green-900"
-            : "bg-blue-100 text-blue-900"
-        }`}
-      >
-        <strong>{msg.from_seller === true ? "Seller" : "You"}:</strong>{" "}
-        {msg.message}
-      </div>
+                  )}
 
-      {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
-        <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {msg.attachments.map((att, i) => (
-            <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
-          ))}
+                <p className="text-[11px] text-gray-400 mt-1">
+                  {new Date(msg.created_at).toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Single composer per listing */}
+          <div className="mt-3 border-t pt-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <input
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                onChange={(e) => onPickFiles(lid, e)}
+                className="text-xs"
+              />
+              <div className="flex-1 flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Reply..."
+                  value={replyText[lid] || ""}
+                  onChange={(e) =>
+                    setReplyText((prev) => ({ ...prev, [lid]: e.target.value }))
+                  }
+                  className="border p-1 rounded flex-1"
+                />
+                <button
+                  type="button"
+                  onClick={() => sendReply(lid, sellerId)}
+                  className="bg-blue-600 text-white px-3 py-1 rounded"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+
+            {replyFiles[lid]?.length > 0 && (
+              <div className="mt-1 text-xs text-gray-600">
+                {replyFiles[lid].map((f, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-block mr-2 truncate max-w-[12rem] align-middle"
+                  >
+                    📎 {f.name}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      )}
-
-      <p className="text-[11px] text-gray-400 mt-1">
-        {new Date(msg.created_at).toLocaleString()}
-      </p>
-    </div>
-  ))}
-</div>
-
-
-{/* Single composer per listing */}
-<div className="mt-3 border-t pt-3">
-  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-    <input
-      type="file"
-      accept="image/*,video/*"
-      multiple
-      onChange={(e) => onPickFiles(lid, e)}
-      className="text-xs"
-    />
-    <div className="flex-1 flex gap-2">
-      <input
-        type="text"
-        placeholder="Reply..."
-        value={replyText[lid] || ""}
-        onChange={(e) =>
-          setReplyText((prev) => ({ ...prev, [lid]: e.target.value }))
-        }
-        className="border p-1 rounded flex-1"
-      />
-      <button
-        type="button" // 🛠️ prevent any stray form submit
-        onClick={() => sendReply(lid, sellerId)}
-        className="bg-blue-600 text-white px-3 py-1 rounded"
-      >
-        Send
-      </button>
-    </div>
-  </div>
-
-  {replyFiles[lid]?.length > 0 && (
-    <div className="mt-1 text-xs text-gray-600">
-      {replyFiles[lid].map((f, idx) => (
-        <span
-          key={idx}
-          className="inline-block mr-2 truncate max-w-[12rem] align-middle"
-        >
-          📎 {f.name}
-        </span>
-      ))}
-    </div>
+      );
+    })
   )}
 </div>
 
