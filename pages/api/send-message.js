@@ -15,6 +15,10 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY || ANON_KEY);
 const ok  = (res, payload) => res.status(200).json({ ok: true,  ...payload });
 const bad = (res, msg, code = 400) => res.status(code).json({ ok: false, error: msg });
 
+// -------- logging helpers --------
+const log = (...args) => console.log('[send-message]', ...args);
+const errlog = (...args) => console.error('[send-message]', ...args);
+
 // "null"/""/undefined → null
 const coerceNull = (v) => {
   if (v === undefined || v === null) return null;
@@ -26,15 +30,26 @@ const coerceNull = (v) => {
   return v;
 };
 
-// ["72"] / "72" / 72 → 72, otherwise null
-const toInt = (v) => {
-  if (Array.isArray(v)) v = v[0];
-  if (v === undefined || v === null) return null;
-  const t = String(v).trim();
-  if (t === '' || t.toLowerCase() === 'null') return null;
-  const n = Number.parseInt(t, 10);
-  return Number.isNaN(n) ? null : n;
-};
+// listing_id normalizer: number | "72" | ["72"] | "[\"72\"]" → 72
+function normalizeInt(val) {
+  let v = val;
+  try {
+    if (Array.isArray(v)) v = v[0];
+    if (typeof v === 'string') {
+      const s = v.trim();
+      if (s.startsWith('[') && s.endsWith(']')) {
+        const parsed = JSON.parse(s);
+        v = Array.isArray(parsed) ? parsed[0] : parsed;
+      } else {
+        v = s;
+      }
+    }
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
 
 const isImage = (m) => typeof m === 'string' && m.startsWith('image/');
 const isVideo = (m) => typeof m === 'string' && m.startsWith('video/');
@@ -57,16 +72,10 @@ async function uploadOne({ file, listingId, actorEmail, actorRole }) {
     upsert: false,
   });
   if (error) {
-    console.warn('Storage upload failed:', error.message);
+    errlog('Storage upload failed:', error.message);
     return null;
   }
-  return {
-    path,
-    name: file.originalFilename || base,
-    size: file.size || buffer.length || null,
-    mime: mime || null,
-    kind,
-  };
+  return { path, name: file.originalFilename || base, size: file.size || buffer.length || null, mime: mime || null, kind };
 }
 
 async function parseMultipart(req) {
@@ -79,66 +88,49 @@ async function parseMultipart(req) {
 async function resolveSellerId({ listing_id, seller_email }) {
   if (!seller_email) return null;
 
-  const { data: byEmail } = await supabase
+  const { data: byEmail, error: e1 } = await supabase
     .from('sellers')
     .select('id,email')
     .eq('email', seller_email)
     .limit(1)
     .maybeSingle();
+  if (e1) errlog('resolve by email error:', e1.message);
   if (byEmail?.id) return byEmail.id;
 
   if (listing_id) {
-    const { data: listingRow } = await supabase
+    const { data: listingRow, error: e2 } = await supabase
       .from('sellers')
       .select('id,email')
       .eq('id', listing_id)
       .limit(1)
       .maybeSingle();
+    if (e2) errlog('resolve by listing error:', e2.message);
     if (listingRow?.id) return listingRow.id;
   }
   return null;
 }
 
-async function insertMessage({
-  listing_id,
-  buyer_email,
-  buyer_name,
-  seller_id,      // optional
-  sender_id,      // optional (uuid of whoever sent)
-  message,
-  topic = 'business-inquiry',
-  is_deal_proposal = false,
-  attachments = [],
-}) {
-  const row = {
-    listing_id,
-    message: message || '',
-    topic,
-    is_deal_proposal: Boolean(is_deal_proposal),
-    attachments, // JSONB
-  };
-  if (buyer_email) row.buyer_email = buyer_email;
-  if (buyer_name)  row.buyer_name  = buyer_name;
-  if (seller_id)   row.seller_id   = seller_id;
-  if (sender_id)   row.sender_id   = sender_id;
-
+async function insertMessage(row) {
+  log('INSERT row:', row); // 🔎 log the exact payload we insert
   const { error, data } = await supabase.from('messages').insert([row]).select().single();
   if (error) throw new Error(error.message);
   return data;
 }
 
 export default async function handler(req, res) {
+  const contentType = req.headers['content-type'] || '';
+  log('REQUEST', { method: req.method, contentType });
+
   if (req.method !== 'POST') return bad(res, 'Method not allowed', 405);
 
   try {
-    const contentType = req.headers['content-type'] || '';
-
     // ---------- MULTIPART ----------
     if (contentType.includes('multipart/form-data')) {
       const { fields, files } = await parseMultipart(req);
+      log('FIELDS (raw):', fields);
 
-      const listing_id = toInt(fields.listing_id ?? fields.listingId);
-      if (!listing_id) return bad(res, 'Missing listing_id');
+      const listing_id = normalizeInt(fields.listing_id ?? fields.listingId);
+      if (!listing_id) return bad(res, 'Invalid listing_id');
 
       const buyer_email = coerceNull(fields.buyer_email);
       const buyer_name  = coerceNull(fields.buyer_name);
@@ -170,7 +162,7 @@ export default async function handler(req, res) {
         }
       }
 
-      const row = await insertMessage({
+      const row = {
         listing_id,
         buyer_email,
         buyer_name,
@@ -178,25 +170,28 @@ export default async function handler(req, res) {
         sender_id,
         message,
         topic,
-        is_deal_proposal,
+        is_deal_proposal: Boolean(is_deal_proposal),
         attachments,
-      });
+      };
 
-      return ok(res, { message: row, uploaded: attachments.length });
+      const out = await insertMessage(row);
+      return ok(res, { message: out, uploaded: attachments.length });
     }
 
     // ---------- JSON ----------
-    const body = await new Promise((resolve, reject) => {
+    const bodyText = await new Promise((resolve, reject) => {
       let data = '';
       req.on('data', (c) => (data += c));
-      req.on('end', () => {
-        try { resolve(JSON.parse(data || '{}')); } catch (e) { reject(e); }
-      });
+      req.on('end', () => resolve(data || '{}'));
       req.on('error', reject);
     });
+    log('JSON body (raw):', bodyText);
 
-    const listing_id  = toInt(body.listing_id ?? body.listingId);
-    if (!listing_id) return bad(res, 'Missing listing_id');
+    let body;
+    try { body = JSON.parse(bodyText); } catch (e) { return bad(res, 'Invalid JSON'); }
+
+    const listing_id  = normalizeInt(body.listing_id ?? body.listingId);
+    if (!listing_id) return bad(res, 'Invalid listing_id');
 
     const buyer_email = coerceNull(body.buyer_email);
     const buyer_name  = coerceNull(body.buyer_name);
@@ -213,7 +208,7 @@ export default async function handler(req, res) {
     }
 
     // sanitize attachments
-    const safeAtt = (Array.isArray(body.attachments) ? body.attachments : [])
+    const attachments = (Array.isArray(body.attachments) ? body.attachments : [])
       .filter(a => a && typeof a === 'object')
       .map(a => ({
         path: a.path,
@@ -226,7 +221,7 @@ export default async function handler(req, res) {
       }))
       .filter(a => a.kind === 'image' || a.kind === 'video');
 
-    const row = await insertMessage({
+    const row = {
       listing_id,
       buyer_email,
       buyer_name,
@@ -234,13 +229,15 @@ export default async function handler(req, res) {
       sender_id,
       message,
       topic,
-      is_deal_proposal,
-      attachments: safeAtt,
-    });
+      is_deal_proposal: Boolean(is_deal_proposal),
+      attachments,
+    };
 
-    return ok(res, { message: row, uploaded: 0 });
-  } catch (err) {
-    console.error('send-message error:', err);
-    return bad(res, `Failed to send message: ${err.message}`, 500);
+    const out = await insertMessage(row);
+    return ok(res, { message: out, uploaded: 0 });
+  } catch (e) {
+    errlog('ERROR:', e.message);
+    return bad(res, `Failed to send message: ${e.message}`, 500);
   }
 }
+
