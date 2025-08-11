@@ -98,44 +98,44 @@ export default function ListingDetail() {
     return sections;
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!message || !buyer || !listing) return;
+ async function handleSubmit(e) {
+  e.preventDefault();
+  if (!message || !buyer || !listing) return;
 
-    const formData = new FormData();
-formData.append('message', message);
+  const formData = new FormData();
+  formData.append('message', message);
 
-// ✅ do NOT send seller_id; let the API resolve it
-if (listing.email) formData.append('seller_email', listing.email);
+  // Don't send seller_id; API will resolve if needed
+  if (listing.email) formData.append('seller_email', listing.email);
 
-formData.append('listing_id', listing.id);
-formData.append('buyer_name', buyer.name || buyer.full_name || buyer.email);
-formData.append('buyer_email', buyer.email);
-formData.append('topic', 'business-inquiry');
-formData.append('extension', 'successionbridge');
+  formData.append('listing_id', listing.id);
+  formData.append('buyer_name', buyer.name || buyer.full_name || buyer.email);
+  formData.append('buyer_email', buyer.email);
+  formData.append('topic', 'business-inquiry');
+  formData.append('extension', 'successionbridge');
 
-if (attachment) formData.append('attachment', attachment);
+  if (attachment) formData.append('attachment', attachment);
 
-const response = await fetch('/api/send-message', {
-  method: 'POST',
-  body: formData,
-});
+  try {
+    const response = await fetch('/api/send-message', {
+      method: 'POST',
+      body: formData,
+    });
 
-    
-      const result = await response.json();
-      if (!response.ok) {
-        alert('Message failed to send.');
-      } else {
-        alert('✅ Message sent to the seller!');
-        setMessage('');
-        setAttachment(null);
-        setSuccess(true);
-      }
-    } catch (err) {
-      console.error('❌ Error sending message:', err);
-      alert('Something went wrong.');
+    const result = await response.json();
+    if (!response.ok) {
+      alert('Message failed to send.');
+    } else {
+      alert('✅ Message sent to the seller!');
+      setMessage('');
+      setAttachment(null);
+      setSuccess(true);
     }
+  } catch (err) {
+    console.error('❌ Error sending message:', err);
+    alert('Something went wrong.');
   }
+}
 
   async function handleSaveListing() {
     if (!buyer) {
