@@ -103,22 +103,25 @@ export default function ListingDetail() {
     if (!message || !buyer || !listing) return;
 
     const formData = new FormData();
-    formData.append('message', message);
-    formData.append('seller_id', listing.auth_id);
-    formData.append('listing_id', listing.id);
-    formData.append('buyer_name', buyer.name || buyer.full_name || buyer.email);
-    formData.append('buyer_email', buyer.email);
-    formData.append('topic', 'business-inquiry');
-    formData.append('extension', 'successionbridge');
+formData.append('message', message);
 
-    if (attachment) formData.append('attachment', attachment); // ✅ Add file
+// ✅ do NOT send seller_id; let the API resolve it
+if (listing.email) formData.append('seller_email', listing.email);
 
-    try {
-      const response = await fetch('/api/send-message', {
-        method: 'POST',
-        body: formData,
-      });
+formData.append('listing_id', listing.id);
+formData.append('buyer_name', buyer.name || buyer.full_name || buyer.email);
+formData.append('buyer_email', buyer.email);
+formData.append('topic', 'business-inquiry');
+formData.append('extension', 'successionbridge');
 
+if (attachment) formData.append('attachment', attachment);
+
+const response = await fetch('/api/send-message', {
+  method: 'POST',
+  body: formData,
+});
+
+    
       const result = await response.json();
       if (!response.ok) {
         alert('Message failed to send.');
