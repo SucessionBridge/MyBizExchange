@@ -6,17 +6,16 @@ import fs from 'fs';
 export const config = { api: { bodyParser: false } };
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY; // prefer service role
-const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY; // fallback
+const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY;      // prefer service role (bypasses RLS)
+const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;  // fallback
 const BUCKET = 'message-attachments';
 
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY || ANON_KEY);
 
-// ---- helpers ----
 const ok  = (res, payload) => res.status(200).json({ ok: true,  ...payload });
 const bad = (res, msg, code = 400) => res.status(code).json({ ok: false, error: msg });
 
-// coerce "null" / "" / undefined → null
+// "null"/""/undefined → null
 const coerceNull = (v) => {
   if (v === undefined || v === null) return null;
   if (typeof v === 'string') {
@@ -137,10 +136,9 @@ export default async function handler(req, res) {
       const topic       = coerceNull(fields.topic) || 'business-inquiry';
       const is_deal_proposal = ['true','1','yes'].includes(String(fields.is_deal_proposal || '').toLowerCase());
 
-      // If client sent the literal "null", coerce to null, then resolve, else keep it.
-      let seller_id    = coerceNull(fields.seller_id);
+      let seller_id     = coerceNull(fields.seller_id);
       const seller_email = coerceNull(fields.seller_email);
-      let sender_id    = coerceNull(fields.sender_id);
+      let sender_id     = coerceNull(fields.sender_id);
 
       if (!seller_id && seller_email) {
         seller_id = await resolveSellerId({ listing_id, seller_email });
@@ -196,9 +194,9 @@ export default async function handler(req, res) {
     const topic       = coerceNull(body.topic) || 'business-inquiry';
     const is_deal_proposal = Boolean(body.is_deal_proposal);
 
-    let seller_id  = coerceNull(body.seller_id);
+    let seller_id     = coerceNull(body.seller_id);
     const seller_email = coerceNull(body.seller_email);
-    let sender_id  = coerceNull(body.sender_id);
+    let sender_id     = coerceNull(body.sender_id);
 
     if (!seller_id && seller_email) {
       seller_id = await resolveSellerId({ listing_id, seller_email });
@@ -233,7 +231,7 @@ export default async function handler(req, res) {
     return ok(res, { message: row, uploaded: 0 });
   } catch (err) {
     console.error('send-message error:', err);
-    // Return the real reason so we can see it in the Network tab
     return bad(res, `Failed to send message: ${err.message}`, 500);
   }
 }
+
