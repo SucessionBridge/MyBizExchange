@@ -134,17 +134,19 @@ async function fetchBuyerMessages(email) {
         }
       }
 
-      // 2) Insert message with text + attachments
-      const { error: insertErr } = await supabase.from('messages').insert([{
-        buyer_name: buyerProfile.name,
-        buyer_email: buyerProfile.email,
-        message: text,
-        seller_id: sellerId || null,
-        listing_id: listingId,
-        topic: 'business-inquiry',
-        is_deal_proposal: false,
-        attachments, // JSONB
-      }]);
+    // 2) Insert message with text + attachments
+const { error: insertErr } = await supabase.from('messages').insert([{
+  buyer_name: buyerProfile.name,
+  buyer_email: buyerProfile.email,
+  sender_id: buyerProfile.auth_id,   // ✅ added: who sent the message
+  message: text,
+  seller_id: sellerId || null,
+  listing_id: listingId,
+  topic: 'business-inquiry',
+  is_deal_proposal: false,
+  attachments, // JSONB
+}]);
+
 
       if (insertErr) {
         console.error('❌ Insert message failed:', insertErr);
