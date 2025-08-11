@@ -92,22 +92,33 @@ export default function DealMaker() {
     setAckEquity(false);
     setReviewOpen(true);
   };
+const sendDealToSeller = async (dealText) => {
+  if (!buyer || !listing) return;
 
-  const sendDealToSeller = async (dealText) => {
-    if (!buyer || !listing) return;
-
-    await supabase.from('messages').insert([
-      {
-        listing_id: listing.id,
-        sender_id: buyer.auth_id,
+  try {
+    const res = await fetch('/api/send-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        listing_id: listing.id,                           // required
+        buyer_email: buyer.email,                         // required for threading on buyer side
+        buyer_name: buyer.name || buyer.full_name || buyer.email,
         message: dealText,
+        topic: 'deal-proposal',
         is_deal_proposal: true,
-      },
-    ]);
+        // NO seller_id, NO seller_email, NO attachments here
+      }),
+    });
+const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || 'Failed to send');
 
     alert('✅ Deal proposal sent to seller!');
     router.push(`/listings/${listing.id}`);
-  };
+  } catch (err) {
+    console.error('sendDealToSeller failed:', err);
+    alert('Sending failed. Please try again.');
+  }
+};
 
   if (!listing || !buyer) {
     return <div className="p-8 text-center text-gray-600">Loading deal maker...</div>;
