@@ -55,23 +55,32 @@ export default function SellerDashboard() {
     })();
 
     // Load all messages where this seller is a participant
-    (async () => {
-      setLoadingMessages(true);
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .or(`seller_email.eq.${sellerEmail},buyer_email.eq.${sellerEmail}`)
-        .order('created_at', { ascending: true });
-
-      if (error) {
-        console.error('Failed to fetch messages:', error.message);
-        setMessages([]);
-      } else {
-        setMessages(data || []);
-      }
-      setLoadingMessages(false);
-    })();
+    fetchMessages(sellerEmail);
   }, [sellerEmail]);
+
+  // 🛠️ FIX: Avoid PostgREST .or() by fetching both sides separately and merging.
+  async function fetchMessages(email) {
+    setLoadingMessages(true);
+    try {
+      const [asSeller, asBuyer] = await Promise.all([
+        supabase.from('messages').select('*').eq('seller_email', email),
+        supabase.from('messages').select('*').eq('buyer_email', email),
+      ]);
+
+      if (asSeller.error) throw asSeller.error;
+      if (asBuyer.error) throw asBuyer.error;
+
+      const rows = [...(asSeller.data || []), ...(asBuyer.data || [])]
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+      setMessages(rows);
+    } catch (err) {
+      console.error('Failed to fetch messages:', err);
+      setMessages([]);
+    } finally {
+      setLoadingMessages(false);
+    }
+  }
 
   // Group messages by listing_id
   const threadsByListing = useMemo(() => {
@@ -99,84 +108,83 @@ export default function SellerDashboard() {
   }
 
   async function sendReply(listingId) {
-    if (!sellerEmail) return;
-    const text = replyText[listingId]?.trim() || '';
-    const files = replyFiles[listingId] || [];
+    try {
+      if (!sellerEmail) return;
+      const text = replyText[listingId]?.trim() || '';
+      const files = replyFiles[listingId] || [];
+      if (!text && files.length === 0) return;
 
-    if (!text && files.length === 0) return;
+      // Determine the buyer_email from the thread (last message that has buyer_email not equal seller)
+      const thread = threadsByListing[listingId] || [];
+      const lastBuyerMsg = [...thread].reverse().find((m) => m.buyer_email && m.buyer_email !== sellerEmail);
+      const buyerEmail = lastBuyerMsg?.buyer_email || null;
 
-    // Determine the buyer_email from the thread (last message that has buyer_email)
-    const thread = threadsByListing[listingId] || [];
-    const lastBuyerMsg = [...thread].reverse().find((m) => m.buyer_email && m.buyer_email !== sellerEmail);
-    const buyerEmail = lastBuyerMsg?.buyer_email || null;
-
-    if (!buyerEmail) {
-      alert('No buyer participant found in this thread yet.');
-      return;
-    }
-
-    // Upload attachments
-    let attachments = [];
-    if (files.length > 0) {
-      for (const file of files) {
-        const isImage = file.type?.startsWith('image/');
-        const isVideo = file.type?.startsWith('video/');
-        if (!isImage && !isVideo) continue;
-
-        const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-        const path = `listing-${listingId}/seller-${sellerEmail}/${Date.now()}-${safeName}`;
-        const { error: upErr } = await supabase.storage
-          .from(ATTACH_BUCKET)
-          .upload(path, file, { cacheControl: '3600', upsert: false });
-        if (upErr) {
-          console.error('Upload failed:', upErr.message);
-          alert('Attachment upload failed. Please try again or remove the file(s).');
-          return;
-        }
-        attachments.push({
-          path,
-          name: file.name,
-          size: file.size,
-          mime: file.type,
-          kind: isImage ? 'image' : 'video',
-        });
+      if (!buyerEmail) {
+        alert('No buyer participant found in this thread yet.');
+        return;
       }
+
+      // Upload attachments
+      let attachments = [];
+      if (files.length > 0) {
+        for (const file of files) {
+          const isImage = file.type?.startsWith('image/');
+          const isVideo = file.type?.startsWith('video/');
+          if (!isImage && !isVideo) continue;
+
+          const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+          const path = `listing-${listingId}/seller-${sellerEmail}/${Date.now()}-${safeName}`;
+          const { error: upErr } = await supabase.storage
+            .from(ATTACH_BUCKET)
+            .upload(path, file, { cacheControl: '3600', upsert: false });
+          if (upErr) {
+            console.error('Upload failed:', upErr.message);
+            alert('Attachment upload failed. Please try again or remove the file(s).');
+            return;
+          }
+          attachments.push({
+            path,
+            name: file.name,
+            size: file.size,
+            mime: file.type,
+            kind: isImage ? 'image' : 'video',
+          });
+        }
+      }
+
+      // Insert message from seller
+      const sellerName =
+        sellerListings.find((l) => l.email === sellerEmail)?.contact_name ||
+        sellerListings.find((l) => l.email === sellerEmail)?.business_name ||
+        'Seller';
+
+      const { error: insertErr } = await supabase.from('messages').insert([
+        {
+          listing_id: listingId,
+          seller_email: sellerEmail,
+          seller_name: sellerName,
+          buyer_email: buyerEmail, // for threading to work for both parties
+          message: text,
+          topic: 'business-inquiry',
+          is_deal_proposal: false,
+          attachments,
+        },
+      ]);
+      if (insertErr) {
+        console.error('Insert message failed:', insertErr.message);
+        alert('Sending failed. Please try again.');
+        return;
+      }
+
+      setReplyText((prev) => ({ ...prev, [listingId]: '' }));
+      setReplyFiles((prev) => ({ ...prev, [listingId]: [] }));
+
+      // Refresh messages
+      await fetchMessages(sellerEmail);
+    } catch (err) {
+      console.error('sendReply crashed:', err);
+      alert('Something went wrong while sending. Please try again.');
     }
-
-    // Insert message from seller
-    const sellerName =
-      sellerListings.find((l) => l.email === sellerEmail)?.contact_name ||
-      sellerListings.find((l) => l.email === sellerEmail)?.business_name ||
-      'Seller';
-
-    const { error: insertErr } = await supabase.from('messages').insert([
-      {
-        listing_id: listingId,
-        seller_email: sellerEmail,
-        seller_name: sellerName,
-        buyer_email: buyerEmail, // for threading to work for both parties
-        message: text,
-        topic: 'business-inquiry',
-        is_deal_proposal: false,
-        attachments,
-      },
-    ]);
-    if (insertErr) {
-      console.error('Insert message failed:', insertErr.message);
-      alert('Sending failed. Please try again.');
-      return;
-    }
-
-    setReplyText((prev) => ({ ...prev, [listingId]: '' }));
-    setReplyFiles((prev) => ({ ...prev, [listingId]: [] }));
-
-    // Refresh messages
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*')
-      .or(`seller_email.eq.${sellerEmail},buyer_email.eq.${sellerEmail}`)
-      .order('created_at', { ascending: true });
-    if (!error) setMessages(data || []);
   }
 
   if (!user) {
@@ -317,6 +325,7 @@ export default function SellerDashboard() {
                             className="border p-1 rounded flex-1"
                           />
                           <button
+                            type="button" // 🛠️ prevent any stray form submit
                             onClick={() => sendReply(lid)}
                             className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded"
                           >
@@ -355,22 +364,14 @@ export default function SellerDashboard() {
   );
 }
 
-/** Inline preview for message attachments */
+/** Inline preview for message attachments (public bucket) */
 function AttachmentPreview({ att }) {
-  const [url, setUrl] = useState(null);
+  const { data } = supabase
+    .storage
+    .from('message-attachments')
+    .getPublicUrl(att.path);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const { data, error } = await supabase
-        .storage
-        .from('message-attachments')
-        .createSignedUrl(att.path, 3600);
-      if (!error && alive) setUrl(data?.signedUrl || null);
-    })();
-    return () => { alive = false; };
-  }, [att?.path]);
-
+  const url = data?.publicUrl;
   if (!url) return null;
 
   if (att.kind === 'image') {
