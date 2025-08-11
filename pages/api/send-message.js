@@ -26,6 +26,16 @@ const coerceNull = (v) => {
   return v;
 };
 
+// ["72"] / "72" / 72 → 72, otherwise null
+const toInt = (v) => {
+  if (Array.isArray(v)) v = v[0];
+  if (v === undefined || v === null) return null;
+  const t = String(v).trim();
+  if (t === '' || t.toLowerCase() === 'null') return null;
+  const n = Number.parseInt(t, 10);
+  return Number.isNaN(n) ? null : n;
+};
+
 const isImage = (m) => typeof m === 'string' && m.startsWith('image/');
 const isVideo = (m) => typeof m === 'string' && m.startsWith('video/');
 const safeName = (n = '') => String(n).replace(/[^\w.\-]+/g, '_').slice(-180) || `file_${Date.now()}`;
@@ -127,7 +137,7 @@ export default async function handler(req, res) {
     if (contentType.includes('multipart/form-data')) {
       const { fields, files } = await parseMultipart(req);
 
-      const listing_id = coerceNull(fields.listing_id ?? fields.listingId);
+      const listing_id = toInt(fields.listing_id ?? fields.listingId);
       if (!listing_id) return bad(res, 'Missing listing_id');
 
       const buyer_email = coerceNull(fields.buyer_email);
@@ -185,7 +195,7 @@ export default async function handler(req, res) {
       req.on('error', reject);
     });
 
-    const listing_id  = coerceNull(body.listing_id ?? body.listingId);
+    const listing_id  = toInt(body.listing_id ?? body.listingId);
     if (!listing_id) return bad(res, 'Missing listing_id');
 
     const buyer_email = coerceNull(body.buyer_email);
@@ -234,4 +244,3 @@ export default async function handler(req, res) {
     return bad(res, `Failed to send message: ${err.message}`, 500);
   }
 }
-
