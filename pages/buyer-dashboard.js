@@ -96,86 +96,76 @@ export default function BuyerDashboard() {
     setReplyFiles(prev => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
 
-  // ✅ Send via /api/send-message (service role). Keep signature but ignore sellerId.
-// ✅ Uses /api/send-message (service role). Resolves seller_email via sellers table by listingId.
-async function sendReply(listingId /* ignore sellerId param */) {
-  try {
-    const text = (replyText[listingId] || '').trim();
-    const files = replyFiles[listingId] || [];
-    if (!text && files.length === 0) return;
-    if (!buyerProfile?.email) return;
+  // ✅ Buyer → Seller: use /api/send-message (service role). No extra columns.
+  async function sendReply(listingId /* sellerId not used */) {
+    try {
+      const text = (replyText[listingId] || '').trim();
+      const files = replyFiles[listingId] || [];
+      if (!text && files.length === 0) return;
+      if (!buyerProfile?.email) return;
 
-    // 1) Look up seller_email from sellers table for this listing
-    const { data: sellerRow, error: sellerErr } = await supabase
-      .from('sellers')
-      .select('email')
-      .eq('id', listingId)
-      .maybeSingle();
+      // Find seller_email for this listing (API resolves seller_id from this)
+      const { data: sellerRow, error: sellerErr } = await supabase
+        .from('sellers')
+        .select('email')
+        .eq('id', listingId)
+        .maybeSingle();
 
-    if (sellerErr) {
-      console.error('seller lookup failed:', sellerErr);
-      alert('Could not find seller for this listing.');
-      return;
-    }
-    const seller_email = sellerRow?.email;
-    if (!seller_email) {
-      alert('No seller email on file for this listing.');
-      return;
-    }
-
-    // 2) Build payload for API
-    if (files.length > 0) {
-      // multipart (API will upload attachments for us)
-      const fd = new FormData();
-      fd.append('listing_id', String(listingId));
-      fd.append('buyer_email', buyerProfile.email);
-      fd.append('buyer_name', buyerProfile.name || buyerProfile.email);
-      fd.append('seller_email', seller_email);
-      fd.append('message', text);
-      fd.append('topic', 'business-inquiry');
-      fd.append('is_deal_proposal', 'false');
-      files.slice(0, 5).forEach((f) => fd.append('attachments', f, f.name));
-
-      const res = await fetch('/api/send-message', { method: 'POST', body: fd });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error('send-message (buyer) failed:', err);
-        alert(err?.error || 'Sending failed (buyer).');
+      if (sellerErr || !sellerRow?.email) {
+        console.error('seller lookup failed:', sellerErr);
+        alert('Could not find seller for this listing.');
         return;
       }
-    } else {
-      // JSON-only
-      const res = await fetch('/api/send-message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listing_id: Number(listingId),
-          buyer_email: buyerProfile.email,
-          buyer_name: buyerProfile.name || buyerProfile.email,
-          seller_email,
-          message: text,
-          topic: 'business-inquiry',
-          is_deal_proposal: false,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error('send-message (buyer) failed:', err);
-        alert(err?.error || 'Sending failed (buyer).');
-        return;
-      }
-    }
 
-    // 3) Reset UI + reload thread list
-    setReplyText((prev) => ({ ...prev, [listingId]: '' }));
-    setReplyFiles((prev) => ({ ...prev, [listingId]: [] }));
-    await fetchBuyerMessages(buyerProfile.email);
-  } catch (err) {
-    console.error('❌ sendReply(buyer) crashed:', err);
-    alert('Something went wrong while sending. Please try again.');
+      if (files.length > 0) {
+        const fd = new FormData();
+        fd.append('listing_id', String(listingId));
+        fd.append('buyer_email', buyerProfile.email);
+        fd.append('buyer_name', buyerProfile.name || buyerProfile.email);
+        fd.append('seller_email', sellerRow.email);
+        fd.append('message', text);
+        fd.append('topic', 'business-inquiry');
+        fd.append('is_deal_proposal', 'false');
+        files.slice(0, 5).forEach((f) => fd.append('attachments', f, f.name));
+
+        const res = await fetch('/api/send-message', { method: 'POST', body: fd });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.error('send-message (buyer) failed:', err);
+          alert(err?.error || 'Sending failed (buyer).');
+          return;
+        }
+      } else {
+        const res = await fetch('/api/send-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            listing_id: Number(listingId),
+            buyer_email: buyerProfile.email,
+            buyer_name: buyerProfile.name || buyerProfile.email,
+            seller_email: sellerRow.email,
+            message: text,
+            topic: 'business-inquiry',
+            is_deal_proposal: false,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.error('send-message (buyer) failed:', err);
+          alert(err?.error || 'Sending failed (buyer).');
+          return;
+        }
+      }
+
+      // Reset UI + reload
+      setReplyText(prev => ({ ...prev, [listingId]: '' }));
+      setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
+      await fetchBuyerMessages(buyerProfile.email);
+    } catch (err) {
+      console.error('❌ sendReply crashed:', err);
+      alert('Something went wrong while sending. Please try again.');
+    }
   }
-}
-
 
   async function handleUnsave(listingId) {
     await supabase
@@ -227,6 +217,7 @@ async function sendReply(listingId /* ignore sellerId param */) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {matches.map(listing => (
                   <div key={listing.id} className="bg-gray-50 border rounded-xl shadow-sm hover:shadow-md transition">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={listing.image_urls?.[0] || "/placeholder-listing.jpg"}
                       alt="Business"
@@ -257,6 +248,7 @@ async function sendReply(listingId /* ignore sellerId param */) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {savedListings.map(entry => (
                   <div key={entry.id} className="bg-gray-50 border rounded-xl shadow-sm hover:shadow-md transition">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={entry.sellers?.image_urls?.[0] || "/placeholder-listing.jpg"}
                       alt="Listing"
@@ -264,7 +256,7 @@ async function sendReply(listingId /* ignore sellerId param */) {
                     />
                     <div className="p-4">
                       <h3 className="text-lg font-bold">{entry.sellers?.industry} in {entry.sellers?.location}</h3>
-                      <p className="text-gray-700">Asking Price: ${entry.sellers?.asking_price?.toLocaleString()}</p>
+                      <p className="text-gray-700">Asking Price: ${entry.sellers?.asking_price?.toLocaleString?.()}</p>
                       <div className="mt-3 flex justify-between">
                         <button
                           onClick={() => router.push(`/listings/${entry.listing_id}`)}
@@ -297,10 +289,7 @@ async function sendReply(listingId /* ignore sellerId param */) {
               listingIds.map((lid) => {
                 const thread = (threadsByListing[lid] || [])
                   .slice()
-                  .sort(
-                    (a, b) =>
-                      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-                  );
+                  .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
                 const lastMsg = thread[thread.length - 1];
                 const sellerId = lastMsg?.seller_id || thread[0]?.seller_id || null;
 
@@ -322,22 +311,25 @@ async function sendReply(listingId /* ignore sellerId param */) {
                         <div key={msg.id}>
                           <div
                             className={`p-2 rounded-lg ${
-                              msg.from_seller === true
-                                ? "bg-green-100 text-green-900"
-                                : "bg-blue-100 text-blue-900"
+                              msg.buyer_email === buyerProfile.email
+                                ? "bg-blue-100 text-blue-900"
+                                : "bg-green-100 text-green-900"
                             }`}
                           >
-                            <strong>{msg.from_seller === true ? "Seller" : "You"}:</strong>{" "}
+                            <strong>{msg.buyer_email === buyerProfile.email ? "You" : "Seller"}:</strong>{" "}
                             {msg.message}
                           </div>
 
-                          {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
-                            <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                              {msg.attachments.map((att, i) => (
-                                <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
-                              ))}
-                            </div>
-                          )}
+                          {(() => {
+                            const safeAttachments = Array.isArray(msg.attachments) ? msg.attachments : [];
+                            return safeAttachments.length > 0 ? (
+                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {safeAttachments.map((att, i) => (
+                                  <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
+                                ))}
+                              </div>
+                            ) : null;
+                          })()}
 
                           <p className="text-[11px] text-gray-400 mt-1">
                             {new Date(msg.created_at).toLocaleString()}
@@ -361,13 +353,11 @@ async function sendReply(listingId /* ignore sellerId param */) {
                             type="text"
                             placeholder="Reply..."
                             value={replyText[lid] || ""}
-                            onChange={(e) =>
-                              setReplyText((prev) => ({ ...prev, [lid]: e.target.value }))
-                            }
+                            onChange={(e) => setReplyText((prev) => ({ ...prev, [lid]: e.target.value }))}
                             className="border p-1 rounded flex-1"
                           />
                           <button
-                            type="button" // 🛠️ prevent any stray form submit
+                            type="button"
                             onClick={() => sendReply(lid, sellerId)}
                             className="bg-blue-600 text-white px-3 py-1 rounded"
                           >
@@ -379,10 +369,7 @@ async function sendReply(listingId /* ignore sellerId param */) {
                       {replyFiles[lid]?.length > 0 && (
                         <div className="mt-1 text-xs text-gray-600">
                           {replyFiles[lid].map((f, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-block mr-2 truncate max-w-[12rem] align-middle"
-                            >
+                            <span key={idx} className="inline-block mr-2 truncate max-w-[12rem] align-middle">
                               📎 {f.name}
                             </span>
                           ))}
@@ -415,6 +402,7 @@ async function sendReply(listingId /* ignore sellerId param */) {
               <div className="mt-4">
                 <p className="font-semibold mb-2">Intro Video / Photo:</p>
                 {buyerProfile.video_introduction.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={buyerProfile.video_introduction} alt="Buyer" className="w-full rounded-lg border" />
                 ) : (
                   <video src={buyerProfile.video_introduction} controls className="w-full rounded-lg border" />
@@ -454,4 +442,5 @@ function AttachmentPreview({ att }) {
     </a>
   );
 }
+
 
