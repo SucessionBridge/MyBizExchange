@@ -153,17 +153,17 @@ export default function SellerDashboard() {
       }
 
       // Insert message from seller (no seller_email column; use sender_id)
-      const { error: insertErr } = await supabase.from('messages').insert([
-        {
-          listing_id: listingId,
-          buyer_email: buyerEmail,     // keep for buyer-side threading
-          sender_id: user.id,          // ✅ marks this message as sent by the seller
-          message: text,
-          topic: 'business-inquiry',
-          is_deal_proposal: false,
-          attachments,
-        },
-      ]);
+     const { error: insertErr } = await supabase.from('messages').insert([
+  {
+    listing_id: listingId,
+    buyer_email: buyerEmail,
+    message: text,
+    topic: 'business-inquiry',
+    is_deal_proposal: false,
+    attachments,
+  },
+]);
+
       if (insertErr) {
         console.error('Insert message failed:', insertErr.message);
         alert('Sending failed. Please try again.');
