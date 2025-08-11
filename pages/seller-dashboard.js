@@ -107,96 +107,93 @@ export default function SellerDashboard() {
     setReplyFiles((prev) => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
 
-  // ✅ Fixed seller reply: includes buyer_name and uses seller_id=user.id (auth UUID). No unknown columns.
-  async function sendReply(listingId) {
-    try {
-      if (!sellerEmail || !user) return;
-      const text = (replyText[listingId] || '').trim();
-      const files = replyFiles[listingId] || [];
-      if (!text && files.length === 0) return;
+// ✅ Uses /api/send-message (service role). Pulls buyer_email/name from current thread.
+async function sendReply(listingId) {
+  try {
+    if (!user?.email) return;
+    const text = (replyText[listingId] || '').trim();
+    const files = replyFiles[listingId] || [];
+    if (!text && files.length === 0) return;
 
-      // Determine the buyer participant from the thread
-      const thread = threadsByListing[listingId] || [];
-      const knownBuyerMsg =
-        [...thread].reverse().find((m) => m.buyer_email && m.buyer_email.trim()) ||
-        thread.find((m) => m.buyer_email && m.buyer_email.trim());
+    // 1) Find the buyer participant for this thread
+    const thread = threadsByListing[listingId] || [];
+    const knownBuyer =
+      [...thread].reverse().find((m) => m.buyer_email && m.buyer_email.trim()) ||
+      thread.find((m) => m.buyer_email && m.buyer_email.trim());
 
-      const buyerEmail = knownBuyerMsg?.buyer_email || thread[0]?.buyer_email || null;
-      const buyerName =
-        (knownBuyerMsg?.buyer_name && knownBuyerMsg.buyer_name.trim())
-          ? knownBuyerMsg.buyer_name
-          : (buyerEmail ?? 'Buyer');
+    const buyer_email = knownBuyer?.buyer_email || thread[0]?.buyer_email || null;
+    const buyer_name =
+      (knownBuyer?.buyer_name && knownBuyer.buyer_name.trim())
+        ? knownBuyer.buyer_name
+        : (buyer_email ?? 'Buyer');
 
-      if (!buyerEmail) {
-        alert('No buyer participant found in this thread yet.');
+    if (!buyer_email) {
+      alert('No buyer found for this conversation yet.');
+      return;
+    }
+
+    // 2) Build payload for API
+    if (files.length > 0) {
+      // multipart
+      const fd = new FormData();
+      fd.append('listing_id', String(listingId));
+      fd.append('buyer_email', buyer_email);
+      fd.append('buyer_name', buyer_name);
+      fd.append('seller_email', user.email); // API resolves seller_id from this
+      fd.append('message', text);
+      fd.append('topic', 'business-inquiry');
+      fd.append('is_deal_proposal', 'false');
+      files.slice(0, 5).forEach((f) => fd.append('attachments', f, f.name));
+
+      const res = await fetch('/api/send-message', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error('send-message (seller) failed:', err);
+        alert(err?.error || 'Sending failed (seller).');
         return;
       }
-
-      // Upload attachments
-      let attachments = [];
-      if (files.length > 0) {
-        for (const file of files) {
-          const isImage = file.type?.startsWith('image/');
-          const isVideo = file.type?.startsWith('video/');
-          if (!isImage && !isVideo) continue;
-
-          const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-          const path = `listing-${listingId}/seller-${sellerEmail}/${Date.now()}-${safeName}`;
-          const { error: upErr } = await supabase.storage
-            .from(ATTACH_BUCKET)
-            .upload(path, file, { cacheControl: '3600', upsert: false });
-          if (upErr) {
-            console.error('Upload failed:', upErr);
-            alert('Attachment upload failed. Please try again or remove the file(s).');
-            return;
-          }
-          attachments.push({
-            path,
-            name: file.name,
-            size: file.size,
-            mime: file.type,
-            kind: isImage ? 'image' : 'video',
-          });
-        }
-      }
-
-      // Insert message from seller (NO sender_id column, and NO from_seller column)
-      const { error: insertErr } = await supabase.from('messages').insert([
-        {
-          listing_id: listingId,
-          buyer_email: buyerEmail,
-          buyer_name: buyerName,   // NOT NULL in your schema
-          seller_id: user.id,      // seller auth UUID fits uuid FK
+    } else {
+      // JSON-only
+      const res = await fetch('/api/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listing_id: Number(listingId),
+          buyer_email,
+          buyer_name,
+          seller_email: user.email, // API resolves seller_id
           message: text,
           topic: 'business-inquiry',
           is_deal_proposal: false,
-          attachments,
-        },
-      ]);
-      if (insertErr) {
-        console.error('Insert message failed:', insertErr);
-        alert(insertErr.message || 'Sending failed. Please try again.');
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error('send-message (seller) failed:', err);
+        alert(err?.error || 'Sending failed (seller).');
         return;
       }
-
-      setReplyText((prev) => ({ ...prev, [listingId]: '' }));
-      setReplyFiles((prev) => ({ ...prev, [listingId]: [] }));
-
-      // Refresh messages
-      const ids = (sellerListings || []).map((l) => l.id).filter(Boolean);
-      if (ids.length > 0) {
-        const { data, error } = await supabase
-          .from('messages')
-          .select('*')
-          .in('listing_id', ids)
-          .order('created_at', { ascending: true });
-        if (!error) setMessages(data || []);
-      }
-    } catch (err) {
-      console.error('sendReply crashed:', err);
-      alert('Something went wrong while sending. Please try again.');
     }
+
+    // 3) Reset UI + refresh threads
+    setReplyText((prev) => ({ ...prev, [listingId]: '' }));
+    setReplyFiles((prev) => ({ ...prev, [listingId]: [] }));
+
+    const ids = (sellerListings || []).map((l) => l.id).filter(Boolean);
+    if (ids.length > 0) {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .in('listing_id', ids)
+        .order('created_at', { ascending: true });
+      if (!error) setMessages(data || []);
+    }
+  } catch (err) {
+    console.error('❌ sendReply(seller) crashed:', err);
+    alert('Something went wrong while sending. Please try again.');
   }
+}
+
 
   if (!user) {
     return <div className="p-8 text-center text-gray-600">Loading dashboard…</div>;
