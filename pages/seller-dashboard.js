@@ -107,50 +107,93 @@ export default function SellerDashboard() {
     setReplyFiles((prev) => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
 
-  async function sendReply(listingId) {
-    try {
-      if (!sellerEmail || !user) return;
-      const text = replyText[listingId]?.trim() || '';
-      const files = replyFiles[listingId] || [];
-      if (!text && files.length === 0) return;
+async function sendReply(listingId) {
+  try {
+    if (!sellerEmail || !user) return;
+    const text = (replyText[listingId] || '').trim();
+    const files = replyFiles[listingId] || [];
+    if (!text && files.length === 0) return;
 
-      // Determine the buyer_email from the thread
-      const thread = threadsByListing[listingId] || [];
-      const lastBuyerMsg = [...thread].reverse().find((m) => m.buyer_email && m.buyer_email !== sellerEmail);
-      const buyerEmail = lastBuyerMsg?.buyer_email || null;
+    // 1) find buyer participant from the thread
+    const thread = threadsByListing[listingId] || [];
+    const lastBuyerMsg = [...thread].reverse()
+      .find(m => m.buyer_email && m.buyer_email !== sellerEmail);
 
-      if (!buyerEmail) {
-        alert('No buyer participant found in this thread yet.');
-        return;
-      }
+    const buyerEmail = lastBuyerMsg?.buyer_email || null;
+    const buyerName  = lastBuyerMsg?.buyer_name || lastBuyerMsg?.buyer_email || null;
 
-      // Upload attachments
-      let attachments = [];
-      if (files.length > 0) {
-        for (const file of files) {
-          const isImage = file.type?.startsWith('image/');
-          const isVideo = file.type?.startsWith('video/');
-          if (!isImage && !isVideo) continue;
+    if (!buyerEmail) {
+      alert('No buyer participant found in this thread yet.');
+      return;
+    }
 
-          const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-          const path = `listing-${listingId}/seller-${sellerEmail}/${Date.now()}-${safeName}`;
-          const { error: upErr } = await supabase.storage
-            .from(ATTACH_BUCKET)
-            .upload(path, file, { cacheControl: '3600', upsert: false });
-          if (upErr) {
-            console.error('Upload failed:', upErr.message);
-            alert('Attachment upload failed. Please try again or remove the file(s).');
-            return;
-          }
-          attachments.push({
-            path,
-            name: file.name,
-            size: file.size,
-            mime: file.type,
-            kind: isImage ? 'image' : 'video',
-          });
+    // 2) upload attachments
+    let attachments = [];
+    if (files.length > 0) {
+      for (const file of files) {
+        const isImage = file.type?.startsWith('image/');
+        const isVideo = file.type?.startsWith('video/');
+        if (!isImage && !isVideo) continue;
+
+        const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+        const path = `listing-${listingId}/seller-${sellerEmail}/${Date.now()}-${safeName}`;
+
+        const { error: upErr } = await supabase.storage
+          .from(ATTACH_BUCKET)
+          .upload(path, file, { cacheControl: '3600', upsert: false });
+
+        if (upErr) {
+          console.error('Upload failed:', upErr);
+          alert('Attachment upload failed. Please try again or remove the file(s).');
+          return;
         }
+        attachments.push({
+          path,
+          name: file.name,
+          size: file.size,
+          mime: file.type,
+          kind: isImage ? 'image' : 'video',
+        });
       }
+    }
+
+    // 3) insert message
+    const { error: insertErr } = await supabase.from('messages').insert([{
+      listing_id: listingId,
+      buyer_email: buyerEmail,
+      buyer_name: buyerName,      // ✅ REQUIRED (your table has NOT NULL)
+      seller_id: user.id,         // ✅ seller’s auth UUID (satisfies uuid constraint)
+      message: text,
+      topic: 'business-inquiry',
+      is_deal_proposal: false,
+      attachments,
+    }]);
+
+    if (insertErr) {
+      console.error('Insert message failed:', insertErr);
+      alert(insertErr.message || 'Sending failed. Please try again.');
+      return;
+    }
+
+    // 4) reset UI and refresh thread
+    setReplyText(prev => ({ ...prev, [listingId]: '' }));
+    setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
+
+    const ids = (sellerListings || []).map(l => l.id).filter(Boolean);
+    if (ids.length > 0) {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .in('listing_id', ids)
+        .order('created_at', { ascending: true });
+      if (!error) setMessages(data || []);
+    }
+  } catch (err) {
+    console.error('sendReply crashed:', err);
+    alert('Something went wrong while sending. Please try again.');
+  }
+}
+
 
       // Insert message from seller (no seller_email column; use sender_id)
      const { error: insertErr } = await supabase.from('messages').insert([
