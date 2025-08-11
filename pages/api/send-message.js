@@ -31,15 +31,12 @@ function isVideo(m) { return typeof m === 'string' && m.startsWith('video/'); }
 function toSafeName(name = '') {
   return String(name).replace(/[^\w.\-]+/g, '_').slice(-180) || `file_${Date.now()}`;
 }
-
-/** Upload one formidable file to Storage, return attachment object */
+/** Upload one formidable file to Storage, return attachment object (Buffer-based, not stream) */
 async function uploadOne({ file, listingId, actorEmail, actorRole }) {
-  // robust guards against missing mime/original name
   const mime = file.mimetype || file.mime || '';
   const ext = (file.originalFilename || '').split('.').pop() || '';
-  const kind = isImage(mime) ? 'image' : (isVideo(mime) ? 'video' : 'other');
-
-  if (kind === 'other') return null; // skip non-image/video quietly
+  const kind = (mime.startsWith('image/') ? 'image' : (mime.startsWith('video/') ? 'video' : 'other'));
+  if (kind === 'other') return null; // skip non-image/video
 
   const baseName = toSafeName(file.originalFilename || `upload.${ext || 'bin'}`);
   const dir =
@@ -48,12 +45,16 @@ async function uploadOne({ file, listingId, actorEmail, actorRole }) {
       : `listing-${listingId}/buyer-${actorEmail}`;
   const path = `${dir}/${Date.now()}-${baseName}`;
 
-  // Read as stream and upload
-  const stream = fs.createReadStream(file.filepath);
+  // 🔧 Read file into a Buffer to avoid Node 18 "duplex" requirement
+  const buffer = await fs.promises.readFile(file.filepath);
+
   const { error } = await supabase
     .storage
     .from(BUCKET)
-    .upload(path, stream, { contentType: mime || undefined, upsert: false });
+    .upload(path, buffer, {
+      contentType: mime || 'application/octet-stream',
+      upsert: false,
+    });
 
   if (error) {
     console.warn('Storage upload failed:', error.message);
@@ -63,11 +64,12 @@ async function uploadOne({ file, listingId, actorEmail, actorRole }) {
   return {
     path,
     name: file.originalFilename || baseName,
-    size: file.size || null,
+    size: file.size || buffer.length || null,
     mime: mime || null,
     kind,
   };
 }
+
 
 // Parse multipart with formidable
 async function parseMultipart(req) {
