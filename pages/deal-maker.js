@@ -96,31 +96,35 @@ const sendDealToSeller = async (dealText) => {
   if (!buyer || !listing) return;
 
   try {
-   const res = await fetch('/api/send-message', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    listing_id: listing.id,
-    buyer_email: buyer.email,
-    buyer_name: buyer.name || buyer.full_name || buyer.email,
-    message: dealText,
-    topic: 'deal-proposal',
-    is_deal_proposal: true,
-    // sender_id is optional here; the API currently ignores it
-  }),
-});
- 
-  
-const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || 'Failed to send');
+    const body = {
+      listing_id: listing.id,
+      buyer_email: buyer.email,
+      buyer_name: buyer.name || buyer.full_name || buyer.email,
+      message: dealText,
+      topic: 'deal-proposal',
+      is_deal_proposal: true,
+    };
+
+    // Optional: only include if it's a real UUID string you have
+    if (buyer.auth_id) body.sender_id = buyer.auth_id;
+
+    const res = await fetch('/api/send-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || 'Failed to send message');
 
     alert('✅ Deal proposal sent to seller!');
     router.push(`/listings/${listing.id}`);
   } catch (err) {
     console.error('sendDealToSeller failed:', err);
-    alert('Sending failed. Please try again.');
+    alert(err.message || 'Sending failed. Please try again.');
   }
 };
+
 
   if (!listing || !buyer) {
     return <div className="p-8 text-center text-gray-600">Loading deal maker...</div>;
