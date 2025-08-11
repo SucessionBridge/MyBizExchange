@@ -21,6 +21,7 @@ export default function SellerDashboard() {
 
   const ATTACH_BUCKET = 'message-attachments';
 
+  // Auth
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase.auth.getUser();
@@ -33,10 +34,10 @@ export default function SellerDashboard() {
     })();
   }, [router]);
 
+  // Load this seller's listings
   useEffect(() => {
     if (!sellerEmail) return;
 
-    // Load this seller's listings
     (async () => {
       setLoadingListings(true);
       const { data, error } = await supabase
@@ -53,34 +54,34 @@ export default function SellerDashboard() {
       }
       setLoadingListings(false);
     })();
-
-    // Load all messages where this seller is a participant
-    fetchMessages(sellerEmail);
   }, [sellerEmail]);
 
-  // 🛠️ FIX: Avoid PostgREST .or() by fetching both sides separately and merging.
-  async function fetchMessages(email) {
-    setLoadingMessages(true);
-    try {
-      const [asSeller, asBuyer] = await Promise.all([
-        supabase.from('messages').select('*').eq('seller_email', email),
-        supabase.from('messages').select('*').eq('buyer_email', email),
-      ]);
-
-      if (asSeller.error) throw asSeller.error;
-      if (asBuyer.error) throw asBuyer.error;
-
-      const rows = [...(asSeller.data || []), ...(asBuyer.data || [])]
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-      setMessages(rows);
-    } catch (err) {
-      console.error('Failed to fetch messages:', err);
+  // Load messages for all of this seller's listing IDs
+  useEffect(() => {
+    const ids = (sellerListings || []).map(l => l.id).filter(Boolean);
+    if (ids.length === 0) {
       setMessages([]);
-    } finally {
       setLoadingMessages(false);
+      return;
     }
-  }
+
+    (async () => {
+      setLoadingMessages(true);
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .in('listing_id', ids)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Failed to fetch messages:', error.message);
+        setMessages([]);
+      } else {
+        setMessages(data || []);
+      }
+      setLoadingMessages(false);
+    })();
+  }, [sellerListings]);
 
   // Group messages by listing_id
   const threadsByListing = useMemo(() => {
@@ -91,7 +92,6 @@ export default function SellerDashboard() {
       if (!map[lid]) map[lid] = [];
       map[lid].push(msg);
     }
-    // ensure chronological
     Object.keys(map).forEach((lid) => {
       map[lid].sort(
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -109,12 +109,12 @@ export default function SellerDashboard() {
 
   async function sendReply(listingId) {
     try {
-      if (!sellerEmail) return;
+      if (!sellerEmail || !user) return;
       const text = replyText[listingId]?.trim() || '';
       const files = replyFiles[listingId] || [];
       if (!text && files.length === 0) return;
 
-      // Determine the buyer_email from the thread (last message that has buyer_email not equal seller)
+      // Determine the buyer_email from the thread
       const thread = threadsByListing[listingId] || [];
       const lastBuyerMsg = [...thread].reverse().find((m) => m.buyer_email && m.buyer_email !== sellerEmail);
       const buyerEmail = lastBuyerMsg?.buyer_email || null;
@@ -152,18 +152,12 @@ export default function SellerDashboard() {
         }
       }
 
-      // Insert message from seller
-      const sellerName =
-        sellerListings.find((l) => l.email === sellerEmail)?.contact_name ||
-        sellerListings.find((l) => l.email === sellerEmail)?.business_name ||
-        'Seller';
-
+      // Insert message from seller (no seller_email column; use sender_id)
       const { error: insertErr } = await supabase.from('messages').insert([
         {
           listing_id: listingId,
-          seller_email: sellerEmail,
-          seller_name: sellerName,
-          buyer_email: buyerEmail, // for threading to work for both parties
+          buyer_email: buyerEmail,     // keep for buyer-side threading
+          sender_id: user.id,          // ✅ marks this message as sent by the seller
           message: text,
           topic: 'business-inquiry',
           is_deal_proposal: false,
@@ -180,7 +174,15 @@ export default function SellerDashboard() {
       setReplyFiles((prev) => ({ ...prev, [listingId]: [] }));
 
       // Refresh messages
-      await fetchMessages(sellerEmail);
+      const ids = (sellerListings || []).map(l => l.id).filter(Boolean);
+      if (ids.length > 0) {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .in('listing_id', ids)
+          .order('created_at', { ascending: true });
+        if (!error) setMessages(data || []);
+      }
     } catch (err) {
       console.error('sendReply crashed:', err);
       alert('Something went wrong while sending. Please try again.');
@@ -278,32 +280,32 @@ export default function SellerDashboard() {
 
                     {/* Thread bubbles */}
                     <div className="space-y-2">
-                      {thread.map((msg) => (
-                        <div key={msg.id}>
-                          <div
-                            className={`p-2 rounded-lg ${
-                              msg.seller_email === sellerEmail
-                                ? 'bg-amber-100 text-amber-900'
-                                : 'bg-blue-100 text-blue-900'
-                            }`}
-                          >
-                            <strong>{msg.seller_email === sellerEmail ? 'You' : 'Buyer'}:</strong>{' '}
-                            {msg.message}
-                          </div>
-
-                          {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
-                            <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                              {msg.attachments.map((att, i) => (
-                                <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
-                              ))}
+                      {thread.map((msg) => {
+                        const mine = msg.sender_id === user.id;
+                        return (
+                          <div key={msg.id}>
+                            <div
+                              className={`p-2 rounded-lg ${
+                                mine ? 'bg-amber-100 text-amber-900' : 'bg-blue-100 text-blue-900'
+                              }`}
+                            >
+                              <strong>{mine ? 'You' : 'Buyer'}:</strong> {msg.message}
                             </div>
-                          )}
 
-                          <p className="text-[11px] text-gray-400 mt-1">
-                            {new Date(msg.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                      ))}
+                            {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
+                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {msg.attachments.map((att, i) => (
+                                  <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
+                                ))}
+                              </div>
+                            )}
+
+                            <p className="text-[11px] text-gray-400 mt-1">
+                              {new Date(msg.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Single composer per listing */}
@@ -325,7 +327,7 @@ export default function SellerDashboard() {
                             className="border p-1 rounded flex-1"
                           />
                           <button
-                            type="button" // 🛠️ prevent any stray form submit
+                            type="button"
                             onClick={() => sendReply(lid)}
                             className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded"
                           >
@@ -387,4 +389,3 @@ function AttachmentPreview({ att }) {
     </a>
   );
 }
-
