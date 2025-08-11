@@ -98,14 +98,14 @@ export default function ListingDetail() {
     return sections;
   }
 
- async function handleSubmit(e) {
+async function handleSubmit(e) {
   e.preventDefault();
   if (!message || !buyer || !listing) return;
 
   const formData = new FormData();
   formData.append('message', message);
 
-  // Don't send seller_id; API will resolve if needed
+  // ✅ Do NOT send seller_id; let API resolve by email if you have it
   if (listing.email) formData.append('seller_email', listing.email);
 
   formData.append('listing_id', listing.id);
@@ -123,8 +123,10 @@ export default function ListingDetail() {
     });
 
     const result = await response.json();
+
     if (!response.ok) {
-      alert('Message failed to send.');
+      console.error('❌ send-message failed:', result);
+      alert(result?.error || 'Message failed to send.');
     } else {
       alert('✅ Message sent to the seller!');
       setMessage('');
@@ -136,6 +138,7 @@ export default function ListingDetail() {
     alert('Something went wrong.');
   }
 }
+
 
   async function handleSaveListing() {
     if (!buyer) {
