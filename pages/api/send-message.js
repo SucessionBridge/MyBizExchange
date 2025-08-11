@@ -8,11 +8,10 @@ export const config = {
 };
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY; // recommended
-const ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY; // fallback
+const SERVICE_KEY  = process.env.SUPABASE_SERVICE_ROLE_KEY; // recommended (bypasses RLS server-side)
+const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY; // fallback
 const BUCKET = 'message-attachments';
 
-// Prefer service-role (bypasses RLS for server-side)
 const supabase = createClient(SUPABASE_URL, SERVICE_KEY || ANON_KEY);
 
 function ok(res, payload) { res.status(200).json({ ok: true, ...payload }); }
@@ -21,6 +20,19 @@ function bad(res, msg, code = 400) { res.status(code).json({ ok: false, error: m
 const isImage = (m) => typeof m === 'string' && m.startsWith('image/');
 const isVideo = (m) => typeof m === 'string' && m.startsWith('video/');
 const safeName = (n = '') => String(n).replace(/[^\w.\-]+/g, '_').slice(-180) || `file_${Date.now()}`;
+
+// ---------- normalization helpers (prevent "null" string in UUID/text) ----------
+function norm(v) {
+  const s = (v ?? '').toString().trim();
+  if (!s) return null;
+  const lo = s.toLowerCase();
+  return (lo === 'null' || lo === 'undefined') ? null : s;
+}
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+function asUUID(v) {
+  const s = norm(v);
+  return s && UUID_RE.test(s) ? s : null;
+}
 
 /** Upload one file to Storage using Buffer (avoids Node18 duplex) */
 async function uploadOne({ file, listingId, actorEmail, actorRole }) {
@@ -63,7 +75,8 @@ async function parseMultipart(req) {
 /** Try to resolve seller_id if only seller_email provided */
 async function resolveSellerId({ listing_id, seller_email }) {
   if (!seller_email) return null;
-  // 1) try the listing owner with this email
+
+  // 1) try the seller row with this email
   const { data: byEmail } = await supabase
     .from('sellers')
     .select('id,email')
@@ -90,7 +103,8 @@ async function insertMessage({
   listing_id,
   buyer_email,
   buyer_name,
-  seller_id,        // optional (resolved if missing)
+  seller_id,        // optional UUID
+  sender_id,        // optional UUID (who sent)
   message,
   topic = 'business-inquiry',
   is_deal_proposal = false,
@@ -105,7 +119,8 @@ async function insertMessage({
   };
   if (buyer_email) row.buyer_email = buyer_email;
   if (buyer_name) row.buyer_name = buyer_name;
-  if (seller_id) row.seller_id = seller_id;
+  if (seller_id)  row.seller_id  = seller_id;
+  if (sender_id)  row.sender_id  = sender_id;
 
   const { error, data } = await supabase.from('messages').insert([row]).select().single();
   if (error) throw new Error(error.message);
@@ -118,21 +133,21 @@ export default async function handler(req, res) {
   try {
     const contentType = req.headers['content-type'] || '';
 
+    // -------- MULTIPART CALLERS ----------
     if (contentType.includes('multipart/form-data')) {
-      // -------- MULTIPART CALLERS (legacy forms) ----------
       const { fields, files } = await parseMultipart(req);
 
-      const listing_id = fields.listing_id?.toString() || fields.listingId?.toString();
-      const buyer_email = fields.buyer_email?.toString() || '';
-      const buyer_name = fields.buyer_name?.toString() || '';
-      const message = fields.message?.toString() || '';
-      const topic = (fields.topic?.toString() || 'business-inquiry');
-      const is_deal_proposal = ['true','1','yes'].includes((fields.is_deal_proposal || '').toString().toLowerCase());
+      const listing_id       = norm(fields.listing_id ?? fields.listingId);
+      const buyer_email      = norm(fields.buyer_email);
+      const buyer_name       = norm(fields.buyer_name);
+      const message          = norm(fields.message);
+      const topic            = norm(fields.topic) || 'business-inquiry';
+      const is_deal_proposal = ['true','1','yes'].includes((fields.is_deal_proposal ?? '').toString().toLowerCase());
+      const sender_id        = asUUID(fields.sender_id);
 
       if (!listing_id) return bad(res, 'Missing listing_id');
 
-      // Determine actor role/email for storage path
-      const seller_email = fields.seller_email?.toString() || '';
+      const seller_email = norm(fields.seller_email);
       const actorRole = fields.actor_role?.toString() ||
         (buyer_email && !seller_email ? 'buyer' : 'seller');
       const actorEmail = actorRole === 'seller' ? (seller_email || 'seller') : (buyer_email || 'buyer');
@@ -155,7 +170,7 @@ export default async function handler(req, res) {
       }
 
       // Resolve seller_id if provided via field, else attempt via seller_email/listing
-      let seller_id = fields.seller_id?.toString() || null;
+      let seller_id = asUUID(fields.seller_id);
       if (!seller_id) {
         seller_id = await resolveSellerId({ listing_id, seller_email });
       }
@@ -165,6 +180,7 @@ export default async function handler(req, res) {
         buyer_email,
         buyer_name,
         seller_id,
+        sender_id,
         message,
         topic,
         is_deal_proposal,
@@ -186,17 +202,24 @@ export default async function handler(req, res) {
       listing_id, listingId,
       buyer_email, buyer_name,
       seller_id, seller_email,
+      sender_id,
       message, topic, is_deal_proposal,
       attachments = [], // already-uploaded {path,name,size,mime,kind}
     } = body || {};
 
-    const lid = listing_id || listingId;
+    const lid   = norm(listing_id ?? listingId);
     if (!lid) return bad(res, 'Missing listing_id');
 
-    let sid = seller_id || null;
-    if (!sid && seller_email) {
-      sid = await resolveSellerId({ listing_id: lid, seller_email });
-    }
+    let sid     = asUUID(seller_id);
+    const sMail = norm(seller_email);
+    if (!sid && sMail) sid = await resolveSellerId({ listing_id: lid, seller_email: sMail });
+
+    const snd   = asUUID(sender_id);
+    const bMail = norm(buyer_email);
+    const bName = norm(buyer_name);
+    const msg   = norm(message);
+    const top   = norm(topic) || 'business-inquiry';
+    const deal  = Boolean(is_deal_proposal);
 
     // Accept only image/video attachments
     const safeAtt = (Array.isArray(attachments) ? attachments : [])
@@ -213,12 +236,13 @@ export default async function handler(req, res) {
 
     const row = await insertMessage({
       listing_id: lid,
-      buyer_email,
-      buyer_name,
-      seller_id: sid,
-      message,
-      topic: topic || 'business-inquiry',
-      is_deal_proposal: Boolean(is_deal_proposal),
+      buyer_email: bMail,
+      buyer_name:  bName,
+      seller_id:   sid,
+      sender_id:   snd,
+      message:     msg,
+      topic:       top,
+      is_deal_proposal: deal,
       attachments: safeAtt,
     });
 
