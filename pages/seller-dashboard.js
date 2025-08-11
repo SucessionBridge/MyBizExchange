@@ -58,7 +58,7 @@ export default function SellerDashboard() {
 
   // Load messages for all of this seller's listing IDs
   useEffect(() => {
-    const ids = (sellerListings || []).map(l => l.id).filter(Boolean);
+    const ids = (sellerListings || []).map((l) => l.id).filter(Boolean);
     if (ids.length === 0) {
       setMessages([]);
       setLoadingMessages(false);
@@ -107,109 +107,72 @@ export default function SellerDashboard() {
     setReplyFiles((prev) => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
 
-async function sendReply(listingId) {
-  try {
-    if (!sellerEmail || !user) return;
-    const text = (replyText[listingId] || '').trim();
-    const files = replyFiles[listingId] || [];
-    if (!text && files.length === 0) return;
+  // ✅ Fixed seller reply: includes buyer_name and uses seller_id=user.id (auth UUID)
+  async function sendReply(listingId) {
+    try {
+      if (!sellerEmail || !user) return;
+      const text = (replyText[listingId] || '').trim();
+      const files = replyFiles[listingId] || [];
+      if (!text && files.length === 0) return;
 
-    // 1) find buyer participant from the thread
-    const thread = threadsByListing[listingId] || [];
-    const lastBuyerMsg = [...thread].reverse()
-      .find(m => m.buyer_email && m.buyer_email !== sellerEmail);
+      // Determine the buyer participant from the thread
+      const thread = threadsByListing[listingId] || [];
+      const lastBuyerMsg = [...thread]
+        .reverse()
+        .find((m) => m.buyer_email && m.buyer_email !== sellerEmail);
 
-    const buyerEmail = lastBuyerMsg?.buyer_email || null;
-    const buyerName  = lastBuyerMsg?.buyer_name || lastBuyerMsg?.buyer_email || null;
+      const buyerEmail = lastBuyerMsg?.buyer_email || null;
+      const buyerName = lastBuyerMsg?.buyer_name || lastBuyerMsg?.buyer_email || null;
 
-    if (!buyerEmail) {
-      alert('No buyer participant found in this thread yet.');
-      return;
-    }
-
-    // 2) upload attachments
-    let attachments = [];
-    if (files.length > 0) {
-      for (const file of files) {
-        const isImage = file.type?.startsWith('image/');
-        const isVideo = file.type?.startsWith('video/');
-        if (!isImage && !isVideo) continue;
-
-        const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-        const path = `listing-${listingId}/seller-${sellerEmail}/${Date.now()}-${safeName}`;
-
-        const { error: upErr } = await supabase.storage
-          .from(ATTACH_BUCKET)
-          .upload(path, file, { cacheControl: '3600', upsert: false });
-
-        if (upErr) {
-          console.error('Upload failed:', upErr);
-          alert('Attachment upload failed. Please try again or remove the file(s).');
-          return;
-        }
-        attachments.push({
-          path,
-          name: file.name,
-          size: file.size,
-          mime: file.type,
-          kind: isImage ? 'image' : 'video',
-        });
+      if (!buyerEmail) {
+        alert('No buyer participant found in this thread yet.');
+        return;
       }
-    }
 
-    // 3) insert message
-    const { error: insertErr } = await supabase.from('messages').insert([{
-      listing_id: listingId,
-      buyer_email: buyerEmail,
-      buyer_name: buyerName,      // ✅ REQUIRED (your table has NOT NULL)
-      seller_id: user.id,         // ✅ seller’s auth UUID (satisfies uuid constraint)
-      message: text,
-      topic: 'business-inquiry',
-      is_deal_proposal: false,
-      attachments,
-    }]);
+      // Upload attachments
+      let attachments = [];
+      if (files.length > 0) {
+        for (const file of files) {
+          const isImage = file.type?.startsWith('image/');
+          const isVideo = file.type?.startsWith('video/');
+          if (!isImage && !isVideo) continue;
 
-    if (insertErr) {
-      console.error('Insert message failed:', insertErr);
-      alert(insertErr.message || 'Sending failed. Please try again.');
-      return;
-    }
+          const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+          const path = `listing-${listingId}/seller-${sellerEmail}/${Date.now()}-${safeName}`;
+          const { error: upErr } = await supabase.storage
+            .from(ATTACH_BUCKET)
+            .upload(path, file, { cacheControl: '3600', upsert: false });
+          if (upErr) {
+            console.error('Upload failed:', upErr);
+            alert('Attachment upload failed. Please try again or remove the file(s).');
+            return;
+          }
+          attachments.push({
+            path,
+            name: file.name,
+            size: file.size,
+            mime: file.type,
+            kind: isImage ? 'image' : 'video',
+          });
+        }
+      }
 
-    // 4) reset UI and refresh thread
-    setReplyText(prev => ({ ...prev, [listingId]: '' }));
-    setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
-
-    const ids = (sellerListings || []).map(l => l.id).filter(Boolean);
-    if (ids.length > 0) {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .in('listing_id', ids)
-        .order('created_at', { ascending: true });
-      if (!error) setMessages(data || []);
-    }
-  } catch (err) {
-    console.error('sendReply crashed:', err);
-    alert('Something went wrong while sending. Please try again.');
-  }
-}
-
-
-      // Insert message from seller (no seller_email column; use sender_id)
-     const { error: insertErr } = await supabase.from('messages').insert([
-  {
-    listing_id: listingId,
-    buyer_email: buyerEmail,
-    message: text,
-    topic: 'business-inquiry',
-    is_deal_proposal: false,
-    attachments,
-  },
-]);
-
+      // Insert message from seller (NO sender_id column)
+      const { error: insertErr } = await supabase.from('messages').insert([
+        {
+          listing_id: listingId,
+          buyer_email: buyerEmail,
+          buyer_name: buyerName,   // ✅ NOT NULL in your schema
+          seller_id: user.id,      // ✅ seller auth UUID fits uuid FK
+          message: text,
+          topic: 'business-inquiry',
+          is_deal_proposal: false,
+          attachments,
+        },
+      ]);
       if (insertErr) {
-        console.error('Insert message failed:', insertErr.message);
-        alert('Sending failed. Please try again.');
+        console.error('Insert message failed:', insertErr);
+        alert(insertErr.message || 'Sending failed. Please try again.');
         return;
       }
 
@@ -217,7 +180,7 @@ async function sendReply(listingId) {
       setReplyFiles((prev) => ({ ...prev, [listingId]: [] }));
 
       // Refresh messages
-      const ids = (sellerListings || []).map(l => l.id).filter(Boolean);
+      const ids = (sellerListings || []).map((l) => l.id).filter(Boolean);
       if (ids.length > 0) {
         const { data, error } = await supabase
           .from('messages')
@@ -262,7 +225,10 @@ async function sendReply(listingId) {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {sellerListings.map((lst) => (
-                  <div key={lst.id} className="bg-gray-50 border rounded-xl shadow-sm hover:shadow-md transition">
+                  <div
+                    key={lst.id}
+                    className="bg-gray-50 border rounded-xl shadow-sm hover:shadow-md transition"
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={lst.image_urls?.[0] || '/placeholder-listing.jpg'}
@@ -270,10 +236,20 @@ async function sendReply(listingId) {
                       className="w-full h-32 object-cover rounded-t-xl"
                     />
                     <div className="p-4">
-                      <h3 className="text-lg font-bold">{lst.business_name || 'Business Listing'}</h3>
-                      <p className="text-gray-700"><strong>Industry:</strong> {lst.industry || '—'}</p>
-                      <p className="text-gray-700"><strong>Asking Price:</strong> {lst.asking_price ? `$${Number(lst.asking_price).toLocaleString()}` : '—'}</p>
-                      <p className="text-gray-700"><strong>Location:</strong> {lst.city || lst.location_city || '—'}, {lst.state_or_province || lst.location_state || '—'}</p>
+                      <h3 className="text-lg font-bold">
+                        {lst.business_name || 'Business Listing'}
+                      </h3>
+                      <p className="text-gray-700">
+                        <strong>Industry:</strong> {lst.industry || '—'}
+                      </p>
+                      <p className="text-gray-700">
+                        <strong>Asking Price:</strong>{' '}
+                        {lst.asking_price ? `$${Number(lst.asking_price).toLocaleString()}` : '—'}
+                      </p>
+                      <p className="text-gray-700">
+                        <strong>Location:</strong> {lst.city || lst.location_city || '—'},{' '}
+                        {lst.state_or_province || lst.location_state || '—'}
+                      </p>
                       <div className="mt-3 flex gap-2">
                         <button
                           onClick={() => router.push(`/listings/${lst.id}`)}
@@ -295,7 +271,7 @@ async function sendReply(listingId) {
             )}
           </div>
 
-          {/* Conversations (threaded: one composer per listing) */}
+          {/* Conversations */}
           <div className="bg-white p-6 rounded-xl shadow">
             <h2 className="text-xl font-semibold text-blue-800 mb-4">Buyer Conversations</h2>
             {loadingMessages ? (
@@ -324,7 +300,7 @@ async function sendReply(listingId) {
                     {/* Thread bubbles */}
                     <div className="space-y-2">
                       {thread.map((msg) => {
-                        const mine = msg.sender_id === user.id;
+                        const mine = msg.seller_id === user.id; // seller's replies
                         return (
                           <div key={msg.id}>
                             <div
@@ -366,7 +342,9 @@ async function sendReply(listingId) {
                             type="text"
                             placeholder="Reply to buyer…"
                             value={replyText[lid] || ''}
-                            onChange={(e) => setReplyText((prev) => ({ ...prev, [lid]: e.target.value }))}
+                            onChange={(e) =>
+                              setReplyText((prev) => ({ ...prev, [lid]: e.target.value }))
+                            }
                             className="border p-1 rounded flex-1"
                           />
                           <button
@@ -379,10 +357,13 @@ async function sendReply(listingId) {
                         </div>
                       </div>
 
-                      {(replyFiles[lid]?.length > 0) && (
+                      {replyFiles[lid]?.length > 0 && (
                         <div className="mt-1 text-xs text-gray-600">
                           {replyFiles[lid].map((f, idx) => (
-                            <span key={idx} className="inline-block mr-2 truncate max-w-[12rem] align-middle">
+                            <span
+                              key={idx}
+                              className="inline-block mr-2 truncate max-w-[12rem] align-middle"
+                            >
                               📎 {f.name}
                             </span>
                           ))}
@@ -399,9 +380,12 @@ async function sendReply(listingId) {
         {/* Right: Seller meta */}
         <div className="bg-white p-6 rounded-xl shadow h-fit">
           <h2 className="text-xl font-semibold text-amber-800 mb-4">Account</h2>
-          <p><strong>Email:</strong> {sellerEmail || '—'}</p>
+          <p>
+            <strong>Email:</strong> {sellerEmail || '—'}
+          </p>
           <p className="text-sm text-gray-600 mt-2">
-            Messages with buyers appear here grouped by listing. You can attach photos or short videos in replies.
+            Messages with buyers appear here grouped by listing. You can attach photos or short videos
+            in replies.
           </p>
         </div>
       </div>
@@ -411,17 +395,19 @@ async function sendReply(listingId) {
 
 /** Inline preview for message attachments (public bucket) */
 function AttachmentPreview({ att }) {
-  const { data } = supabase
-    .storage
-    .from('message-attachments')
-    .getPublicUrl(att.path);
-
+  const { data } = supabase.storage.from('message-attachments').getPublicUrl(att.path);
   const url = data?.publicUrl;
   if (!url) return null;
 
   if (att.kind === 'image') {
     // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt={att.name || 'attachment'} className="w-full h-32 object-cover rounded border" />;
+    return (
+      <img
+        src={url}
+        alt={att.name || 'attachment'}
+        className="w-full h-32 object-cover rounded border"
+      />
+    );
   }
   if (att.kind === 'video') {
     return <video src={url} controls className="w-full h-32 object-cover rounded border" />;
