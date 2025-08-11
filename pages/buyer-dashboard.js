@@ -71,16 +71,27 @@ export default function BuyerDashboard() {
     setSavedListings(data || []);
   }
 
+  // 🛠️ FIX: Avoid PostgREST .or() 400 by fetching both sides separately and merging.
   async function fetchBuyerMessages(email) {
     setLoadingMessages(true);
-    const { data } = await supabase
-      .from('messages')
-      .select('*')
-      .or(`buyer_email.eq.${email},seller_email.eq.${email}`)
-      .order('created_at', { ascending: true });
+    try {
+      const [buyerSide, sellerSide] = await Promise.all([
+        supabase.from('messages').select('*').eq('buyer_email', email),
+        supabase.from('messages').select('*').eq('seller_email', email),
+      ]);
 
-    setBuyerMessages(data || []);
-    setLoadingMessages(false);
+      if (buyerSide.error) throw buyerSide.error;
+      if (sellerSide.error) throw sellerSide.error;
+
+      const rows = [...(buyerSide.data || []), ...(sellerSide.data || [])]
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+      setBuyerMessages(rows);
+    } catch (err) {
+      console.error('❌ fetchBuyerMessages failed:', err);
+    } finally {
+      setLoadingMessages(false);
+    }
   }
 
   function onPickFiles(listingId, e) {
@@ -88,55 +99,69 @@ export default function BuyerDashboard() {
     setReplyFiles(prev => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
 
+  // 🛠️ FIX: stronger error handling; stays client-side (no /api/send-message)
   async function sendReply(listingId, sellerId) {
-    if (!replyText[listingId] && !(replyFiles[listingId]?.length)) return;
-    if (!buyerProfile) return;
+    try {
+      const text = (replyText[listingId] || '').trim();
+      const files = replyFiles[listingId] || [];
+      if (!text && files.length === 0) return;
+      if (!buyerProfile) return;
 
-    // 1) Upload attachments (if any)
-    let attachments = [];
-    const files = replyFiles[listingId] || [];
-    if (files.length > 0) {
-      for (const file of files) {
-        const isImage = file.type?.startsWith('image/');
-        const isVideo = file.type?.startsWith('video/');
-        if (!isImage && !isVideo) continue;
+      // 1) Upload attachments (if any)
+      let attachments = [];
+      if (files.length > 0) {
+        for (const file of files) {
+          const isImage = file.type?.startsWith('image/');
+          const isVideo = file.type?.startsWith('video/');
+          if (!isImage && !isVideo) continue;
 
-        const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-        const path = `listing-${listingId}/buyer-${buyerProfile.email}/${Date.now()}-${safeName}`;
-        const { error: upErr } = await supabase.storage
-          .from(ATTACH_BUCKET)
-          .upload(path, file, { cacheControl: '3600', upsert: false });
-        if (upErr) {
-          console.error('Upload failed:', upErr.message);
-          alert('Attachment upload failed. Please try again or remove the file(s).');
-          return;
+          const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+          const path = `listing-${listingId}/buyer-${buyerProfile.email}/${Date.now()}-${safeName}`;
+          const { error: upErr } = await supabase.storage
+            .from(ATTACH_BUCKET)
+            .upload(path, file, { cacheControl: '3600', upsert: false });
+
+          if (upErr) {
+            console.error('❌ Upload failed:', upErr);
+            alert('Attachment upload failed. Please try again or remove the file(s).');
+            return;
+          }
+          attachments.push({
+            path,
+            name: file.name,
+            size: file.size,
+            mime: file.type,
+            kind: isImage ? 'image' : 'video',
+          });
         }
-        attachments.push({
-          path,
-          name: file.name,
-          size: file.size,
-          mime: file.type,
-          kind: isImage ? 'image' : 'video',
-        });
       }
+
+      // 2) Insert message with text + attachments
+      const { error: insertErr } = await supabase.from('messages').insert([{
+        buyer_name: buyerProfile.name,
+        buyer_email: buyerProfile.email,
+        message: text,
+        seller_id: sellerId || null,
+        listing_id: listingId,
+        topic: 'business-inquiry',
+        is_deal_proposal: false,
+        attachments, // JSONB
+      }]);
+
+      if (insertErr) {
+        console.error('❌ Insert message failed:', insertErr);
+        alert('Sending message failed. Please try again.');
+        return;
+      }
+
+      // 3) Reset UI + reload
+      setReplyText(prev => ({ ...prev, [listingId]: '' }));
+      setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
+      await fetchBuyerMessages(buyerProfile.email);
+    } catch (err) {
+      console.error('❌ sendReply crashed:', err);
+      alert('Something went wrong while sending. Please try again.');
     }
-
-    // 2) Insert message with text + attachments
-    await supabase.from('messages').insert([{
-      buyer_name: buyerProfile.name,
-      buyer_email: buyerProfile.email,
-      message: replyText[listingId] || '',
-      seller_id: sellerId,
-      listing_id: listingId,
-      topic: 'business-inquiry',
-      is_deal_proposal: false,
-      attachments, // JSONB
-    }]);
-
-    // 3) Reset UI + reload
-    setReplyText(prev => ({ ...prev, [listingId]: '' }));
-    setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
-    fetchBuyerMessages(buyerProfile.email);
   }
 
   async function handleUnsave(listingId) {
@@ -315,6 +340,7 @@ export default function BuyerDashboard() {
                             className="border p-1 rounded flex-1"
                           />
                           <button
+                            type="button" // 🛠️ prevent any stray form submit
                             onClick={() => sendReply(lid, sellerId)}
                             className="bg-blue-600 text-white px-3 py-1 rounded"
                           >
@@ -379,22 +405,14 @@ export default function BuyerDashboard() {
   );
 }
 
-/** Inline preview component for message attachments */
+/** Inline preview component for message attachments (public bucket) */
 function AttachmentPreview({ att }) {
-  const [url, setUrl] = useState(null);
+  const { data } = supabase
+    .storage
+    .from('message-attachments')
+    .getPublicUrl(att.path);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      const { data, error } = await supabase
-        .storage
-        .from('message-attachments')
-        .createSignedUrl(att.path, 3600);
-      if (!error && alive) setUrl(data?.signedUrl || null);
-    })();
-    return () => { alive = false; };
-  }, [att?.path]);
-
+  const url = data?.publicUrl;
   if (!url) return null;
 
   if (att.kind === 'image') {
@@ -410,4 +428,3 @@ function AttachmentPreview({ att }) {
     </a>
   );
 }
-
