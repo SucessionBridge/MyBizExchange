@@ -96,21 +96,20 @@ const sendDealToSeller = async (dealText) => {
   if (!buyer || !listing) return;
 
   try {
-    const res = await fetch('/api/send-message', {
-     method: 'POST',
-     headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({
-       listing_id: listing.id,
-       buyer_email: buyer.email,
-       buyer_name: buyer.name || buyer.full_name || buyer.email,
-+      sender_id: buyer.auth_id,              // mark who sent
-       message: dealText,
-       topic: 'deal-proposal',
-       is_deal_proposal: true,
--      // NO seller_id, NO seller_email, NO attachments here
-+      // do not send seller_id; API will still insert cleanly
-     }),
-   });
+   const res = await fetch('/api/send-message', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    listing_id: listing.id,
+    buyer_email: buyer.email,
+    buyer_name: buyer.name || buyer.full_name || buyer.email,
+    message: dealText,
+    topic: 'deal-proposal',
+    is_deal_proposal: true,
+    // sender_id is optional here; the API currently ignores it
+  }),
+});
+ 
   
 const json = await res.json();
     if (!res.ok) throw new Error(json?.error || 'Failed to send');
