@@ -168,6 +168,7 @@ export default function SellerDashboard() {
           topic: 'business-inquiry',
           is_deal_proposal: false,
           attachments,
+          from_seller: true, 
         },
       ]);
       if (insertErr) {
@@ -300,18 +301,15 @@ export default function SellerDashboard() {
 {/* Thread bubbles */}
 <div className="space-y-2">
   {thread.map((msg) => {
-    // A seller-authored message will always have seller_id (UUID of seller).
-    // Buyer-authored messages are in the same thread but not from that seller account.
-    const isFromSeller = Boolean(msg.seller_id);
-
+    const fromSeller = msg.from_seller === true; // reliable direction flag
     return (
       <div key={msg.id}>
         <div
           className={`p-2 rounded-lg ${
-            isFromSeller ? "bg-green-100 text-green-900" : "bg-blue-100 text-blue-900"
+            fromSeller ? "bg-green-100 text-green-900" : "bg-blue-100 text-blue-900"
           }`}
         >
-          <strong>{isFromSeller ? "Seller" : "You"}:</strong> {msg.message}
+          <strong>{fromSeller ? "You" : "Buyer"}:</strong> {msg.message}
         </div>
 
         {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
