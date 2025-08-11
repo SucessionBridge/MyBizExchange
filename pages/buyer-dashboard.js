@@ -1,3 +1,4 @@
+// pages/buyer-dashboard.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from "../lib/supabaseClient";
@@ -12,7 +13,11 @@ export default function BuyerDashboard() {
 
   const [buyerMessages, setBuyerMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
-  const [replyText, setReplyText] = useState({});
+
+  // One composer per listing thread
+  const [replyText, setReplyText] = useState({});   // { [listingId]: string }
+  const [replyFiles, setReplyFiles] = useState({}); // { [listingId]: File[] }
+  const ATTACH_BUCKET = 'message-attachments';
 
   useEffect(() => {
     const fetchProfileAndListings = async () => {
@@ -42,7 +47,7 @@ export default function BuyerDashboard() {
     };
 
     fetchProfileAndListings();
-  }, []);
+  }, [router]);
 
   async function fetchMatches(userId) {
     setLoadingMatches(true);
@@ -78,18 +83,59 @@ export default function BuyerDashboard() {
     setLoadingMessages(false);
   }
 
+  function onPickFiles(listingId, e) {
+    const files = Array.from(e.target.files || []);
+    setReplyFiles(prev => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
+  }
+
   async function sendReply(listingId, sellerId) {
-    if (!replyText[listingId]) return;
+    if (!replyText[listingId] && !(replyFiles[listingId]?.length)) return;
+    if (!buyerProfile) return;
+
+    // 1) Upload attachments (if any)
+    let attachments = [];
+    const files = replyFiles[listingId] || [];
+    if (files.length > 0) {
+      for (const file of files) {
+        const isImage = file.type?.startsWith('image/');
+        const isVideo = file.type?.startsWith('video/');
+        if (!isImage && !isVideo) continue;
+
+        const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+        const path = `listing-${listingId}/buyer-${buyerProfile.email}/${Date.now()}-${safeName}`;
+        const { error: upErr } = await supabase.storage
+          .from(ATTACH_BUCKET)
+          .upload(path, file, { cacheControl: '3600', upsert: false });
+        if (upErr) {
+          console.error('Upload failed:', upErr.message);
+          alert('Attachment upload failed. Please try again or remove the file(s).');
+          return;
+        }
+        attachments.push({
+          path,
+          name: file.name,
+          size: file.size,
+          mime: file.type,
+          kind: isImage ? 'image' : 'video',
+        });
+      }
+    }
+
+    // 2) Insert message with text + attachments
     await supabase.from('messages').insert([{
       buyer_name: buyerProfile.name,
       buyer_email: buyerProfile.email,
-      message: replyText[listingId],
+      message: replyText[listingId] || '',
       seller_id: sellerId,
       listing_id: listingId,
       topic: 'business-inquiry',
       is_deal_proposal: false,
+      attachments, // JSONB
     }]);
+
+    // 3) Reset UI + reload
     setReplyText(prev => ({ ...prev, [listingId]: '' }));
+    setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
     fetchBuyerMessages(buyerProfile.email);
   }
 
@@ -106,6 +152,15 @@ export default function BuyerDashboard() {
   if (loading) {
     return <div className="p-8 text-center text-gray-600">Loading dashboard...</div>;
   }
+
+  // Group messages into threads by listing_id
+  const threadsByListing = (buyerMessages || []).reduce((acc, msg) => {
+    const lid = msg.listing_id;
+    if (!lid) return acc;
+    (acc[lid] = acc[lid] || []).push(msg);
+    return acc;
+  }, {});
+  const listingIds = Object.keys(threadsByListing);
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -193,38 +248,94 @@ export default function BuyerDashboard() {
             </div>
           )}
 
-          {/* ✅ Conversations */}
+          {/* ✅ Conversations (threaded, one composer per listing) */}
           <div className="bg-white p-6 rounded-xl shadow">
             <h2 className="text-xl font-semibold text-blue-800 mb-4">Your Conversations</h2>
             {loadingMessages ? (
               <p>Loading conversations...</p>
-            ) : buyerMessages.length === 0 ? (
+            ) : listingIds.length === 0 ? (
               <p className="text-gray-600">You haven't sent or received any messages yet.</p>
             ) : (
-              buyerMessages.map(msg => (
-                <div key={msg.id} className="mb-4 border rounded-xl p-3 bg-gray-50">
-                  <p className="text-sm text-gray-500 mb-1">Listing #{msg.listing_id}</p>
-                  <div className={`p-2 rounded-lg ${msg.buyer_email === buyerProfile.email ? "bg-blue-100 text-blue-900" : "bg-green-100 text-green-900"}`}>
-                    <strong>{msg.buyer_email === buyerProfile.email ? "You" : "Seller"}:</strong> {msg.message}
+              listingIds.map((lid) => {
+                const thread = (threadsByListing[lid] || []).slice().sort(
+                  (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                );
+                const lastMsg = thread[thread.length - 1];
+                const sellerId = lastMsg?.seller_id || thread[0]?.seller_id || null;
+
+                return (
+                  <div key={lid} className="mb-6 border rounded-xl p-3 bg-gray-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm text-gray-600">Listing #{lid}</p>
+                      <button
+                        onClick={() => router.push(`/listings/${lid}`)}
+                        className="text-blue-600 hover:underline text-xs"
+                      >
+                        View Listing
+                      </button>
+                    </div>
+
+                    {/* Thread bubbles */}
+                    <div className="space-y-2">
+                      {thread.map(msg => (
+                        <div key={msg.id}>
+                          <div className={`p-2 rounded-lg ${msg.buyer_email === buyerProfile.email ? "bg-blue-100 text-blue-900" : "bg-green-100 text-green-900"}`}>
+                            <strong>{msg.buyer_email === buyerProfile.email ? "You" : "Seller"}:</strong> {msg.message}
+                          </div>
+
+                          {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
+                            <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {msg.attachments.map((att, i) => (
+                                <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
+                              ))}
+                            </div>
+                          )}
+
+                          <p className="text-[11px] text-gray-400 mt-1">{new Date(msg.created_at).toLocaleString()}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Single composer per listing */}
+                    <div className="mt-3 border-t pt-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                        <input
+                          type="file"
+                          accept="image/*,video/*"
+                          multiple
+                          onChange={(e) => onPickFiles(lid, e)}
+                          className="text-xs"
+                        />
+                        <div className="flex-1 flex gap-2">
+                          <input
+                            type="text"
+                            placeholder="Reply..."
+                            value={replyText[lid] || ""}
+                            onChange={(e) => setReplyText(prev => ({ ...prev, [lid]: e.target.value }))}
+                            className="border p-1 rounded flex-1"
+                          />
+                          <button
+                            onClick={() => sendReply(lid, sellerId)}
+                            className="bg-blue-600 text-white px-3 py-1 rounded"
+                          >
+                            Send
+                          </button>
+                        </div>
+                      </div>
+
+                      {(replyFiles[lid]?.length > 0) && (
+                        <div className="mt-1 text-xs text-gray-600">
+                          {replyFiles[lid].map((f, idx) => (
+                            <span key={idx} className="inline-block mr-2 truncate max-w-[12rem] align-middle">
+                              📎 {f.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">{new Date(msg.created_at).toLocaleString()}</p>
-                  <div className="mt-2 flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="Reply..."
-                      value={replyText[msg.listing_id] || ""}
-                      onChange={(e) => setReplyText(prev => ({ ...prev, [msg.listing_id]: e.target.value }))}
-                      className="border p-1 rounded flex-1"
-                    />
-                    <button
-                      onClick={() => sendReply(msg.listing_id, msg.seller_id)}
-                      className="bg-blue-600 text-white px-3 py-1 rounded"
-                    >
-                      Send
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -265,6 +376,38 @@ export default function BuyerDashboard() {
         )}
       </div>
     </div>
+  );
+}
+
+/** Inline preview component for message attachments */
+function AttachmentPreview({ att }) {
+  const [url, setUrl] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const { data, error } = await supabase
+        .storage
+        .from('message-attachments')
+        .createSignedUrl(att.path, 3600);
+      if (!error && alive) setUrl(data?.signedUrl || null);
+    })();
+    return () => { alive = false; };
+  }, [att?.path]);
+
+  if (!url) return null;
+
+  if (att.kind === 'image') {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={url} alt={att.name || 'attachment'} className="w-full h-32 object-cover rounded border" />;
+  }
+  if (att.kind === 'video') {
+    return <video src={url} controls className="w-full h-32 object-cover rounded border" />;
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-sm">
+      Download {att.name || 'attachment'}
+    </a>
   );
 }
 
