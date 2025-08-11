@@ -80,20 +80,7 @@ async function parseMultipart(req) {
   });
 }
 
-async function resolveSellerId({ listing_id, seller_email }) {
-  if (!seller_email) return null;
-  const { data: byEmail } = await supabase
-    .from('sellers').select('id,email').eq('email', seller_email).limit(1).maybeSingle();
-  if (byEmail?.id) return byEmail.id;
-
-  if (listing_id) {
-    const { data: listingRow } = await supabase
-      .from('sellers').select('id,email').eq('id', listing_id).limit(1).maybeSingle();
-    if (listingRow?.id) return listingRow.id;
-  }
-  return null;
-}
-
+// Insert helper (ONLY columns that exist)
 async function insertMessage(row) {
   log('INSERT row:', row);
   const { error, data } = await supabase.from('messages').insert([row]).select().single();
@@ -118,17 +105,9 @@ export default async function handler(req, res) {
 
       const buyer_email = coerceNull(fields.buyer_email);
       const buyer_name  = coerceNull(fields.buyer_name);
-      const message     = coerceNull(fields.message) ?? '';
-      const topic       = coerceNull(fields.topic) || 'business-inquiry';
+      const message     = (coerceNull(fields.message) ?? '').toString();
+      const topic       = (coerceNull(fields.topic) || 'business-inquiry').toString();
       const is_deal_proposal = ['true','1','yes'].includes(String(first(fields.is_deal_proposal) || '').toLowerCase());
-
-      let seller_id     = coerceNull(fields.seller_id);
-      const seller_email = coerceNull(fields.seller_email);
-      // NOTE: sender_id is NOT used because your table doesn't have this column
-
-      if (!seller_id && seller_email) {
-        seller_id = await resolveSellerId({ listing_id, seller_email });
-      }
 
       // attachments
       const raw = files.attachments || files.attachment || files.file || null;
@@ -146,11 +125,16 @@ export default async function handler(req, res) {
         }
       }
 
-      // build row only with existing columns
-      const row = { listing_id, message, topic, is_deal_proposal: Boolean(is_deal_proposal), attachments };
+      // Build row WITHOUT seller_id (avoids UUID errors)
+      const row = {
+        listing_id,
+        message,
+        topic,
+        is_deal_proposal: Boolean(is_deal_proposal),
+        attachments,
+      };
       if (buyer_email) row.buyer_email = buyer_email;
       if (buyer_name)  row.buyer_name  = buyer_name;
-      if (seller_id)   row.seller_id   = seller_id;
 
       const out = await insertMessage(row);
       return ok(res, { message: out, uploaded: attachments.length });
@@ -170,15 +154,9 @@ export default async function handler(req, res) {
 
     const buyer_email = coerceNull(body.buyer_email);
     const buyer_name  = coerceNull(body.buyer_name);
-    const message     = coerceNull(body.message) ?? '';
-    const topic       = coerceNull(body.topic) || 'business-inquiry';
+    const message     = (coerceNull(body.message) ?? '').toString();
+    const topic       = (coerceNull(body.topic) || 'business-inquiry').toString();
     const is_deal_proposal = Boolean(body.is_deal_proposal);
-
-    let seller_id     = coerceNull(body.seller_id);
-    const seller_email = coerceNull(body.seller_email);
-    if (!seller_id && seller_email) {
-      seller_id = await resolveSellerId({ listing_id, seller_email });
-    }
 
     const attachments = (Array.isArray(body.attachments) ? body.attachments : [])
       .filter(a => a && typeof a === 'object')
@@ -189,11 +167,15 @@ export default async function handler(req, res) {
       }))
       .filter(a => a.kind === 'image' || a.kind === 'video');
 
-    const row = { listing_id, message, topic, is_deal_proposal: Boolean(is_deal_proposal), attachments };
+    const row = {
+      listing_id,
+      message,
+      topic,
+      is_deal_proposal: Boolean(is_deal_proposal),
+      attachments,
+    };
     if (buyer_email) row.buyer_email = buyer_email;
     if (buyer_name)  row.buyer_name  = buyer_name;
-    if (seller_id)   row.seller_id   = seller_id;
-    // no sender_id column
 
     const out = await insertMessage(row);
     return ok(res, { message: out, uploaded: 0 });
@@ -202,4 +184,3 @@ export default async function handler(req, res) {
     return bad(res, `Failed to send message: ${e.message}`, 500);
   }
 }
-
