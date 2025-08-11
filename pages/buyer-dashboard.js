@@ -71,28 +71,26 @@ export default function BuyerDashboard() {
     setSavedListings(data || []);
   }
 
-  // 🛠️ FIX: Avoid PostgREST .or() 400 by fetching both sides separately and merging.
-  async function fetchBuyerMessages(email) {
-    setLoadingMessages(true);
-    try {
-      const [buyerSide, sellerSide] = await Promise.all([
-        supabase.from('messages').select('*').eq('buyer_email', email),
-        supabase.from('messages').select('*').eq('seller_email', email),
-      ]);
+ // ✅ Only query by buyer_email (compatible with your current schema)
+async function fetchBuyerMessages(email) {
+  setLoadingMessages(true);
+  try {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('buyer_email', email)
+      .order('created_at', { ascending: true });
 
-      if (buyerSide.error) throw buyerSide.error;
-      if (sellerSide.error) throw sellerSide.error;
-
-      const rows = [...(buyerSide.data || []), ...(sellerSide.data || [])]
-        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-      setBuyerMessages(rows);
-    } catch (err) {
-      console.error('❌ fetchBuyerMessages failed:', err);
-    } finally {
-      setLoadingMessages(false);
-    }
+    if (error) throw error;
+    setBuyerMessages(data || []);
+  } catch (err) {
+    console.error('❌ fetchBuyerMessages failed:', err);
+    setBuyerMessages([]);
+  } finally {
+    setLoadingMessages(false);
   }
+}
+ 
 
   function onPickFiles(listingId, e) {
     const files = Array.from(e.target.files || []);
