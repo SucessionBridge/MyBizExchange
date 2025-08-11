@@ -97,58 +97,85 @@ export default function BuyerDashboard() {
   }
 
   // ✅ Send via /api/send-message (service role). Keep signature but ignore sellerId.
-  async function sendReply(listingId, _sellerId) {
-    try {
-      const text = (replyText[listingId] || '').trim();
-      const files = replyFiles[listingId] || [];
-      if (!text && files.length === 0) return;
-      if (!buyerProfile) return;
+// ✅ Uses /api/send-message (service role). Resolves seller_email via sellers table by listingId.
+async function sendReply(listingId /* ignore sellerId param */) {
+  try {
+    const text = (replyText[listingId] || '').trim();
+    const files = replyFiles[listingId] || [];
+    if (!text && files.length === 0) return;
+    if (!buyerProfile?.email) return;
 
-      // Resolve seller_email for this listing (API uses it to resolve seller_id)
-      const { data: sellerRow, error: sellerErr } = await supabase
-        .from('sellers')
-        .select('email')
-        .eq('id', listingId)
-        .maybeSingle();
+    // 1) Look up seller_email from sellers table for this listing
+    const { data: sellerRow, error: sellerErr } = await supabase
+      .from('sellers')
+      .select('email')
+      .eq('id', listingId)
+      .maybeSingle();
 
-      const sellerEmail = sellerRow?.email || null;
-      if (sellerErr || !sellerEmail) {
-        console.error('Could not resolve seller email for listing', listingId, sellerErr);
-        alert('Could not find seller for this listing. Please open the listing and use Contact Seller.');
-        return;
-      }
+    if (sellerErr) {
+      console.error('seller lookup failed:', sellerErr);
+      alert('Could not find seller for this listing.');
+      return;
+    }
+    const seller_email = sellerRow?.email;
+    if (!seller_email) {
+      alert('No seller email on file for this listing.');
+      return;
+    }
 
-      // Build multipart body so API handles attachment upload + DB insert
+    // 2) Build payload for API
+    if (files.length > 0) {
+      // multipart (API will upload attachments for us)
       const fd = new FormData();
       fd.append('listing_id', String(listingId));
       fd.append('buyer_email', buyerProfile.email);
       fd.append('buyer_name', buyerProfile.name || buyerProfile.email);
-      fd.append('seller_email', sellerEmail); // API resolves seller_id from this
+      fd.append('seller_email', seller_email);
       fd.append('message', text);
       fd.append('topic', 'business-inquiry');
       fd.append('is_deal_proposal', 'false');
-      fd.append('from_seller', 'false'); // direction flag (for labels)
-
-      files.forEach((file) => fd.append('attachments', file, file.name));
+      files.slice(0, 5).forEach((f) => fd.append('attachments', f, f.name));
 
       const res = await fetch('/api/send-message', { method: 'POST', body: fd });
-      let out = null;
-      try { out = await res.json(); } catch (_) {}
       if (!res.ok) {
-        console.error('send-message failed:', out || res.statusText);
-        alert(out?.error || out?.message || 'Sending failed.');
+        const err = await res.json().catch(() => ({}));
+        console.error('send-message (buyer) failed:', err);
+        alert(err?.error || 'Sending failed (buyer).');
         return;
       }
-
-      // Reset UI + reload
-      setReplyText(prev => ({ ...prev, [listingId]: '' }));
-      setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
-      await fetchBuyerMessages(buyerProfile.email);
-    } catch (err) {
-      console.error('❌ sendReply crashed:', err);
-      alert('Something went wrong while sending. Please try again.');
+    } else {
+      // JSON-only
+      const res = await fetch('/api/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          listing_id: Number(listingId),
+          buyer_email: buyerProfile.email,
+          buyer_name: buyerProfile.name || buyerProfile.email,
+          seller_email,
+          message: text,
+          topic: 'business-inquiry',
+          is_deal_proposal: false,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error('send-message (buyer) failed:', err);
+        alert(err?.error || 'Sending failed (buyer).');
+        return;
+      }
     }
+
+    // 3) Reset UI + reload thread list
+    setReplyText((prev) => ({ ...prev, [listingId]: '' }));
+    setReplyFiles((prev) => ({ ...prev, [listingId]: [] }));
+    await fetchBuyerMessages(buyerProfile.email);
+  } catch (err) {
+    console.error('❌ sendReply(buyer) crashed:', err);
+    alert('Something went wrong while sending. Please try again.');
   }
+}
+
 
   async function handleUnsave(listingId) {
     await supabase
