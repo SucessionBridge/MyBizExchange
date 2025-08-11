@@ -107,7 +107,7 @@ export default function SellerDashboard() {
     setReplyFiles((prev) => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
 
-  // ✅ Fixed seller reply: includes buyer_name and uses seller_id=user.id (auth UUID)
+  // ✅ Seller reply: ensures buyer_email is set; uses seller_id=user.id; includes from_seller flag
   async function sendReply(listingId) {
     try {
       if (!sellerEmail || !user) return;
@@ -423,3 +423,4 @@ function AttachmentPreview({ att }) {
     </a>
   );
 }
+
