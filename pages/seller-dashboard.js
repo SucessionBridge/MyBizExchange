@@ -107,7 +107,7 @@ export default function SellerDashboard() {
     setReplyFiles((prev) => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
 
-  // ✅ Seller reply: ensures buyer_email is set; uses seller_id=user.id; includes from_seller flag
+  // ✅ Fixed seller reply: includes buyer_name and uses seller_id=user.id (auth UUID). No unknown columns.
   async function sendReply(listingId) {
     try {
       if (!sellerEmail || !user) return;
@@ -115,12 +115,11 @@ export default function SellerDashboard() {
       const files = replyFiles[listingId] || [];
       if (!text && files.length === 0) return;
 
-      // ---- Determine the buyer participant from the thread (ROBUST) ----
+      // Determine the buyer participant from the thread
       const thread = threadsByListing[listingId] || [];
-      // Prefer the most recent row that actually has a buyer_email
       const knownBuyerMsg =
-        [...thread].reverse().find(m => m.buyer_email && m.buyer_email.trim()) ||
-        thread.find(m => m.buyer_email && m.buyer_email.trim());
+        [...thread].reverse().find((m) => m.buyer_email && m.buyer_email.trim()) ||
+        thread.find((m) => m.buyer_email && m.buyer_email.trim());
 
       const buyerEmail = knownBuyerMsg?.buyer_email || thread[0]?.buyer_email || null;
       const buyerName =
@@ -129,7 +128,7 @@ export default function SellerDashboard() {
           : (buyerEmail ?? 'Buyer');
 
       if (!buyerEmail) {
-        alert('Could not determine buyer email for this thread yet.');
+        alert('No buyer participant found in this thread yet.');
         return;
       }
 
@@ -161,18 +160,17 @@ export default function SellerDashboard() {
         }
       }
 
-      // Insert message from seller (NO sender_id column)
+      // Insert message from seller (NO sender_id column, and NO from_seller column)
       const { error: insertErr } = await supabase.from('messages').insert([
         {
           listing_id: listingId,
           buyer_email: buyerEmail,
-          buyer_name: buyerName,   // ✅ NOT NULL in your schema
-          seller_id: user.id,      // ✅ seller auth UUID fits uuid FK
+          buyer_name: buyerName,   // NOT NULL in your schema
+          seller_id: user.id,      // seller auth UUID fits uuid FK
           message: text,
           topic: 'business-inquiry',
           is_deal_proposal: false,
           attachments,
-          from_seller: true,
         },
       ]);
       if (insertErr) {
@@ -249,7 +247,9 @@ export default function SellerDashboard() {
                       </p>
                       <p className="text-gray-700">
                         <strong>Asking Price:</strong>{' '}
-                        {lst.asking_price ? `$${Number(lst.asking_price).toLocaleString()}` : '—'}
+                        {lst.asking_price != null && lst.asking_price !== ''
+                          ? `$${Number(lst.asking_price).toLocaleString()}`
+                          : '—'}
                       </p>
                       <p className="text-gray-700">
                         <strong>Location:</strong> {lst.city || lst.location_city || '—'},{' '}
@@ -305,15 +305,15 @@ export default function SellerDashboard() {
                     {/* Thread bubbles */}
                     <div className="space-y-2">
                       {thread.map((msg) => {
-                        const fromSeller = msg.from_seller === true; // reliable direction flag
+                        const isFromSeller = msg.seller_id === user.id;
                         return (
                           <div key={msg.id}>
                             <div
                               className={`p-2 rounded-lg ${
-                                fromSeller ? "bg-green-100 text-green-900" : "bg-blue-100 text-blue-900"
+                                isFromSeller ? "bg-green-100 text-green-900" : "bg-blue-100 text-blue-900"
                               }`}
                             >
-                              <strong>{fromSeller ? "You" : "Buyer"}:</strong> {msg.message}
+                              <strong>{isFromSeller ? "You" : "Buyer"}:</strong> {msg.message}
                             </div>
 
                             {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
@@ -369,7 +369,7 @@ export default function SellerDashboard() {
                               key={idx}
                               className="inline-block mr-2 truncate max-w-[12rem] align-middle"
                             >
-                              📎 {f.name}
+                              📎 {f?.name || 'file'}
                             </span>
                           ))}
                         </div>
@@ -423,4 +423,3 @@ function AttachmentPreview({ att }) {
     </a>
   );
 }
-
