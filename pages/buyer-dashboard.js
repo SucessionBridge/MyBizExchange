@@ -96,63 +96,51 @@ export default function BuyerDashboard() {
     setReplyFiles(prev => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
 
-  // 🛠️ stays client-side (no /api/send-message)
-  async function sendReply(listingId, sellerId) {
+  // ✅ Send via /api/send-message (service role). Keep signature but ignore sellerId.
+  async function sendReply(listingId, _sellerId) {
     try {
       const text = (replyText[listingId] || '').trim();
       const files = replyFiles[listingId] || [];
       if (!text && files.length === 0) return;
       if (!buyerProfile) return;
 
-      // 1) Upload attachments (if any)
-      let attachments = [];
-      if (files.length > 0) {
-        for (const file of files) {
-          const isImage = file.type?.startsWith('image/');
-          const isVideo = file.type?.startsWith('video/');
-          if (!isImage && !isVideo) continue;
+      // Resolve seller_email for this listing (API uses it to resolve seller_id)
+      const { data: sellerRow, error: sellerErr } = await supabase
+        .from('sellers')
+        .select('email')
+        .eq('id', listingId)
+        .maybeSingle();
 
-          const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-          const path = `listing-${listingId}/buyer-${buyerProfile.email}/${Date.now()}-${safeName}`;
-          const { error: upErr } = await supabase.storage
-            .from(ATTACH_BUCKET)
-            .upload(path, file, { cacheControl: '3600', upsert: false });
-
-          if (upErr) {
-            console.error('❌ Upload failed:', upErr);
-            alert('Attachment upload failed. Please try again or remove the file(s).');
-            return;
-          }
-          attachments.push({
-            path,
-            name: file.name,
-            size: file.size,
-            mime: file.type,
-            kind: isImage ? 'image' : 'video',
-          });
-        }
-      }
-
-      // 2) Insert message with text + attachments
-      const { error: insertErr } = await supabase.from('messages').insert([{
-        buyer_name: buyerProfile.name,
-        buyer_email: buyerProfile.email,
-        message: text,
-        seller_id: sellerId || null,
-        listing_id: listingId,
-        topic: 'business-inquiry',
-        is_deal_proposal: false,
-        attachments,
-        from_seller: false, // 👈 buyer-sent
-      }]);
-
-      if (insertErr) {
-        console.error('❌ Insert message failed:', insertErr);
-        alert('Sending message failed. Please try again.');
+      const sellerEmail = sellerRow?.email || null;
+      if (sellerErr || !sellerEmail) {
+        console.error('Could not resolve seller email for listing', listingId, sellerErr);
+        alert('Could not find seller for this listing. Please open the listing and use Contact Seller.');
         return;
       }
 
-      // 3) Reset UI + reload
+      // Build multipart body so API handles attachment upload + DB insert
+      const fd = new FormData();
+      fd.append('listing_id', String(listingId));
+      fd.append('buyer_email', buyerProfile.email);
+      fd.append('buyer_name', buyerProfile.name || buyerProfile.email);
+      fd.append('seller_email', sellerEmail); // API resolves seller_id from this
+      fd.append('message', text);
+      fd.append('topic', 'business-inquiry');
+      fd.append('is_deal_proposal', 'false');
+      fd.append('from_seller', 'false'); // direction flag (for labels)
+
+      files.forEach((file) => fd.append('attachments', file, file.name));
+
+      const res = await fetch('/api/send-message', { method: 'POST', body: fd });
+      let out = null;
+      try { out = await res.json(); } catch (_) {}
+      if (!res.ok) {
+        console.error('send-message failed:', out || res.statusText);
+        alert(out?.error || out?.message || 'Sending failed.');
+        return;
+      }
+
+      // Reset UI + reload
       setReplyText(prev => ({ ...prev, [listingId]: '' }));
       setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
       await fetchBuyerMessages(buyerProfile.email);
