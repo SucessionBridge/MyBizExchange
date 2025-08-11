@@ -107,93 +107,89 @@ export default function SellerDashboard() {
     setReplyFiles((prev) => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
 
-// ✅ Uses /api/send-message (service role). Pulls buyer_email/name from current thread.
-async function sendReply(listingId) {
-  try {
-    if (!user?.email) return;
-    const text = (replyText[listingId] || '').trim();
-    const files = replyFiles[listingId] || [];
-    if (!text && files.length === 0) return;
+  // ✅ Seller → Buyer: use /api/send-message (service role). No extra columns.
+  async function sendReply(listingId) {
+    try {
+      if (!user?.email) return;
+      const text = (replyText[listingId] || '').trim();
+      const files = replyFiles[listingId] || [];
+      if (!text && files.length === 0) return;
 
-    // 1) Find the buyer participant for this thread
-    const thread = threadsByListing[listingId] || [];
-    const knownBuyer =
-      [...thread].reverse().find((m) => m.buyer_email && m.buyer_email.trim()) ||
-      thread.find((m) => m.buyer_email && m.buyer_email.trim());
+      // Determine the buyer participant from the thread
+      const thread = threadsByListing[listingId] || [];
+      const knownBuyer =
+        [...thread].reverse().find((m) => m.buyer_email && m.buyer_email.trim()) ||
+        thread.find((m) => m.buyer_email && m.buyer_email.trim());
 
-    const buyer_email = knownBuyer?.buyer_email || thread[0]?.buyer_email || null;
-    const buyer_name =
-      (knownBuyer?.buyer_name && knownBuyer.buyer_name.trim())
-        ? knownBuyer.buyer_name
-        : (buyer_email ?? 'Buyer');
+      const buyer_email = knownBuyer?.buyer_email || thread[0]?.buyer_email || null;
+      const buyer_name =
+        (knownBuyer?.buyer_name && knownBuyer.buyer_name.trim())
+          ? knownBuyer.buyer_name
+          : (buyer_email ?? 'Buyer');
 
-    if (!buyer_email) {
-      alert('No buyer found for this conversation yet.');
-      return;
-    }
-
-    // 2) Build payload for API
-    if (files.length > 0) {
-      // multipart
-      const fd = new FormData();
-      fd.append('listing_id', String(listingId));
-      fd.append('buyer_email', buyer_email);
-      fd.append('buyer_name', buyer_name);
-      fd.append('seller_email', user.email); // API resolves seller_id from this
-      fd.append('message', text);
-      fd.append('topic', 'business-inquiry');
-      fd.append('is_deal_proposal', 'false');
-      files.slice(0, 5).forEach((f) => fd.append('attachments', f, f.name));
-
-      const res = await fetch('/api/send-message', { method: 'POST', body: fd });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error('send-message (seller) failed:', err);
-        alert(err?.error || 'Sending failed (seller).');
+      if (!buyer_email) {
+        alert('No buyer found for this conversation yet.');
         return;
       }
-    } else {
-      // JSON-only
-      const res = await fetch('/api/send-message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listing_id: Number(listingId),
-          buyer_email,
-          buyer_name,
-          seller_email: user.email, // API resolves seller_id
-          message: text,
-          topic: 'business-inquiry',
-          is_deal_proposal: false,
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error('send-message (seller) failed:', err);
-        alert(err?.error || 'Sending failed (seller).');
-        return;
+
+      if (files.length > 0) {
+        const fd = new FormData();
+        fd.append('listing_id', String(listingId));
+        fd.append('buyer_email', buyer_email);
+        fd.append('buyer_name', buyer_name);
+        fd.append('seller_email', user.email); // API resolves seller_id
+        fd.append('message', text);
+        fd.append('topic', 'business-inquiry');
+        fd.append('is_deal_proposal', 'false');
+        files.slice(0, 5).forEach((f) => fd.append('attachments', f, f.name));
+
+        const res = await fetch('/api/send-message', { method: 'POST', body: fd });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.error('send-message (seller) failed:', err);
+          alert(err?.error || 'Sending failed (seller).');
+          return;
+        }
+      } else {
+        const res = await fetch('/api/send-message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            listing_id: Number(listingId),
+            buyer_email,
+            buyer_name,
+            seller_email: user.email, // API resolves seller_id
+            message: text,
+            topic: 'business-inquiry',
+            is_deal_proposal: false,
+          }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          console.error('send-message (seller) failed:', err);
+          alert(err?.error || 'Sending failed (seller).');
+          return;
+        }
       }
-    }
 
-    // 3) Reset UI + refresh threads
-    setReplyText((prev) => ({ ...prev, [listingId]: '' }));
-    setReplyFiles((prev) => ({ ...prev, [listingId]: [] }));
+      setReplyText((prev) => ({ ...prev, [listingId]: '' }));
+      setReplyFiles((prev) => ({ ...prev, [listingId]: [] }));
 
-    const ids = (sellerListings || []).map((l) => l.id).filter(Boolean);
-    if (ids.length > 0) {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .in('listing_id', ids)
-        .order('created_at', { ascending: true });
-      if (!error) setMessages(data || []);
+      // Refresh messages
+      const ids = (sellerListings || []).map((l) => l.id).filter(Boolean);
+      if (ids.length > 0) {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .in('listing_id', ids)
+          .order('created_at', { ascending: true });
+        if (!error) setMessages(data || []);
+      }
+    } catch (err) {
+      console.error('sendReply crashed:', err);
+      alert('Something went wrong while sending. Please try again.');
     }
-  } catch (err) {
-    console.error('❌ sendReply(seller) crashed:', err);
-    alert('Something went wrong while sending. Please try again.');
   }
-}
-
 
   if (!user) {
     return <div className="p-8 text-center text-gray-600">Loading dashboard…</div>;
@@ -244,13 +240,10 @@ async function sendReply(listingId) {
                       </p>
                       <p className="text-gray-700">
                         <strong>Asking Price:</strong>{' '}
-                        {lst.asking_price != null && lst.asking_price !== ''
-                          ? `$${Number(lst.asking_price).toLocaleString()}`
-                          : '—'}
+                        {lst.asking_price ? `$${Number(lst.asking_price).toLocaleString()}` : '—'}
                       </p>
                       <p className="text-gray-700">
-                        <strong>Location:</strong> {lst.city || lst.location_city || '—'},{' '}
-                        {lst.state_or_province || lst.location_state || '—'}
+                        <strong>Location:</strong> {lst.city || lst.location_city || '—'}, {lst.state_or_province || lst.location_state || '—'}
                       </p>
                       <div className="mt-3 flex gap-2">
                         <button
@@ -284,6 +277,10 @@ async function sendReply(listingId) {
               listingIds.map((lid) => {
                 const thread = threadsByListing[lid] || [];
                 const listing = sellerListings.find((l) => String(l.id) === String(lid));
+                // Determine buyer for labeling in this thread
+                const threadBuyerEmail =
+                  [...thread].find(m => m.buyer_email && m.buyer_email.trim())?.buyer_email ||
+                  thread[0]?.buyer_email || '';
 
                 return (
                   <div key={lid} className="mb-6 border rounded-xl p-3 bg-gray-50">
@@ -302,24 +299,27 @@ async function sendReply(listingId) {
                     {/* Thread bubbles */}
                     <div className="space-y-2">
                       {thread.map((msg) => {
-                        const isFromSeller = msg.seller_id === user.id;
+                        const isBuyerMsg = msg.buyer_email && msg.buyer_email === threadBuyerEmail;
                         return (
                           <div key={msg.id}>
                             <div
                               className={`p-2 rounded-lg ${
-                                isFromSeller ? "bg-green-100 text-green-900" : "bg-blue-100 text-blue-900"
+                                isBuyerMsg ? "bg-blue-100 text-blue-900" : "bg-green-100 text-green-900"
                               }`}
                             >
-                              <strong>{isFromSeller ? "You" : "Buyer"}:</strong> {msg.message}
+                              <strong>{isBuyerMsg ? "Buyer" : "You"}:</strong> {msg.message}
                             </div>
 
-                            {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
-                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {msg.attachments.map((att, i) => (
-                                  <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
-                                ))}
-                              </div>
-                            )}
+                            {(() => {
+                              const safeAttachments = Array.isArray(msg.attachments) ? msg.attachments : [];
+                              return safeAttachments.length > 0 ? (
+                                <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                  {safeAttachments.map((att, i) => (
+                                    <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
+                                  ))}
+                                </div>
+                              ) : null;
+                            })()}
 
                             <p className="text-[11px] text-gray-400 mt-1">
                               {new Date(msg.created_at).toLocaleString()}
@@ -344,9 +344,7 @@ async function sendReply(listingId) {
                             type="text"
                             placeholder="Reply to buyer…"
                             value={replyText[lid] || ''}
-                            onChange={(e) =>
-                              setReplyText((prev) => ({ ...prev, [lid]: e.target.value }))
-                            }
+                            onChange={(e) => setReplyText((prev) => ({ ...prev, [lid]: e.target.value }))}
                             className="border p-1 rounded flex-1"
                           />
                           <button
@@ -362,11 +360,8 @@ async function sendReply(listingId) {
                       {replyFiles[lid]?.length > 0 && (
                         <div className="mt-1 text-xs text-gray-600">
                           {replyFiles[lid].map((f, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-block mr-2 truncate max-w-[12rem] align-middle"
-                            >
-                              📎 {f?.name || 'file'}
+                            <span key={idx} className="inline-block mr-2 truncate max-w-[12rem] align-middle">
+                              📎 {f.name}
                             </span>
                           ))}
                         </div>
@@ -420,3 +415,4 @@ function AttachmentPreview({ att }) {
     </a>
   );
 }
+
