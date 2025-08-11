@@ -115,17 +115,21 @@ export default function SellerDashboard() {
       const files = replyFiles[listingId] || [];
       if (!text && files.length === 0) return;
 
-      // Determine the buyer participant from the thread
+      // ---- Determine the buyer participant from the thread (ROBUST) ----
       const thread = threadsByListing[listingId] || [];
-      const lastBuyerMsg = [...thread]
-        .reverse()
-        .find((m) => m.buyer_email && m.buyer_email !== sellerEmail);
+      // Prefer the most recent row that actually has a buyer_email
+      const knownBuyerMsg =
+        [...thread].reverse().find(m => m.buyer_email && m.buyer_email.trim()) ||
+        thread.find(m => m.buyer_email && m.buyer_email.trim());
 
-      const buyerEmail = lastBuyerMsg?.buyer_email || null;
-      const buyerName = lastBuyerMsg?.buyer_name || lastBuyerMsg?.buyer_email || null;
+      const buyerEmail = knownBuyerMsg?.buyer_email || thread[0]?.buyer_email || null;
+      const buyerName =
+        (knownBuyerMsg?.buyer_name && knownBuyerMsg.buyer_name.trim())
+          ? knownBuyerMsg.buyer_name
+          : (buyerEmail ?? 'Buyer');
 
       if (!buyerEmail) {
-        alert('No buyer participant found in this thread yet.');
+        alert('Could not determine buyer email for this thread yet.');
         return;
       }
 
@@ -168,7 +172,7 @@ export default function SellerDashboard() {
           topic: 'business-inquiry',
           is_deal_proposal: false,
           attachments,
-          from_seller: true, 
+          from_seller: true,
         },
       ]);
       if (insertErr) {
@@ -297,38 +301,38 @@ export default function SellerDashboard() {
                         View Listing
                       </button>
                     </div>
-             
-{/* Thread bubbles */}
-<div className="space-y-2">
-  {thread.map((msg) => {
-    const fromSeller = msg.from_seller === true; // reliable direction flag
-    return (
-      <div key={msg.id}>
-        <div
-          className={`p-2 rounded-lg ${
-            fromSeller ? "bg-green-100 text-green-900" : "bg-blue-100 text-blue-900"
-          }`}
-        >
-          <strong>{fromSeller ? "You" : "Buyer"}:</strong> {msg.message}
-        </div>
 
-        {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
-          <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {msg.attachments.map((att, i) => (
-              <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
-            ))}
-          </div>
-        )}
+                    {/* Thread bubbles */}
+                    <div className="space-y-2">
+                      {thread.map((msg) => {
+                        const fromSeller = msg.from_seller === true; // reliable direction flag
+                        return (
+                          <div key={msg.id}>
+                            <div
+                              className={`p-2 rounded-lg ${
+                                fromSeller ? "bg-green-100 text-green-900" : "bg-blue-100 text-blue-900"
+                              }`}
+                            >
+                              <strong>{fromSeller ? "You" : "Buyer"}:</strong> {msg.message}
+                            </div>
 
-        <p className="text-[11px] text-gray-400 mt-1">
-          {new Date(msg.created_at).toLocaleString()}
-        </p>
-      </div>
-    );
-  })}
-</div>
-  
-{/* Single composer per listing */}
+                            {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
+                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {msg.attachments.map((att, i) => (
+                                  <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
+                                ))}
+                              </div>
+                            )}
+
+                            <p className="text-[11px] text-gray-400 mt-1">
+                              {new Date(msg.created_at).toLocaleString()}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Single composer per listing */}
                     <div className="mt-3 border-t pt-3">
                       <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <input
