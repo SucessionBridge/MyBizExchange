@@ -1,14 +1,14 @@
 // pages/business-valuation.js
 import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
-import jsPDF from 'jspdf'; // ← top-level import fixes bundling/runtime quirks
+import jsPDF from 'jspdf'; // top-level import for reliability
 import {
   INDUSTRY_MULTIPLES,
   normalizeIndustry,
   formatMoney,
 } from '../lib/valuation';
 
-/* Route for seller onboarding (optional; adjust or remove) */
+/* Route for seller onboarding (adjust if needed) */
 const LIST_ROUTE = '/seller-onboarding';
 
 /* ---------- Local pure helpers for the approved logic ---------- */
@@ -205,30 +205,36 @@ function BusinessValuation() {
     return true;
   }
 
+  // NON-async, no await
   function handleSeeMyValuation() {
-    if (!email) return alert('Please add your email.');
-    if (sdeUsed <= 0) return alert('Please enter SDE (or use the calculator).');
+    if (!email) {
+      alert('Please add your email.');
+      return;
+    }
+    if (sdeUsed <= 0) {
+      alert('Please enter SDE (or use the calculator).');
+      return;
+    }
     if (!requireAck()) return;
-    setShowReport(true);
-    // inside handleSeeMyValuation(), after the ack checks and before setShowReport(true)
-try {
-  await fetch('/api/valuation-leads', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      email,
-      owner_name: ownerName || null,
-      business_name: businessName || null,
-      industry,
-      sde: sdeUsed,
-      fair_low: valueLow,
-      fair_base: valueBase,
-      fair_high: valueHigh,
-      years_in_business: Number(yearsInBusiness || 0)
-    }),
-  });
-} catch (_) { /* non-blocking */ }
 
+    // Lead capture (non-blocking; errors ignored)
+    fetch('/api/valuation-leads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        owner_name: ownerName || null,
+        business_name: businessName || null,
+        industry,
+        sde: sdeUsed,
+        fair_low: valueLow,
+        fair_base: valueBase,
+        fair_high: valueHigh,
+        years_in_business: Number(yearsInBusiness || 0),
+      }),
+    }).catch(() => {});
+
+    setShowReport(true);
   }
 
   async function handleSaveAndEmail() {
@@ -314,218 +320,216 @@ ${data2.url}
     }
   }
 
-  // PDF (fair valuation only) — uses top-level jsPDF import
+  // PDF (fair valuation only) — styled
+  async function generatePdfBlob() {
+    // uses top-level `import jsPDF from 'jspdf'`
+    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
 
-async function generatePdfBlob() {
-  // uses top-level `import jsPDF from 'jspdf'`
-  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+    // Layout + palette
+    const PAGE_W = doc.internal.pageSize.getWidth();
+    const MARGIN = 40;
+    const CONTENT_W = PAGE_W - MARGIN * 2;
 
-  // Layout + palette
-  const PAGE_W = doc.internal.pageSize.getWidth();
-  const MARGIN = 40;
-  const CONTENT_W = PAGE_W - MARGIN * 2;
+    const INK = [17, 24, 39];        // gray-900
+    const MUTED = [107, 114, 128];   // gray-500
+    const BORDER = [229, 231, 235];  // gray-200
+    const ACCENT = [37, 99, 235];    // blue-600
+    const SOFT = [249, 250, 251];    // gray-50
+    const WARN_BG = [255, 251, 235]; // amber-50
+    const WARN_TX = [120, 53, 15];   // amber-900
 
-  const INK = [17, 24, 39];        // gray-900
-  const MUTED = [107, 114, 128];   // gray-500
-  const BORDER = [229, 231, 235];  // gray-200
-  const ACCENT = [37, 99, 235];    // blue-600
-  const SOFT = [249, 250, 251];    // gray-50
-  const WARN_BG = [255, 251, 235]; // amber-50
-  const WARN_TX = [120, 53, 15];   // amber-900
+    let y = 48;
 
-  let y = 48;
-
-  // Header
-  doc.setTextColor(...INK);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(20);
-  doc.text('SuccessionBridge — Fair Valuation', MARGIN, y);
-  y += 10;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...MUTED);
-  doc.setFontSize(10);
-  doc.text(
-    `Generated ${new Date().toLocaleDateString()} • Indicative guide only — not an appraisal.`,
-    MARGIN,
-    y
-  );
-  y += 16;
-
-  // Disclaimer banner
-  doc.setFillColor(...WARN_BG);
-  doc.setDrawColor(...BORDER);
-  doc.roundedRect(MARGIN, y, CONTENT_W, 48, 6, 6, 'F');
-  doc.setTextColor(...WARN_TX);
-  doc.setFontSize(10);
-  doc.text(
-    'Not for lending, insurance, tax, or legal use. Info not verified.',
-    MARGIN + 10,
-    y + 18
-  );
-  doc.setTextColor(...MUTED);
-  doc.text(
-    'This is an indicative tool to help owners consider a fair asking range.',
-    MARGIN + 10,
-    y + 34
-  );
-  y += 64;
-
-  // Fair Value card
-  doc.setDrawColor(...BORDER);
-  doc.setFillColor(...SOFT);
-  doc.roundedRect(MARGIN, y, CONTENT_W, 90, 10, 10, 'F');
-
-  doc.setTextColor(...INK);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text(`Fair Value (Base): ${formatMoney(valueBase)}`, MARGIN + 16, y + 28);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...MUTED);
-  doc.setFontSize(11);
-  doc.text(
-    `Fair Range: ${formatMoney(valueLow)} – ${formatMoney(valueHigh)}`,
-    MARGIN + 16,
-    y + 48
-  );
-  doc.setTextColor(...ACCENT);
-  doc.text(
-    `Adjusted multiples: ${mLow.toFixed(2)}× / ${mBase.toFixed(2)}× / ${mHigh.toFixed(2)}×`,
-    MARGIN + 16,
-    y + 68
-  );
-  y += 110;
-
-  // Key/Value helper
-  function kv(label, value, x, yy) {
-    doc.setFontSize(9);
-    doc.setTextColor(...MUTED);
-    doc.text(label, x, yy);
-    doc.setFont('helvetica', 'bold');
+    // Header
     doc.setTextColor(...INK);
-    doc.setFontSize(11);
-    doc.text(String(value ?? '—'), x, yy + 16);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(20);
+    doc.text('SuccessionBridge — Fair Valuation', MARGIN, y);
+    y += 10;
+
     doc.setFont('helvetica', 'normal');
-  }
-
-  // Snapshot (two columns)
-  const COL_W = (CONTENT_W - 20) / 2;
-  const COL1 = MARGIN;
-  const COL2 = MARGIN + COL_W + 20;
-  let rowY = y;
-
-  kv('SDE used', formatMoney(sdeUsed), COL1, rowY);
-  kv('Industry', industry, COL1, rowY + 36);
-  kv('Years in business', yearsInBusiness || 'N/A', COL1, rowY + 72);
-
-  if (Number(annualRevenue || 0) > 0)
-    kv('Annual revenue (gross sales)', formatMoney(Number(annualRevenue || 0)), COL2, rowY);
-  kv('Simple payback (Base ÷ SDE)', Number.isFinite(paybackYears) ? `${paybackYears.toFixed(1)} years` : '—', COL2, rowY + 36);
-  if (margin != null)
-    kv('SDE margin (SDE ÷ Revenue)', `${(margin * 100).toFixed(1)}%`, COL2, rowY + 72);
-
-  y = rowY + 108;
-
-  // Margin note
-  if (margin != null) {
     doc.setTextColor(...MUTED);
     doc.setFontSize(10);
-    const note =
-      margin >= 0.30
-        ? 'Unusually high margin — double-check SDE and expenses are recast correctly.'
-        : margin >= 0.15
-        ? 'Healthy margin common in many service businesses.'
-        : margin >= 0.10
-        ? 'Thin margin — buyers will scrutinize costs and seasonality.'
-        : 'Very thin margin — expect buyers to negotiate hard.';
-    doc.text(note, MARGIN, y, { maxWidth: CONTENT_W });
-    y += 18;
-  }
+    doc.text(
+      `Generated ${new Date().toLocaleDateString()} • Indicative guide only — not an appraisal.`,
+      MARGIN,
+      y
+    );
+    y += 16;
 
-  // Divider
-  doc.setDrawColor(...BORDER);
-  doc.line(MARGIN, y, MARGIN + CONTENT_W, y);
-  y += 16;
+    // Disclaimer banner
+    doc.setFillColor(...WARN_BG);
+    doc.setDrawColor(...BORDER);
+    doc.roundedRect(MARGIN, y, CONTENT_W, 48, 6, 6, 'F');
+    doc.setTextColor(...WARN_TX);
+    doc.setFontSize(10);
+    doc.text(
+      'Not for lending, insurance, tax, or legal use. Info not verified.',
+      MARGIN + 10,
+      y + 18
+    );
+    doc.setTextColor(...MUTED);
+    doc.text(
+      'This is an indicative tool to help owners consider a fair asking range.',
+      MARGIN + 10,
+      y + 34
+    );
+    y += 64;
 
-  // Included vs added
-  doc.setTextColor(...INK);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text("What’s included vs added", MARGIN, y);
-  y += 14;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...MUTED);
-  doc.setFontSize(10);
-  doc.text(
-    'Essential operating assets are assumed included. Inventory at cost is typically added on top. Real estate is separate.',
-    MARGIN,
-    y,
-    { maxWidth: CONTENT_W }
-  );
-  y += 20;
-
-  function chip(label, value, x, yy, w) {
+    // Fair Value card
     doc.setDrawColor(...BORDER);
     doc.setFillColor(...SOFT);
-    doc.roundedRect(x, yy, w, 48, 8, 8, 'F');
+    doc.roundedRect(MARGIN, y, CONTENT_W, 90, 10, 10, 'F');
+
+    doc.setTextColor(...INK);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text(`Fair Value (Base): ${formatMoney(valueBase)}`, MARGIN + 16, y + 28);
+
+    doc.setFont('helvetica', 'normal');
     doc.setTextColor(...MUTED);
-    doc.setFontSize(10);
-    doc.text(label, x + 12, yy + 18);
+    doc.setFontSize(11);
+    doc.text(
+      `Fair Range: ${formatMoney(valueLow)} – ${formatMoney(valueHigh)}`,
+      MARGIN + 16,
+      y + 48
+    );
+    doc.setTextColor(...ACCENT);
+    doc.text(
+      `Adjusted multiples: ${mLow.toFixed(2)}× / ${mBase.toFixed(2)}× / ${mHigh.toFixed(2)}×`,
+      MARGIN + 16,
+      y + 68
+    );
+    y += 110;
+
+    // Key/Value helper
+    function kv(label, value, x, yy) {
+      doc.setFontSize(9);
+      doc.setTextColor(...MUTED);
+      doc.text(label, x, yy);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...INK);
+      doc.setFontSize(11);
+      doc.text(String(value ?? '—'), x, yy + 16);
+      doc.setFont('helvetica', 'normal');
+    }
+
+    // Snapshot (two columns)
+    const COL_W = (CONTENT_W - 20) / 2;
+    const COL1 = MARGIN;
+    const COL2 = MARGIN + COL_W + 20;
+    let rowY = y;
+
+    kv('SDE used', formatMoney(sdeUsed), COL1, rowY);
+    kv('Industry', industry, COL1, rowY + 36);
+    kv('Years in business', yearsInBusiness || 'N/A', COL1, rowY + 72);
+
+    if (Number(annualRevenue || 0) > 0)
+      kv('Annual revenue (gross sales)', formatMoney(Number(annualRevenue || 0)), COL2, rowY);
+    kv('Simple payback (Base ÷ SDE)', Number.isFinite(paybackYears) ? `${paybackYears.toFixed(1)} years` : '—', COL2, rowY + 36);
+    if (margin != null)
+      kv('SDE margin (SDE ÷ Revenue)', `${(margin * 100).toFixed(1)}%`, COL2, rowY + 72);
+
+    y = rowY + 108;
+
+    // Margin note
+    if (margin != null) {
+      doc.setTextColor(...MUTED);
+      doc.setFontSize(10);
+      const note =
+        margin >= 0.30
+          ? 'Unusually high margin — double-check SDE and expenses are recast correctly.'
+          : margin >= 0.15
+          ? 'Healthy margin common in many service businesses.'
+          : margin >= 0.10
+          ? 'Thin margin — buyers will scrutinize costs and seasonality.'
+          : 'Very thin margin — expect buyers to negotiate hard.';
+      doc.text(note, MARGIN, y, { maxWidth: CONTENT_W });
+      y += 18;
+    }
+
+    // Divider
+    doc.setDrawColor(...BORDER);
+    doc.line(MARGIN, y, MARGIN + CONTENT_W, y);
+    y += 16;
+
+    // Included vs added
     doc.setTextColor(...INK);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
-    doc.text(value, x + 12, yy + 36);
+    doc.text("What’s included vs added", MARGIN, y);
+    y += 14;
+
     doc.setFont('helvetica', 'normal');
-  }
+    doc.setTextColor(...MUTED);
+    doc.setFontSize(10);
+    doc.text(
+      'Essential operating assets are assumed included. Inventory at cost is typically added on top. Real estate is separate.',
+      MARGIN,
+      y,
+      { maxWidth: CONTENT_W }
+    );
+    y += 20;
 
-  const CHIP_W = (CONTENT_W - 20) / 2;
-  chip('Business (Base)', formatMoney(valueBase), MARGIN, y, CHIP_W);
-  chip('Business + Inventory', formatMoney(packageBusinessPlusInventory), MARGIN + CHIP_W + 20, y, CHIP_W);
-  y += 64;
-  if (includeRealEstate) {
-    chip('Combined (Bus. + Inv. + Building)', formatMoney(combinedWithBuilding), MARGIN, y, CONTENT_W);
+    function chip(label, value, x, yy, w) {
+      doc.setDrawColor(...BORDER);
+      doc.setFillColor(...SOFT);
+      doc.roundedRect(x, yy, w, 48, 8, 8, 'F');
+      doc.setTextColor(...MUTED);
+      doc.setFontSize(10);
+      doc.text(label, x + 12, yy + 18);
+      doc.setTextColor(...INK);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text(value, x + 12, yy + 36);
+      doc.setFont('helvetica', 'normal');
+    }
+
+    const CHIP_W = (CONTENT_W - 20) / 2;
+    chip('Business (Base)', formatMoney(valueBase), MARGIN, y, CHIP_W);
+    chip('Business + Inventory', formatMoney(packageBusinessPlusInventory), MARGIN + CHIP_W + 20, y, CHIP_W);
     y += 64;
+    if (includeRealEstate) {
+      chip('Combined (Bus. + Inv. + Building)', formatMoney(combinedWithBuilding), MARGIN, y, CONTENT_W);
+      y += 64;
+    }
+
+    // Divider
+    doc.setDrawColor(...BORDER);
+    doc.line(MARGIN, y, MARGIN + CONTENT_W, y);
+    y += 16;
+
+    // How we calculated
+    doc.setTextColor(...INK);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.text('How we calculated this', MARGIN, y);
+    y += 14;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...INK);
+    doc.setFontSize(10);
+
+    const bullets = [
+      `SDE × industry multiple (range ${baseTriplet[0]}–${baseTriplet[1]}–${baseTriplet[2]}×) with small bumps (track record, owner independence, franchise).`,
+      `Adjustments applied: Years + Runs without you + Franchise = ${(bumpSum >= 0 ? '+' : '')}${bumpSum.toFixed(2)}× total.`,
+      'Essential operating assets assumed included; inventory at cost on top; real estate separate.',
+    ];
+    bullets.forEach((t) => {
+      doc.circle(MARGIN + 2, y - 3, 2, 'F');               // bullet dot
+      const wrapped = doc.splitTextToSize(t, CONTENT_W - 12);
+      doc.text(wrapped, MARGIN + 12, y);                   // wrapped text
+      y += wrapped.length * 14;
+    });
+
+    y += 6;
+    doc.setTextColor(...MUTED);
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(9);
+    doc.text('Generated by SuccessionBridge — Fair Valuation (indicative only).', MARGIN, y);
+
+    return doc.output('blob');
   }
-
-  // Divider
-  doc.setDrawColor(...BORDER);
-  doc.line(MARGIN, y, MARGIN + CONTENT_W, y);
-  y += 16;
-
-  // How we calculated
-  doc.setTextColor(...INK);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(12);
-  doc.text('How we calculated this', MARGIN, y);
-  y += 14;
-
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...INK);
-  doc.setFontSize(10);
-
-  const bullets = [
-    `SDE × industry multiple (range ${baseTriplet[0]}–${baseTriplet[1]}–${baseTriplet[2]}×) with small bumps (track record, owner independence, franchise).`,
-    `Adjustments applied: Years + Runs without you + Franchise = ${(bumpSum >= 0 ? '+' : '')}${bumpSum.toFixed(2)}× total.`,
-    'Essential operating assets assumed included; inventory at cost on top; real estate separate.',
-  ];
-  bullets.forEach((t) => {
-    doc.circle(MARGIN + 2, y - 3, 2, 'F');               // bullet dot
-    const wrapped = doc.splitTextToSize(t, CONTENT_W - 12);
-    doc.text(wrapped, MARGIN + 12, y);                   // wrapped text
-    y += wrapped.length * 14;
-  });
-
-  y += 6;
-  doc.setTextColor(...MUTED);
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(9);
-  doc.text('Generated by SuccessionBridge — Fair Valuation (indicative only).', MARGIN, y);
-
-  return doc.output('blob');
-}
-
 
   /* ---------- Render ---------- */
   return (
@@ -772,3 +776,4 @@ async function generatePdfBlob() {
 }
 
 export default dynamic(() => Promise.resolve(BusinessValuation), { ssr: false });
+
