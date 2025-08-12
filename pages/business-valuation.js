@@ -210,6 +210,25 @@ function BusinessValuation() {
     if (sdeUsed <= 0) return alert('Please enter SDE (or use the calculator).');
     if (!requireAck()) return;
     setShowReport(true);
+    // inside handleSeeMyValuation(), after the ack checks and before setShowReport(true)
+try {
+  await fetch('/api/valuation-leads', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      email,
+      owner_name: ownerName || null,
+      business_name: businessName || null,
+      industry,
+      sde: sdeUsed,
+      fair_low: valueLow,
+      fair_base: valueBase,
+      fair_high: valueHigh,
+      years_in_business: Number(yearsInBusiness || 0)
+    }),
+  });
+} catch (_) { /* non-blocking */ }
+
   }
 
   async function handleSaveAndEmail() {
