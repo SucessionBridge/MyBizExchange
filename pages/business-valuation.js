@@ -1,6 +1,7 @@
 // pages/business-valuation.js
 import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
+import jsPDF from 'jspdf'; // ← top-level import fixes bundling/runtime quirks
 import {
   INDUSTRY_MULTIPLES,
   normalizeIndustry,
@@ -97,6 +98,9 @@ function BusinessValuation() {
 
   // Reveal report
   const [showReport, setShowReport] = useState(false);
+
+  // Email flow loading state
+  const [sending, setSending] = useState(false);
 
   /* ---------- Derived values (approved logic) ---------- */
   const sdeComputed = useMemo(() => {
@@ -213,72 +217,86 @@ function BusinessValuation() {
     if (sdeUsed <= 0) return alert('Please enter SDE first.');
     if (!requireAck()) return;
 
-    // Save minimal snapshot to your existing valuations endpoint (if present)
+    setSending(true);
     try {
-      const resp = await fetch('/api/valuations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          listing_id: null,
-          buyer_email: email,
-          inputs: {
-            source: 'owner_fair_value_v1',
-            email,
-            owner_name: ownerName || null,
-            business_name: businessName || null,
-            industry_label: industry,
-            years_in_business: Number(yearsInBusiness || 0),
-            annual_revenue: Number(annualRevenue || 0),
-            annual_expenses: Number(annualExpenses || 0),
-            sde_used: sdeUsed,
-            inventory_cost: Number(inventoryCost || 0),
-            runs_without_owner: Boolean(runsWithoutOwner),
-            is_franchise: Boolean(isFranchise),
-            real_estate: { included: includeRealEstate, fmv: Number(realEstateFMV || 0) },
-          },
-          outputs: {
-            adjusted_multiples: { low: mLow, base: mBase, high: mHigh },
-            fair_range: { low: valueLow, base: valueBase, high: valueHigh },
-            payback_years: Number.isFinite(paybackYears) ? paybackYears : null,
-            business_plus_inventory: packageBusinessPlusInventory,
-            combined_with_building: combinedWithBuilding,
-            summary_text: summaryText,
-          },
-        }),
-      });
-      await resp.json().catch(() => ({}));
-    } catch (_) {}
+      // 1) Save minimal snapshot (best-effort)
+      try {
+        const resp = await fetch('/api/valuations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            listing_id: null,
+            buyer_email: email,
+            inputs: {
+              source: 'owner_fair_value_v1',
+              email,
+              owner_name: ownerName || null,
+              business_name: businessName || null,
+              industry_label: industry,
+              years_in_business: Number(yearsInBusiness || 0),
+              annual_revenue: Number(annualRevenue || 0),
+              annual_expenses: Number(annualExpenses || 0),
+              sde_used: sdeUsed,
+              inventory_cost: Number(inventoryCost || 0),
+              runs_without_owner: Boolean(runsWithoutOwner),
+              is_franchise: Boolean(isFranchise),
+              real_estate: { included: includeRealEstate, fmv: Number(realEstateFMV || 0) },
+            },
+            outputs: {
+              adjusted_multiples: { low: mLow, base: mBase, high: mHigh },
+              fair_range: { low: valueLow, base: valueBase, high: valueHigh },
+              payback_years: Number.isFinite(paybackYears) ? paybackYears : null,
+              business_plus_inventory: packageBusinessPlusInventory,
+              combined_with_building: combinedWithBuilding,
+              summary_text: summaryText,
+            },
+          }),
+        });
+        await resp.json().catch(() => ({}));
+      } catch (e) {
+        console.warn('Save snapshot failed (continuing):', e);
+      }
 
-    // Generate PDF and email (opens user's email client with link)
-    try {
+      // 2) Generate PDF
       const blob = await generatePdfBlob();
       const ab = await blob.arrayBuffer();
       const base64 = btoa(String.fromCharCode(...new Uint8Array(ab)));
 
+      // 3) Upload to storage → get URL
       const resp2 = await fetch('/api/send-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, filename: 'valuation-report.pdf', pdfBase64: base64 }),
       });
-      const data = await resp2.json();
-      if (!resp2.ok) return alert(data.error || 'Upload failed');
+      const data2 = await resp2.json().catch(() => ({}));
+      if (!resp2.ok || !data2?.url) {
+        throw new Error(data2?.error || 'Upload failed');
+      }
 
+      // 4) Short mailto body (long bodies fail silently in many clients)
       const subject = 'Your Fair Valuation Summary';
-      const disclaimer =
-        '\n\n— Disclaimer —\nThis is an indicative tool to help owners consider pricing.\nIt is not an appraisal and must not be used for loans, insurance, tax, or legal purposes.\nWe have not verified the information you provided.';
       const body =
-        `Hi${ownerName ? ' ' + ownerName : ''},\n\nHere is your valuation summary.${businessName ? `\nBusiness: ${businessName}` : ''}\n\n${summaryText}${disclaimer}\n\nDownload your PDF: ${data.url}\n\n— SuccessionBridge`;
+`Hi${ownerName ? ' ' + ownerName : ''},
+
+Your valuation summary PDF is ready:
+${data2.url}
+
+— SuccessionBridge
+(Indicative guide only — not an appraisal.)`;
       const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       window.location.href = mailto;
+
       setShowReport(true);
-    } catch (e) {
-      alert('Failed to email PDF: ' + (e?.message || e));
+    } catch (err) {
+      console.error('Email flow failed:', err);
+      alert('Email flow failed: ' + (err?.message || err));
+    } finally {
+      setSending(false);
     }
   }
 
-  // PDF (fair valuation only)
+  // PDF (fair valuation only) — uses top-level jsPDF import
   async function generatePdfBlob() {
-    const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF({ unit: 'pt', format: 'letter' });
 
     let y = 54;
@@ -442,8 +460,12 @@ function BusinessValuation() {
             <button onClick={handleSeeMyValuation} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
               See my valuation
             </button>
-            <button onClick={handleSaveAndEmail} className="bg-gray-900 text-white px-4 py-2 rounded hover:bg-black/90">
-              Save & email me this valuation
+            <button
+              onClick={handleSaveAndEmail}
+              disabled={sending}
+              className={`text-white px-4 py-2 rounded ${sending ? 'bg-gray-400 cursor-not-allowed' : 'bg-gray-900 hover:bg-black/90'}`}
+            >
+              {sending ? 'Sending…' : 'Save & email me this valuation'}
             </button>
           </div>
           <div className="text-xs text-gray-500 mt-2">
@@ -562,8 +584,12 @@ function BusinessValuation() {
                 }} className="bg-white border px-4 py-2 rounded hover:bg-gray-50">
                   Download PDF
                 </button>
-                <button onClick={handleSaveAndEmail} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-                  Email me the PDF
+                <button
+                  onClick={handleSaveAndEmail}
+                  disabled={sending}
+                  className={`text-white px-4 py-2 rounded ${sending ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                >
+                  {sending ? 'Sending…' : 'Email me the PDF'}
                 </button>
               </div>
             </Section>
