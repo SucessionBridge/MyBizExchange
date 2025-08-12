@@ -3,6 +3,22 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
 
+// --- who/colour for SELLER view ---
+function whoAndColorForSeller(msg, sellerAuthId) {
+  // Prefer the explicit flag when present
+  if (msg.from_seller === true)  return { who: "You",   color: "bg-green-100 text-green-900" };
+  if (msg.from_seller === false) return { who: "Buyer", color: "bg-blue-100 text-blue-900" };
+
+  // Fallback for older rows (no flag)
+  const fromMe =
+    msg?.seller_id && sellerAuthId &&
+    String(msg.seller_id).toLowerCase() === String(sellerAuthId).toLowerCase();
+
+  return fromMe
+    ? { who: "You",   color: "bg-green-100 text-green-900" }
+    : { who: "Buyer", color: "bg-blue-100 text-blue-900" };
+}
+
 export default function SellerDashboard() {
   const router = useRouter();
 
@@ -29,7 +45,7 @@ export default function SellerDashboard() {
         router.push('/login');
         return;
       }
-      setUser(data.user);
+      setUser(data.user);             // data.user.id is the seller auth UUID
       setSellerEmail(data.user.email || null);
     })();
   }, [router]);
@@ -107,95 +123,96 @@ export default function SellerDashboard() {
     setReplyFiles((prev) => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
 
- // 📨 Send (POST) via service-role API, not direct DB insert
-async function sendReply(listingId /* int */) {
-  try {
-    if (!sellerEmail || !user) return;
-    const text = (replyText[listingId] || '').trim();
-    const files = replyFiles[listingId] || [];
-    if (!text && files.length === 0) return;
+  // Seller reply: sets from_seller: true + includes buyer info
+  async function sendReply(listingId) {
+    try {
+      if (!sellerEmail || !user) return;
+      const text = (replyText[listingId] || '').trim();
+      const files = replyFiles[listingId] || [];
+      if (!text && files.length === 0) return;
 
-    // Find buyer participant from the thread
-    const thread = threadsByListing[listingId] || [];
-    const lastBuyerMsg = [...thread].reverse().find(m => m.buyer_email);
-    const buyer_email = lastBuyerMsg?.buyer_email || null;
-    const buyer_name  = (lastBuyerMsg?.buyer_name && lastBuyerMsg.buyer_name.trim())
-      ? lastBuyerMsg.buyer_name
-      : (buyer_email ?? 'Buyer');
+      // Determine buyer participant from this thread
+      const thread = threadsByListing[listingId] || [];
+      const knownBuyerMsg =
+        [...thread].reverse().find(m => m.buyer_email && m.buyer_email.trim()) ||
+        thread.find(m => m.buyer_email && m.buyer_email.trim());
 
-    if (!buyer_email) {
-      alert('No buyer participant found in this thread yet.');
-      return;
-    }
+      const buyerEmail = knownBuyerMsg?.buyer_email || null;
+      const buyerName =
+        (knownBuyerMsg?.buyer_name && knownBuyerMsg.buyer_name.trim())
+          ? knownBuyerMsg.buyer_name
+          : (buyerEmail ?? 'Buyer');
 
-    // Upload attachments (public bucket) — keep behavior
-    const attachments = [];
-    for (const file of files) {
-      const isImage = file.type?.startsWith('image/');
-      const isVideo = file.type?.startsWith('video/');
-      if (!isImage && !isVideo) continue;
-
-      const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-      const path = `listing-${listingId}/seller-${sellerEmail}/${Date.now()}-${safeName}`;
-      const { error: upErr } = await supabase.storage
-        .from(ATTACH_BUCKET)
-        .upload(path, file, { cacheControl: '3600', upsert: false });
-      if (upErr) {
-        console.error('Upload failed:', upErr);
-        alert('Attachment upload failed. Please try again or remove the file(s).');
+      if (!buyerEmail) {
+        alert('No buyer participant found in this thread yet.');
         return;
       }
-      attachments.push({
-        path,
-        name: file.name,
-        size: file.size,
-        mime: file.type,
-        kind: isImage ? 'image' : 'video',
-      });
-    }
 
-    // Call API with service role (pass seller_email to resolve UUID)
-    const resp = await fetch('/api/send-message', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        listing_id: Number(listingId),
-        buyer_email,
-        buyer_name,
-        seller_email: sellerEmail,
+      // Upload attachments
+      let attachments = [];
+      if (files.length > 0) {
+        for (const file of files) {
+          const isImage = file.type?.startsWith('image/');
+          const isVideo = file.type?.startsWith('video/');
+          if (!isImage && !isVideo) continue;
+
+          const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+          const path = `listing-${listingId}/seller-${sellerEmail}/${Date.now()}-${safeName}`;
+          const { error: upErr } = await supabase.storage
+            .from(ATTACH_BUCKET)
+            .upload(path, file, { cacheControl: '3600', upsert: false });
+          if (upErr) {
+            console.error('Upload failed:', upErr);
+            alert('Attachment upload failed. Please try again or remove the file(s).');
+            return;
+          }
+          attachments.push({
+            path,
+            name: file.name,
+            size: file.size,
+            mime: file.type,
+            kind: isImage ? 'image' : 'video',
+          });
+        }
+      }
+
+      // Insert message from seller
+      const { error: insertErr } = await supabase.from('messages').insert([{
+        listing_id: listingId,
+        buyer_email: buyerEmail,
+        buyer_name: buyerName,
+        seller_id: user.id,         // seller auth UUID
         message: text,
         topic: 'business-inquiry',
         is_deal_proposal: false,
         attachments,
-        from_seller: true,
-      }),
-    });
+        from_seller: true,          // 👈 flag drives label/colour
+      }]);
 
-    const json = await resp.json().catch(() => ({}));
-    if (!resp.ok || json.ok === false) {
-      console.error('❌ API failed:', json?.error);
-      alert(json?.error || 'Sending failed.');
-      return;
+      if (insertErr) {
+        console.error('Insert message failed:', insertErr);
+        alert(insertErr.message || 'Sending failed. Please try again.');
+        return;
+      }
+
+      setReplyText((prev) => ({ ...prev, [listingId]: '' }));
+      setReplyFiles((prev) => ({ ...prev, [listingId]: [] }));
+
+      // Refresh messages
+      const ids = (sellerListings || []).map((l) => l.id).filter(Boolean);
+      if (ids.length > 0) {
+        const { data, error } = await supabase
+          .from('messages')
+          .select('*')
+          .in('listing_id', ids)
+          .order('created_at', { ascending: true });
+        if (!error) setMessages(data || []);
+      }
+    } catch (err) {
+      console.error('sendReply crashed:', err);
+      alert('Something went wrong while sending. Please try again.');
     }
-
-    setReplyText(prev => ({ ...prev, [listingId]: '' }));
-    setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
-
-    // Refresh thread
-    const ids = (sellerListings || []).map((l) => l.id).filter(Boolean);
-    if (ids.length > 0) {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .in('listing_id', ids)
-        .order('created_at', { ascending: true });
-      if (!error) setMessages(data || []);
-    }
-  } catch (err) {
-    console.error('sendReply crashed:', err);
-    alert('Something went wrong while sending. Please try again.');
   }
-}
 
   if (!user) {
     return <div className="p-8 text-center text-gray-600">Loading dashboard…</div>;
@@ -249,7 +266,8 @@ async function sendReply(listingId /* int */) {
                         {lst.asking_price ? `$${Number(lst.asking_price).toLocaleString()}` : '—'}
                       </p>
                       <p className="text-gray-700">
-                        <strong>Location:</strong> {lst.city || lst.location_city || '—'}, {lst.state_or_province || lst.location_state || '—'}
+                        <strong>Location:</strong> {lst.city || lst.location_city || '—'},{' '}
+                        {lst.state_or_province || lst.location_state || '—'}
                       </p>
                       <div className="mt-3 flex gap-2">
                         <button
@@ -283,10 +301,6 @@ async function sendReply(listingId /* int */) {
               listingIds.map((lid) => {
                 const thread = threadsByListing[lid] || [];
                 const listing = sellerListings.find((l) => String(l.id) === String(lid));
-                // Determine buyer for labeling in this thread
-                const threadBuyerEmail =
-                  [...thread].find(m => m.buyer_email && m.buyer_email.trim())?.buyer_email ||
-                  thread[0]?.buyer_email || '';
 
                 return (
                   <div key={lid} className="mb-6 border rounded-xl p-3 bg-gray-50">
@@ -305,27 +319,20 @@ async function sendReply(listingId /* int */) {
                     {/* Thread bubbles */}
                     <div className="space-y-2">
                       {thread.map((msg) => {
-                        const isBuyerMsg = msg.buyer_email && msg.buyer_email === threadBuyerEmail;
+                        const { who, color } = whoAndColorForSeller(msg, user?.id);
                         return (
                           <div key={msg.id}>
-                            <div
-                              className={`p-2 rounded-lg ${
-                                isBuyerMsg ? "bg-blue-100 text-blue-900" : "bg-green-100 text-green-900"
-                              }`}
-                            >
-                              <strong>{isBuyerMsg ? "Buyer" : "You"}:</strong> {msg.message}
+                            <div className={`p-2 rounded-lg ${color}`}>
+                              <strong>{who}:</strong> {msg.message}
                             </div>
 
-                            {(() => {
-                              const safeAttachments = Array.isArray(msg.attachments) ? msg.attachments : [];
-                              return safeAttachments.length > 0 ? (
-                                <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                  {safeAttachments.map((att, i) => (
-                                    <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
-                                  ))}
-                                </div>
-                              ) : null;
-                            })()}
+                            {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
+                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                {msg.attachments.map((att, i) => (
+                                  <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
+                                ))}
+                              </div>
+                            )}
 
                             <p className="text-[11px] text-gray-400 mt-1">
                               {new Date(msg.created_at).toLocaleString()}
@@ -350,7 +357,9 @@ async function sendReply(listingId /* int */) {
                             type="text"
                             placeholder="Reply to buyer…"
                             value={replyText[lid] || ''}
-                            onChange={(e) => setReplyText((prev) => ({ ...prev, [lid]: e.target.value }))}
+                            onChange={(e) =>
+                              setReplyText((prev) => ({ ...prev, [lid]: e.target.value }))
+                            }
                             className="border p-1 rounded flex-1"
                           />
                           <button
@@ -366,7 +375,10 @@ async function sendReply(listingId /* int */) {
                       {replyFiles[lid]?.length > 0 && (
                         <div className="mt-1 text-xs text-gray-600">
                           {replyFiles[lid].map((f, idx) => (
-                            <span key={idx} className="inline-block mr-2 truncate max-w-[12rem] align-middle">
+                            <span
+                              key={idx}
+                              className="inline-block mr-2 truncate max-w-[12rem] align-middle"
+                            >
                               📎 {f.name}
                             </span>
                           ))}
@@ -421,4 +433,3 @@ function AttachmentPreview({ att }) {
     </a>
   );
 }
-
