@@ -1,7 +1,3 @@
-// STEP 2 — Replace file: pages/api/valuations.js
-// Accepts POST with or without listing_id. GET loads last valuation:
-// - if listing_id provided: by (listing_id + buyer_email)
-// - else: by (buyer_email only)
 
 import { createClient } from '@supabase/supabase-js';
 
