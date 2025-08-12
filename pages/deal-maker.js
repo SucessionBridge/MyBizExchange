@@ -96,17 +96,31 @@ const sendDealToSeller = async (dealText) => {
   if (!buyer || !listing) return;
 
   try {
+    // Try to give the API *either* seller_email or seller_id (UUID).
+    const sellerEmail =
+      listing.email ||
+      listing.seller_email ||
+      listing.contact_email ||
+      null;
+
+    const possibleSellerId = listing.auth_id; // if your sellers row has it
+    const isUUID = (s) =>
+      typeof s === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+
     const body = {
-      listing_id: listing.id,
+      listing_id: Number(listing.id),
       buyer_email: buyer.email,
       buyer_name: buyer.name || buyer.full_name || buyer.email,
       message: dealText,
       topic: 'deal-proposal',
       is_deal_proposal: true,
+      from_seller: false,          // buyer → seller
     };
 
-    // Optional: only include if it's a real UUID string you have
-    if (buyer.auth_id) body.sender_id = buyer.auth_id;
+    // Help the API resolve the seller
+    if (sellerEmail) body.seller_email = sellerEmail;
+    if (isUUID(possibleSellerId)) body.seller_id = possibleSellerId;
 
     const res = await fetch('/api/send-message', {
       method: 'POST',
@@ -114,8 +128,10 @@ const sendDealToSeller = async (dealText) => {
       body: JSON.stringify(body),
     });
 
-    const json = await res.json();
-    if (!res.ok) throw new Error(json?.error || 'Failed to send message');
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.ok === false) {
+      throw new Error(json?.error || 'Failed to send message');
+    }
 
     alert('✅ Deal proposal sent to seller!');
     router.push(`/listings/${listing.id}`);
@@ -124,6 +140,7 @@ const sendDealToSeller = async (dealText) => {
     alert(err.message || 'Sending failed. Please try again.');
   }
 };
+
 
 
   if (!listing || !buyer) {
