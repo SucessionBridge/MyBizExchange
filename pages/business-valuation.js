@@ -1,313 +1,593 @@
-import React, { useState } from 'react';
-import jsPDF from 'jspdf';
+// pages/valuation-tool.js
+import React, { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/router';
+import supabase from '../lib/supabaseClient';
 
-export default function BusinessValuation() {
-  const [formData, setFormData] = useState({
-    businessName: '',
-    yearsInBusiness: '',
-    email: '',
-    industry: '',
-    annualRevenue: '',
-    annualExpenses: '',
-    totalSalariesPaid: '',
-    ownerSalaryAddBack: '',
-    personalAddBacks: '',
-    hasEmployees: 'yes',
-    includeRealEstate: 'no',
-    equipment: [{ name: '', value: '' }],
-    realEstateValue: '',
-    sellerFinancing: 'no',
-    returnCustomers: '',       // ✅ Additional Notes restored
-    contractsInPlace: ''       // ✅ Additional Notes restored
-  });
+import {
+  INDUSTRY_MULTIPLES,
+  DEFAULT_EBITDA_MULTIPLES,
+  DEFAULT_REVENUE_MULTIPLES,
+  normalizeIndustry,
+  computeAdjustments,
+  effectiveMultiples,
+  calculateSDEMultipleValues,
+  calculateEBITDAValues,
+  calculateRevenueValues,
+  calculateDCF,
+  formatMoney,
+  percentDelta,
+} from '../lib/valuation';
 
-  const industries = [
-    'Landscaping', 'Construction', 'Cleaning', 'Retail', 'E-commerce', 'Consulting',
-    'Accounting', 'Legal', 'Restaurant', 'Health & Wellness', 'Transportation',
-    'Technology', 'Education', 'Manufacturing', 'Automotive', 'Real Estate',
-    'Hospitality', 'Home Services', 'Fitness', 'Event Planning', 'Photography',
-    'Other'
-  ];
+export default function ValuationTool() {
+  const router = useRouter();
+  const [listing, setListing] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [buyerEmail, setBuyerEmail] = useState('');
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  // Inputs / assumptions
+  const [sdeInput, setSdeInput] = useState(0);
+  const [industryKey, setIndustryKey] = useState('fallback');
+  const [industryTriplet, setIndustryTriplet] = useState([2.5, 3.0, 3.5]);
 
-  const handleEquipmentChange = (index, field, value) => {
-    const updated = [...formData.equipment];
-    updated[index][field] = value;
-    setFormData((prev) => ({ ...prev, equipment: updated }));
-  };
+  const [growthRate, setGrowthRate] = useState(4);
+  const [discountRate, setDiscountRate] = useState(22);
+  const [terminalMultiple, setTerminalMultiple] = useState(3.0);
 
-  const addEquipment = () => {
-    setFormData((prev) => ({
-      ...prev,
-      equipment: [...prev.equipment, { name: '', value: '' }],
-    }));
-  };
+  const [riskScore, setRiskScore] = useState(3);              // 1=low risk … 5=high risk
+  const [ownerDepScore, setOwnerDepScore] = useState(3);      // 1=low dep … 5=high dep
+  const [workingCapital, setWorkingCapital] = useState(0);    // positive need subtracts
+  const [sellerCarryAllowed, setSellerCarryAllowed] = useState(false);
 
-  const calculateValuation = () => {
-    const revenue = parseFloat(formData.annualRevenue) || 0;
-    const expenses = parseFloat(formData.annualExpenses) || 0;
-    const ownerSalaryAddBack = parseFloat(formData.ownerSalaryAddBack) || 0;
-    const addBacks = parseFloat(formData.personalAddBacks) || 0;
-    const realEstate = formData.includeRealEstate === 'yes' ? (parseFloat(formData.realEstateValue) || 0) : 0;
+  const [showEbitdaRevenue, setShowEbitdaRevenue] = useState(false);
+  const [ebitdaOverride, setEbitdaOverride] = useState('');
+  const [revenueInput, setRevenueInput] = useState('');
+  const [ebitdaMultiples, setEbitdaMultiples] = useState([...DEFAULT_EBITDA_MULTIPLES]);
+  const [revenueMultiples, setRevenueMultiples] = useState([...DEFAULT_REVENUE_MULTIPLES]);
 
-    const equipmentValue = formData.equipment.reduce((sum, eq) => {
-      return sum + (parseFloat(eq.value) || 0);
-    }, 0);
+  const listingId = useMemo(() => {
+    const raw = router.query?.listingId;
+    if (!raw) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  }, [router.query]);
 
-    const sde = revenue - expenses + ownerSalaryAddBack + addBacks;
+  useEffect(() => {
+    // Get buyer email if logged in
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const email = data?.user?.email || '';
+        setBuyerEmail(email);
+      } catch {
+        // ignore
+      }
+    })();
+  }, []);
 
-    const multiplier = equipmentValue > 0
-      ? (formData.hasEmployees === 'yes' ? 2.5 : 2.0)
-      : (formData.hasEmployees === 'yes' ? 2.2 : 1.8);
+  useEffect(() => {
+    if (!router.isReady || !listingId) return;
+    (async () => {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('sellers')
+        .select('*')
+        .eq('id', listingId)
+        .maybeSingle();
 
-    const sdeValue = sde * multiplier;
+      if (!error && data) {
+        setListing(data);
+        const normalized = normalizeIndustry(data.industry);
+        setIndustryKey(normalized);
+        const baseTriplet = INDUSTRY_MULTIPLES[normalized] || INDUSTRY_MULTIPLES.fallback;
+        setIndustryTriplet(baseTriplet);
 
-    return {
-      businessValue: sdeValue,
-      totalValue: sdeValue + realEstate,
-      equipmentValue,
-      realEstate
-    };
-  };
+        const initialSde = Number(data.annual_profit || 0);
+        setSdeInput(initialSde);
+        setRevenueInput(String(data.annual_revenue || ''));
+      }
+      setLoading(false);
+    })();
+  }, [router.isReady, listingId]);
 
-  const generatePDF = () => {
-    const { businessValue, totalValue } = calculateValuation();
-    const doc = new jsPDF();
+  const adjustments = useMemo(
+    () => computeAdjustments({ growthRatePct: growthRate, riskScore, ownerDepScore, sellerCarryAllowed }),
+    [growthRate, riskScore, ownerDepScore, sellerCarryAllowed]
+  );
 
-    // === Title ===
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.text('SuccessionBridge Business Valuation', 20, 20);
+  const effective = useMemo(
+    () => effectiveMultiples(industryTriplet, adjustments.total),
+    [industryTriplet, adjustments.total]
+  );
 
-    // === Disclaimer ===
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text(
-      'Disclaimer: This valuation is a simple tool to help business owners get a general sense of what their business may be worth. It should not be used for investment, loan, or legal decisions.',
-      20,
-      30,
-      { maxWidth: 170 }
-    );
+  const sdeValues = useMemo(
+    () =>
+      calculateSDEMultipleValues({
+        sde: Number(sdeInput || 0),
+        multiples: effective,
+        workingCapital: Number(workingCapital || 0),
+      }),
+    [sdeInput, effective, workingCapital]
+  );
 
-    let y = 50;
-    const lineHeight = 8;
+  const ebitdaValues = useMemo(() => {
+    if (!showEbitdaRevenue) return null;
+    const eVal = Number(ebitdaOverride || sdeInput || 0);
+    return calculateEBITDAValues({
+      ebitda: eVal,
+      multiples: ebitdaMultiples.map(Number),
+      workingCapital: Number(workingCapital || 0),
+    });
+  }, [showEbitdaRevenue, ebitdaOverride, sdeInput, ebitdaMultiples, workingCapital]);
 
-    // === Business Information ===
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Business Information', 20, y);
-    y += lineHeight;
+  const revenueValues = useMemo(() => {
+    if (!showEbitdaRevenue) return null;
+    const rVal = Number(revenueInput || listing?.annual_revenue || 0);
+    return calculateRevenueValues({
+      revenue: rVal,
+      multiples: revenueMultiples.map(Number),
+      workingCapital: Number(workingCapital || 0),
+    });
+  }, [showEbitdaRevenue, revenueInput, listing?.annual_revenue, revenueMultiples, workingCapital]);
 
-    const addLine = (label, value) => {
-      doc.setFont('helvetica', 'bold');
-      doc.text(label, 20, y);
-      doc.setFont('helvetica', 'normal');
-      doc.text(value || 'N/A', 90, y);
-      y += lineHeight;
-    };
+  const dcfValue = useMemo(
+    () =>
+      calculateDCF({
+        sde: Number(sdeInput || 0),
+        growthRatePct: Number(growthRate || 0),
+        discountRatePct: Number(discountRate || 0),
+        terminalMultiple: Number(terminalMultiple || 3),
+        sellerCarryAllowed,
+        workingCapital: Number(workingCapital || 0),
+      }),
+    [sdeInput, growthRate, discountRate, terminalMultiple, sellerCarryAllowed, workingCapital]
+  );
 
-    addLine('Business Name:', formData.businessName);
-    addLine('Years in Business:', formData.yearsInBusiness);
-    addLine('Email:', formData.email);
-    addLine('Industry:', formData.industry);
+  const asking = Number(listing?.asking_price || 0);
 
-    // === Financials ===
-    y += 6;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Financials', 20, y);
-    y += lineHeight;
-
-    addLine('Annual Revenue:', `$${parseFloat(formData.annualRevenue || 0).toLocaleString()}`);
-    addLine('Annual Expenses:', `$${parseFloat(formData.annualExpenses || 0).toLocaleString()}`);
-    addLine('Total Salaries Paid:', `$${parseFloat(formData.totalSalariesPaid || 0).toLocaleString()}`);
-    addLine("Owner Salary Add-Back:", `$${parseFloat(formData.ownerSalaryAddBack || 0).toLocaleString()}`);
-    addLine('Personal Add-Backs:', `$${parseFloat(formData.personalAddBacks || 0).toLocaleString()}`);
-    addLine('Employees:', formData.hasEmployees === 'yes' ? 'Yes' : 'No');
-
-    if (formData.includeRealEstate === 'yes') {
-      addLine('Real Estate Value:', `$${parseFloat(formData.realEstateValue || 0).toLocaleString()}`);
+  const summaryText = useMemo(() => {
+    const lines = [];
+    lines.push(`Valuation Summary for ${listing?.business_name || 'Listing #' + listingId}`);
+    if (listing?.city || listing?.state_or_province) {
+      lines.push(`${listing?.city || ''}${listing?.city && listing?.state_or_province ? ', ' : ''}${listing?.state_or_province || ''}`);
     }
+    lines.push(`Industry: ${listing?.industry || 'N/A'}`);
+    lines.push('');
+    lines.push(`SDE used: ${formatMoney(sdeInput)} (adjustable)`);
+    lines.push(`Industry multiples (adjusted): Low ${effective[0].toFixed(2)}× | Base ${effective[1].toFixed(2)}× | High ${effective[2].toFixed(2)}×`);
+    lines.push(`SDE method results: Low ${formatMoney(sdeValues.low)}, Base ${formatMoney(sdeValues.base)}, High ${formatMoney(sdeValues.high)}`);
+    if (showEbitdaRevenue && ebitdaValues) {
+      lines.push(`EBITDA method: Low ${formatMoney(ebitdaValues.low)}, Base ${formatMoney(ebitdaValues.base)}, High ${formatMoney(ebitdaValues.high)}`);
+    }
+    if (showEbitdaRevenue && revenueValues) {
+      lines.push(`Revenue method: Low ${formatMoney(revenueValues.low)}, Base ${formatMoney(revenueValues.base)}, High ${formatMoney(revenueValues.high)}`);
+    }
+    lines.push(`DCF (5y, terminal ${Number(terminalMultiple).toFixed(1)}×, growth ${Number(growthRate)}%, discount ${Number(discountRate)}%${sellerCarryAllowed ? ' (carry adj.)' : ''}): ${formatMoney(dcfValue)}`);
+    if (asking) {
+      lines.push('');
+      lines.push(`Asking price: ${formatMoney(asking)}`);
+      lines.push(`Δ vs Asking — SDE Base: ${formatMoney(sdeValues.base - asking)} (${percentDelta(sdeValues.base, asking).toFixed(1)}%)`);
+    }
+    lines.push('');
+    lines.push(`Notes: Working capital applied ${formatMoney(workingCapital)}. Risk ${riskScore}/5, Owner-dependency ${ownerDepScore}/5. Seller carry ${sellerCarryAllowed ? 'YES' : 'NO'}.`);
+    return lines.join('\n');
+  }, [
+    listing?.business_name,
+    listing?.city,
+    listing?.state_or_province,
+    listing?.industry,
+    listingId,
+    sdeInput,
+    effective,
+    sdeValues,
+    showEbitdaRevenue,
+    ebitdaValues,
+    revenueValues,
+    dcfValue,
+    terminalMultiple,
+    growthRate,
+    discountRate,
+    sellerCarryAllowed,
+    workingCapital,
+    riskScore,
+    ownerDepScore,
+    asking,
+  ]);
 
-    // === Equipment ===
-    y += 6;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Equipment', 20, y);
-    y += lineHeight;
-    doc.setFont('helvetica', 'normal');
-    if (formData.equipment.some(eq => eq.name || eq.value)) {
-      formData.equipment.forEach(eq => {
-        if (eq.name || eq.value) {
-          doc.text(`- ${eq.name || 'Unnamed'}: $${eq.value || 0}`, 30, y);
-          y += lineHeight;
-        }
-      });
+  async function handleSave() {
+    if (!listingId) return alert('No listingId in URL');
+    if (!buyerEmail) return alert('Please enter your email to save valuations.');
+    const inputs = {
+      listing_id: listingId,
+      buyer_email: buyerEmail,
+      industry: industryKey,
+      industry_multiples: { low: Number(industryTriplet[0]), base: Number(industryTriplet[1]), high: Number(industryTriplet[2]) },
+      sde_input: Number(sdeInput || 0),
+      used_annual_profit_as_sde: Boolean(listing?.annual_profit && Number(sdeInput) === Number(listing?.annual_profit)),
+      growth_rate_pct: Number(growthRate || 0),
+      discount_rate_pct: Number(discountRate || 0),
+      terminal_multiple: Number(terminalMultiple || 3),
+      risk_score: Number(riskScore || 3),
+      owner_dependency_score: Number(ownerDepScore || 3),
+      working_capital_adjustment: Number(workingCapital || 0),
+      seller_carry_allowed: Boolean(sellerCarryAllowed),
+      show_ebitda_revenue_methods: Boolean(showEbitdaRevenue),
+      ebitda_value_override: ebitdaOverride ? Number(ebitdaOverride) : null,
+      ebitda_multiples: { low: Number(ebitdaMultiples[0]), base: Number(ebitdaMultiples[1]), high: Number(ebitdaMultiples[2]) },
+      revenue_input: revenueInput ? Number(revenueInput) : Number(listing?.annual_revenue || 0),
+      revenue_multiples: { low: Number(revenueMultiples[0]), base: Number(revenueMultiples[1]), high: Number(revenueMultiples[2]) },
+      adjustments: {
+        risk: adjustments.risk,
+        owner_dependency: adjustments.owner_dependency,
+        growth: adjustments.growth,
+        carry: adjustments.carry,
+        total_applied: adjustments.total,
+      },
+    };
+
+    const outputs = {
+      effective_multiples: { low: Number(effective[0]), base: Number(effective[1]), high: Number(effective[2]) },
+      sde_multiple_values: { low: sdeValues.low, base: sdeValues.base, high: sdeValues.high },
+      ebitda_values: ebitdaValues || { low: null, base: null, high: null },
+      revenue_values: revenueValues || { low: null, base: null, high: null },
+      dcf_value: dcfValue,
+      working_capital_applied: Number(workingCapital || 0),
+      asking_price: asking || null,
+      deltas_vs_asking: asking
+        ? {
+            sde_low: { amount: sdeValues.low - asking, percent: percentDelta(sdeValues.low, asking) },
+            sde_base: { amount: sdeValues.base - asking, percent: percentDelta(sdeValues.base, asking) },
+            sde_high: { amount: sdeValues.high - asking, percent: percentDelta(sdeValues.high, asking) },
+            dcf: { amount: dcfValue - asking, percent: percentDelta(dcfValue, asking) },
+          }
+        : null,
+      recommended_method: 'SDE base',
+      recommended_value: sdeValues.base,
+    };
+
+    const resp = await fetch('/api/valuations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        listing_id: listingId,
+        buyer_email: buyerEmail,
+        inputs,
+        outputs,
+      }),
+    });
+    const json = await resp.json();
+    if (!resp.ok) {
+      alert(json.error || 'Failed to save valuation.');
     } else {
-      doc.text('(None listed) N/A', 30, y);
-      y += lineHeight;
+      alert('Valuation saved.');
     }
+  }
 
-    // === Additional Notes ===
-    y += 6;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Additional Notes', 20, y);
-    y += lineHeight;
-    addLine('Return Customers %:', formData.returnCustomers);
-    addLine('Contracts in Place:', formData.contractsInPlace);
-
-    // === Estimated Valuation ===
-    y += 6;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Estimated Valuation', 20, y);
-    y += lineHeight;
-    doc.setFont('helvetica', 'normal');
-    doc.text(`$${businessValue.toFixed(2)}`, 20, y);
-    y += lineHeight;
-    if (formData.includeRealEstate === 'yes') {
-      doc.text(`+ Real Estate: $${parseFloat(formData.realEstateValue || 0).toLocaleString()}`, 20, y);
-      y += lineHeight;
-      doc.text(`Total Estimated Value: $${totalValue.toFixed(2)}`, 20, y);
-      y += lineHeight;
+  async function handleLoad() {
+    if (!listingId) return alert('No listingId in URL');
+    if (!buyerEmail) return alert('Enter your email to load your last valuation.');
+    const url = `/api/valuations?listing_id=${encodeURIComponent(listingId)}&buyer_email=${encodeURIComponent(buyerEmail)}`;
+    const resp = await fetch(url);
+    const json = await resp.json();
+    if (!resp.ok) {
+      alert(json.error || 'Failed to load valuation.');
+      return;
     }
+    const val = json?.valuation;
+    if (!val) {
+      alert('No saved valuation found for this listing and email.');
+      return;
+    }
+    const i = val.inputs || {};
+    const effTrip = i.industry_multiples ? [i.industry_multiples.low, i.industry_multiples.base, i.industry_multiples.high] : industryTriplet;
 
-    // === Seller Financing Advantage ===
-    y += 10;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('Seller Financing Advantage', 20, y);
-    y += lineHeight;
-    doc.setFont('helvetica', 'normal');
-    doc.text(
-      'Offering seller financing under your own terms can increase your total payout while making your business more attractive to buyers.',
-      20,
-      y,
-      { maxWidth: 170 }
-    );
-    y += lineHeight * 2;
-    doc.text(
-      'For example: Financing $250K over 4 years at 6% interest could add tens of thousands in interest income to your sale price.',
-      20,
-      y,
-      { maxWidth: 170 }
-    );
+    setIndustryKey(i.industry || industryKey);
+    setIndustryTriplet(effTrip.map(Number));
+    setSdeInput(Number(i.sde_input || 0));
+    setGrowthRate(Number(i.growth_rate_pct || 0));
+    setDiscountRate(Number(i.discount_rate_pct || 0));
+    setTerminalMultiple(Number(i.terminal_multiple || 3));
+    setRiskScore(Number(i.risk_score || 3));
+    setOwnerDepScore(Number(i.owner_dependency_score || 3));
+    setWorkingCapital(Number(i.working_capital_adjustment || 0));
+    setSellerCarryAllowed(Boolean(i.seller_carry_allowed));
+    setShowEbitdaRevenue(Boolean(i.show_ebitda_revenue_methods));
+    setEbitdaOverride(i.ebitda_value_override ?? '');
+    const em = i.ebitda_multiples || {};
+    setEbitdaMultiples([Number(em.low || 3), Number(em.base || 4), Number(em.high || 5)]);
+    const rm = i.revenue_multiples || {};
+    setRevenueMultiples([Number(rm.low || 0.6), Number(rm.base || 1.0), Number(rm.high || 1.4)]);
+    setRevenueInput(String(i.revenue_input ?? listing?.annual_revenue ?? ''));
+    alert('Loaded last valuation.');
+  }
 
-    // === Footer ===
-    y += 20;
-    doc.setFont('helvetica', 'italic');
-    doc.setFontSize(9);
-    doc.text('Generated by SuccessionBridge Valuation Wizard', 20, y);
+  async function handleSendToSeller() {
+    if (!listingId) return alert('No listingId');
+    const body = {
+      topic: 'valuation',
+      listing_id: listingId,
+      listingId, // include both snake/camel just in case your API expects one
+      message: summaryText,
+    };
+    const resp = await fetch('/api/send-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      alert(json.error || 'Failed to send message.');
+    } else {
+      alert('Sent to seller.');
+    }
+  }
 
-    doc.save('valuation-report.pdf');
-  };
+  if (loading) {
+    return <main className="min-h-screen p-6"><div className="max-w-6xl mx-auto">Loading…</div></main>;
+  }
 
   return (
     <main className="min-h-screen p-6 bg-gray-50">
-      <div className="max-w-3xl mx-auto bg-white shadow-md p-6 rounded-lg">
-        <h1 className="text-3xl font-bold mb-6">Valuation Wizard</h1>
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* LEFT: Listing recap + Assumptions */}
+        <section className="bg-white rounded-xl shadow p-5 space-y-4">
+          <h1 className="text-2xl font-bold">Valuation Tool</h1>
 
-        <p className="mb-4 text-sm text-gray-600">
-          📌 This valuation is a simple tool to help business owners get a general sense of what their business may be worth. It should not be used for investment, loan, or legal decisions.
-        </p>
+          <div className="text-sm text-gray-600">
+            <div className="font-semibold">Listing</div>
+            <div>{listing?.business_name || '—'}</div>
+            <div className="text-gray-500">{[listing?.city, listing?.state_or_province].filter(Boolean).join(', ')}</div>
+            <div>Industry: <span className="font-medium">{listing?.industry || 'N/A'}</span></div>
+            <div>Asking Price: <span className="font-medium">{asking ? formatMoney(asking) : 'N/A'}</span></div>
+            <div>Annual Revenue: <span className="font-medium">{formatMoney(listing?.annual_revenue || 0)}</span></div>
+            <div>Annual Profit (SDE baseline): <span className="font-medium">{formatMoney(listing?.annual_profit || 0)}</span></div>
+          </div>
 
-        <div className="space-y-4">
-          <input name="businessName" placeholder="Business Name" value={formData.businessName} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="yearsInBusiness" placeholder="Years in Business" value={formData.yearsInBusiness} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="email" type="email" placeholder="Email Address (we’ll send your report)" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" required />
+          <div className="pt-2 border-t">
+            <label className="block text-sm font-medium mb-1">Your Email (for saving/loading)</label>
+            <input
+              className="w-full border rounded p-2"
+              placeholder="you@example.com"
+              value={buyerEmail}
+              onChange={(e) => setBuyerEmail(e.target.value)}
+            />
+          </div>
 
-          <select name="industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded">
-            <option value="">Select Industry</option>
-            {industries.map((ind) => (
-              <option key={ind} value={ind}>{ind}</option>
-            ))}
-          </select>
-
-          <input name="annualRevenue" placeholder="Annual Revenue ($)" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="annualExpenses" placeholder="Annual Expenses ($)" value={formData.annualExpenses} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="totalSalariesPaid" placeholder="Total Salaries Paid (including owner)" value={formData.totalSalariesPaid} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="ownerSalaryAddBack" placeholder="Owner’s Salary (only if already included above)" value={formData.ownerSalaryAddBack} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="personalAddBacks" placeholder="Add-backs (personal expenses, etc.)" value={formData.personalAddBacks} onChange={handleChange} className="w-full border p-3 rounded" />
-
-          <label className="block font-medium">Does your business have employees?</label>
-          <select name="hasEmployees" value={formData.hasEmployees} onChange={handleChange} className="w-full border p-3 rounded">
-            <option value="yes">Yes</option>
-            <option value="no">No, I operate it alone</option>
-          </select>
-
-          <label className="block font-medium">List Non-Essential Equipment</label>
-          <p className="text-sm text-gray-600">
-            💡 Only include equipment here if it is <strong>not essential</strong> to running the business (like extra tools or backup vehicles). If the equipment is required for daily operations (e.g. oven for a bakery, dump truck for landscaping), leave this blank — its value is already reflected in the valuation multiplier.
-          </p>
-
-          {formData.equipment.map((eq, idx) => (
-            <div key={idx} className="flex space-x-2 mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium">SDE (Profit)</label>
               <input
-                placeholder="Equipment Name"
-                value={eq.name}
-                onChange={(e) => handleEquipmentChange(idx, 'name', e.target.value)}
-                className="flex-1 border p-2 rounded"
-              />
-              <input
-                placeholder="Value ($)"
-                value={eq.value}
-                onChange={(e) => handleEquipmentChange(idx, 'value', e.target.value)}
-                className="w-32 border p-2 rounded"
+                type="number"
+                className="w-full border rounded p-2"
+                value={sdeInput}
+                onChange={(e) => setSdeInput(Number(e.target.value || 0))}
               />
             </div>
-          ))}
-          <button onClick={addEquipment} className="text-blue-600 hover:underline">+ Add Equipment</button>
 
-          <label className="block font-medium">Include Real Estate in Valuation?</label>
-          <p className="text-sm text-gray-600">
-            💡 If you own the property and want its value included in the total, select "Yes" and enter its estimated market value. This will be added as a separate line item in the report.
-          </p>
-          <select name="includeRealEstate" value={formData.includeRealEstate} onChange={handleChange} className="w-full border p-3 rounded">
-            <option value="no">No</option>
-            <option value="yes">Yes</option>
-          </select>
+            <div>
+              <label className="block text-sm font-medium">Industry</label>
+              <select
+                className="w-full border rounded p-2"
+                value={industryKey}
+                onChange={(e) => {
+                  const k = e.target.value;
+                  setIndustryKey(k);
+                  setIndustryTriplet(INDUSTRY_MULTIPLES[k] || INDUSTRY_MULTIPLES.fallback);
+                }}
+              >
+                {Object.keys(INDUSTRY_MULTIPLES).map((k) => (
+                  <option key={k} value={k}>{k}</option>
+                ))}
+              </select>
+            </div>
 
-          {formData.includeRealEstate === 'yes' && (
-            <input name="realEstateValue" placeholder="Real Estate Value ($)" value={formData.realEstateValue} onChange={handleChange} className="w-full border p-3 rounded" />
+            <div>
+              <label className="block text-sm font-medium">Working Capital Need (+)</label>
+              <input
+                type="number"
+                className="w-full border rounded p-2"
+                value={workingCapital}
+                onChange={(e) => setWorkingCapital(Number(e.target.value || 0))}
+              />
+            </div>
+          </div>
+
+          {/* Multiples editor */}
+          <div className="grid grid-cols-3 gap-3">
+            {['Low×', 'Base×', 'High×'].map((label, idx) => (
+              <div key={label}>
+                <label className="block text-sm font-medium">{`Industry ${label}`}</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  className="w-full border rounded p-2"
+                  value={industryTriplet[idx]}
+                  onChange={(e) => {
+                    const val = Number(e.target.value || 0);
+                    setIndustryTriplet((prev) => prev.map((x, i) => (i === idx ? val : x)));
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Risk / owner dep / growth / discount / terminal */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium">Risk (1–5)</label>
+              <input type="number" min={1} max={5} className="w-full border rounded p-2" value={riskScore} onChange={(e) => setRiskScore(Number(e.target.value || 3))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Owner-Dependency (1–5)</label>
+              <input type="number" min={1} max={5} className="w-full border rounded p-2" value={ownerDepScore} onChange={(e) => setOwnerDepScore(Number(e.target.value || 3))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Growth %</label>
+              <input type="number" step="0.1" className="w-full border rounded p-2" value={growthRate} onChange={(e) => setGrowthRate(Number(e.target.value || 0))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Discount %</label>
+              <input type="number" step="0.1" className="w-full border rounded p-2" value={discountRate} onChange={(e) => setDiscountRate(Number(e.target.value || 0))} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium">Terminal Multiple ×</label>
+              <input type="number" step="0.1" className="w-full border rounded p-2" value={terminalMultiple} onChange={(e) => setTerminalMultiple(Number(e.target.value || 3))} />
+            </div>
+            <div className="flex items-end">
+              <label className="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={sellerCarryAllowed} onChange={(e) => setSellerCarryAllowed(e.target.checked)} />
+                Seller carry allowed
+              </label>
+            </div>
+          </div>
+
+          {/* Optional EBITDA/Revenue methods */}
+          <div className="pt-2 border-t">
+            <label className="inline-flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={showEbitdaRevenue} onChange={(e) => setShowEbitdaRevenue(e.target.checked)} />
+              Show EBITDA/Revenue methods
+            </label>
+
+            {showEbitdaRevenue && (
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium">EBITDA Override ($)</label>
+                    <input type="number" className="w-full border rounded p-2" value={ebitdaOverride} onChange={(e) => setEbitdaOverride(e.target.value)} placeholder="Leave blank to use SDE" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium">Revenue ($)</label>
+                    <input type="number" className="w-full border rounded p-2" value={revenueInput} onChange={(e) => setRevenueInput(e.target.value)} placeholder="Defaults to listing revenue" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  {['EBITDA Low×', 'EBITDA Base×', 'EBITDA High×'].map((label, idx) => (
+                    <div key={label}>
+                      <label className="block text-sm font-medium">{label}</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        className="w-full border rounded p-2"
+                        value={ebitdaMultiples[idx]}
+                        onChange={(e) => {
+                          const val = Number(e.target.value || 0);
+                          setEbitdaMultiples((prev) => prev.map((x, i) => (i === idx ? val : x)));
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  {['Revenue Low×', 'Revenue Base×', 'Revenue High×'].map((label, idx) => (
+                    <div key={label}>
+                      <label className="block text-sm font-medium">{label}</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        className="w-full border rounded p-2"
+                        value={revenueMultiples[idx]}
+                        onChange={(e) => {
+                          const val = Number(e.target.value || 0);
+                          setRevenueMultiples((prev) => prev.map((x, i) => (i === idx ? val : x)));
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button onClick={handleSave} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Save Valuation</button>
+            <button onClick={handleLoad} className="bg-gray-100 text-gray-800 px-4 py-2 rounded hover:bg-gray-200">Load last valuation</button>
+          </div>
+        </section>
+
+        {/* RIGHT: Results */}
+        <section className="space-y-4">
+          <div className="bg-white rounded-xl shadow p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">SDE Multiple Method</h2>
+              <div className="text-sm text-gray-500">Adj total: {adjustments.total.toFixed(2)}×</div>
+            </div>
+            <div className="text-sm text-gray-600">Effective multiples: Low {effective[0].toFixed(2)}× • Base {effective[1].toFixed(2)}× • High {effective[2].toFixed(2)}×</div>
+            <div className="grid grid-cols-3 gap-3 mt-3">
+              <ResultCard label="Low" value={sdeValues.low} asking={asking} />
+              <ResultCard label="Base" value={sdeValues.base} asking={asking} highlight />
+              <ResultCard label="High" value={sdeValues.high} asking={asking} />
+            </div>
+          </div>
+
+          {showEbitdaRevenue && (
+            <div className="bg-white rounded-xl shadow p-5">
+              <h2 className="text-xl font-semibold">EBITDA & Revenue Methods</h2>
+              <div className="grid grid-cols-3 gap-3 mt-3">
+                <ResultCard label="EBITDA Low" value={ebitdaValues?.low} asking={asking} />
+                <ResultCard label="EBITDA Base" value={ebitdaValues?.base} asking={asking} />
+                <ResultCard label="EBITDA High" value={ebitdaValues?.high} asking={asking} />
+              </div>
+              <div className="grid grid-cols-3 gap-3 mt-3">
+                <ResultCard label="Revenue Low" value={revenueValues?.low} asking={asking} />
+                <ResultCard label="Revenue Base" value={revenueValues?.base} asking={asking} />
+                <ResultCard label="Revenue High" value={revenueValues?.high} asking={asking} />
+              </div>
+            </div>
           )}
 
-          {/* ✅ Additional Notes inputs restored */}
-          <input name="returnCustomers" placeholder="Return Customers % (e.g. 75%)" value={formData.returnCustomers} onChange={handleChange} className="w-full border p-3 rounded" />
-          <input name="contractsInPlace" placeholder="Contracts in Place (e.g. 3 long-term clients)" value={formData.contractsInPlace} onChange={handleChange} className="w-full border p-3 rounded" />
-
-          <label className="block font-medium">Would you consider seller financing as part of your exit?</label>
-          <select name="sellerFinancing" value={formData.sellerFinancing} onChange={handleChange} className="w-full border p-3 rounded">
-            <option value="no">No</option>
-            <option value="yes">Yes</option>
-            <option value="maybe">Maybe, I want to learn more</option>
-          </select>
-
-          <div className="mt-6">
-            <p className="text-xl font-semibold mb-2">Estimated Business Value: ${calculateValuation().businessValue.toFixed(2)}</p>
-            {formData.includeRealEstate === 'yes' && (
-              <p className="text-lg font-medium">+ Real Estate: ${calculateValuation().realEstate}</p>
-            )}
-            {formData.includeRealEstate === 'yes' && (
-              <p className="text-lg font-bold">Total Estimated Value: ${calculateValuation().totalValue.toFixed(2)}</p>
-            )}
-
-            <p className="text-sm text-gray-700 mt-4">
-              💡 The price you choose to sell your business is ultimately your decision. How you get paid and who you sell to will also be your decision. Use this valuation as a guideline — offering seller financing under your terms can help you achieve a higher total payout and reduce taxable gains.
-            </p>
-
-            <button onClick={generatePDF} className="mt-4 bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700">
-              Download PDF Report
-            </button>
+          <div className="bg-white rounded-xl shadow p-5">
+            <h2 className="text-xl font-semibold">Quick DCF (5-year + Terminal)</h2>
+            <div className="text-sm text-gray-600">
+              Growth {Number(growthRate)}% • Discount {Number(discountRate)}%{sellerCarryAllowed ? ' (carry adj.)' : ''} • Terminal {Number(terminalMultiple).toFixed(1)}×
+            </div>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <ResultCard label="DCF Value" value={dcfValue} asking={asking} highlight />
+              <div className="rounded border p-3 text-sm text-gray-700">
+                <div>Working capital applied: {formatMoney(workingCapital)}</div>
+                <div>Risk {riskScore}/5 • Owner-dependency {ownerDepScore}/5</div>
+              </div>
+            </div>
           </div>
-        </div>
+
+          <div className="bg-white rounded-xl shadow p-5">
+            <h2 className="text-xl font-semibold mb-2">Valuation Summary</h2>
+            <textarea className="w-full border rounded p-3 text-sm h-48" value={summaryText} readOnly />
+            <div className="flex gap-2 mt-3">
+              <button
+                onClick={() => navigator.clipboard.writeText(summaryText).then(() => alert('Summary copied.'))}
+                className="bg-gray-100 text-gray-800 px-4 py-2 rounded hover:bg-gray-200"
+              >
+                Copy Summary
+              </button>
+              <button onClick={handleSendToSeller} className="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700">
+                Send to Seller
+              </button>
+              {/* Optional PDF can be added in Step 2 */}
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   );
 }
 
+function ResultCard({ label, value, asking, highlight = false }) {
+  const amt = Number(value || 0);
+  const delta = asking ? amt - Number(asking) : null;
+  const pct = asking ? percentDelta(amt, asking) : null;
+  return (
+    <div className={`rounded-xl border p-4 ${highlight ? 'bg-blue-50 border-blue-200' : 'bg-white'}`}>
+      <div className="text-sm text-gray-600">{label}</div>
+      <div className="text-lg font-semibold">{formatMoney(amt)}</div>
+      {asking ? (
+        <div className={`text-xs mt-1 ${delta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+          Δ vs Asking: {formatMoney(delta)} ({pct.toFixed(1)}%)
+        </div>
+      ) : (
+        <div className="text-xs mt-1 text-gray-500">Asking price not set</div>
+      )}
+    </div>
+  );
+}
 
