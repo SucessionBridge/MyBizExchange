@@ -95,77 +95,83 @@ export default function BuyerDashboard() {
     const files = Array.from(e.target.files || []);
     setReplyFiles(prev => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
+// 📨 Send (POST) via service-role API, not direct DB insert
+async function sendReply(listingId /* int */, _sellerIdIgnored) {
+  try {
+    const text = (replyText[listingId] || '').trim();
+    const files = replyFiles[listingId] || [];
+    if (!text && files.length === 0) return;
+    if (!buyerProfile) return;
 
-  // ✅ Buyer → Seller: use /api/send-message (service role). No extra columns.
-  async function sendReply(listingId /* sellerId not used */) {
-    try {
-      const text = (replyText[listingId] || '').trim();
-      const files = replyFiles[listingId] || [];
-      if (!text && files.length === 0) return;
-      if (!buyerProfile?.email) return;
+    // 0) Look up seller email for this listing (helps API resolve seller_id)
+    const { data: sellerRow } = await supabase
+      .from('sellers')
+      .select('email')
+      .eq('id', listingId)
+      .maybeSingle();
+    const seller_email = sellerRow?.email || null;
 
-      // Find seller_email for this listing (API resolves seller_id from this)
-      const { data: sellerRow, error: sellerErr } = await supabase
-        .from('sellers')
-        .select('email')
-        .eq('id', listingId)
-        .maybeSingle();
+    // 1) Upload attachments (public bucket) — keep your current behavior
+    const attachments = [];
+    for (const file of files) {
+      const isImage = file.type?.startsWith('image/');
+      const isVideo = file.type?.startsWith('video/');
+      if (!isImage && !isVideo) continue;
 
-      if (sellerErr || !sellerRow?.email) {
-        console.error('seller lookup failed:', sellerErr);
-        alert('Could not find seller for this listing.');
+      const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+      const path = `listing-${listingId}/buyer-${buyerProfile.email}/${Date.now()}-${safeName}`;
+      const { error: upErr } = await supabase.storage
+        .from(ATTACH_BUCKET)
+        .upload(path, file, { cacheControl: '3600', upsert: false });
+      if (upErr) {
+        console.error('❌ Upload failed:', upErr);
+        alert('Attachment upload failed. Please try again or remove the file(s).');
         return;
       }
-
-      if (files.length > 0) {
-        const fd = new FormData();
-        fd.append('listing_id', String(listingId));
-        fd.append('buyer_email', buyerProfile.email);
-        fd.append('buyer_name', buyerProfile.name || buyerProfile.email);
-        fd.append('seller_email', sellerRow.email);
-        fd.append('message', text);
-        fd.append('topic', 'business-inquiry');
-        fd.append('is_deal_proposal', 'false');
-        files.slice(0, 5).forEach((f) => fd.append('attachments', f, f.name));
-
-        const res = await fetch('/api/send-message', { method: 'POST', body: fd });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          console.error('send-message (buyer) failed:', err);
-          alert(err?.error || 'Sending failed (buyer).');
-          return;
-        }
-      } else {
-        const res = await fetch('/api/send-message', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            listing_id: Number(listingId),
-            buyer_email: buyerProfile.email,
-            buyer_name: buyerProfile.name || buyerProfile.email,
-            seller_email: sellerRow.email,
-            message: text,
-            topic: 'business-inquiry',
-            is_deal_proposal: false,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          console.error('send-message (buyer) failed:', err);
-          alert(err?.error || 'Sending failed (buyer).');
-          return;
-        }
-      }
-
-      // Reset UI + reload
-      setReplyText(prev => ({ ...prev, [listingId]: '' }));
-      setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
-      await fetchBuyerMessages(buyerProfile.email);
-    } catch (err) {
-      console.error('❌ sendReply crashed:', err);
-      alert('Something went wrong while sending. Please try again.');
+      attachments.push({
+        path,
+        name: file.name,
+        size: file.size,
+        mime: file.type,
+        kind: isImage ? 'image' : 'video',
+      });
     }
+
+    // 2) Call API (service role) so RLS can't block inserts
+    const resp = await fetch('/api/send-message', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        listing_id: Number(listingId),
+        buyer_email: buyerProfile.email,
+        buyer_name: buyerProfile.name || buyerProfile.email,
+        seller_email,                          // helps resolve UUID
+        message: text,
+        topic: 'business-inquiry',
+        is_deal_proposal: false,
+        attachments,                           // already uploaded
+        from_seller: false,                    // direction flag for UI
+      }),
+    });
+
+    const json = await resp.json().catch(() => ({}));
+    if (!resp.ok || json.ok === false) {
+      console.error('❌ API failed:', json?.error);
+      alert(json?.error || 'Sending failed.');
+      return;
+    }
+
+    // 3) Reset + refresh
+    setReplyText(prev => ({ ...prev, [listingId]: '' }));
+    setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
+    await fetchBuyerMessages(buyerProfile.email);
+  } catch (err) {
+    console.error('❌ sendReply crashed:', err);
+    alert('Something went wrong while sending. Please try again.');
   }
+}
+
+  
 
   async function handleUnsave(listingId) {
     await supabase
