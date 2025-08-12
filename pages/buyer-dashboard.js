@@ -2,6 +2,23 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from "../lib/supabaseClient";
+// --- who/colour for BUYER view ---
+function whoAndColorForBuyer(msg, buyerEmail) {
+  // New rows with the flag:
+  if (msg.from_seller === true)  return { who: "Seller", color: "bg-green-100 text-green-900" };
+  if (msg.from_seller === false) return { who: "You",    color: "bg-blue-100 text-blue-900" };
+
+  // Fallback for older rows (no flag):
+  const isMine =
+    msg?.buyer_email &&
+    buyerEmail &&
+    String(msg.buyer_email).toLowerCase() === String(buyerEmail).toLowerCase();
+
+  return isMine
+    ? { who: "You",    color: "bg-blue-100 text-blue-900" }
+    : { who: "Seller", color: "bg-green-100 text-green-900" };
+}
+
 
 export default function BuyerDashboard() {
   const router = useRouter();
