@@ -15,9 +15,11 @@ const supabase = createClient(SUPABASE_URL, SERVICE_KEY || ANON_KEY);
 const ok  = (res, payload) => res.status(200).json({ ok: true,  ...payload });
 const bad = (res, msg, code = 400) => res.status(code).json({ ok: false, error: msg });
 
+// logging
 const log = (...a) => console.log('[send-message]', ...a);
 const err = (...a) => console.error('[send-message]', ...a);
 
+// helpers
 const first = (v) => Array.isArray(v) ? v[0] : v;
 const coerceNull = (v) => {
   const x = first(v);
@@ -29,6 +31,7 @@ const coerceNull = (v) => {
   }
   return x;
 };
+// number | "72" | ["72"] | "[\"72\"]" → 72
 function normalizeInt(val) {
   let v = first(val);
   try {
@@ -45,12 +48,17 @@ function normalizeInt(val) {
     return Number.isFinite(n) ? n : null;
   } catch { return null; }
 }
+
 const isImage = (m) => typeof m === 'string' && m.startsWith('image/');
 const isVideo = (m) => typeof m === 'string' && m.startsWith('video/');
 const safeName = (n = '') => String(n).replace(/[^\w.\-]+/g, '_').slice(-180) || `file_${Date.now()}`;
 const isUUID = (s) => typeof s === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+// 👇 simple truthy helper (so "true", "1", "yes" all work)
+const truthy = (v) => ['true','1','yes','on'].includes(String(first(v)).toLowerCase());
 
+/** Resolve the *UUID* to store in messages.seller_id (NOT integer listing id) */
 async function resolveSellerUUID({ listing_id, seller_email }) {
+  // 1) sellers.auth_id by email
   if (seller_email) {
     const { data: byEmail, error: e1 } = await supabase
       .from('sellers')
@@ -61,6 +69,8 @@ async function resolveSellerUUID({ listing_id, seller_email }) {
       .maybeSingle();
     if (!e1 && byEmail?.auth_id && isUUID(byEmail.auth_id)) return byEmail.auth_id;
   }
+
+  // 2) sellers.auth_id by listing row id (int)
   if (listing_id != null) {
     const { data: byListing, error: e2 } = await supabase
       .from('sellers')
@@ -71,6 +81,8 @@ async function resolveSellerUUID({ listing_id, seller_email }) {
       .maybeSingle();
     if (!e2 && byListing?.auth_id && isUUID(byListing.auth_id)) return byListing.auth_id;
   }
+
+  // 3) fallback: auth.users by email (only with service role)
   if (seller_email && SERVICE_KEY) {
     const { data: authUser, error: e3 } = await supabase
       .from('auth.users')
@@ -80,6 +92,7 @@ async function resolveSellerUUID({ listing_id, seller_email }) {
       .maybeSingle();
     if (!e3 && authUser?.id && isUUID(authUser.id)) return authUser.id;
   }
+
   return null;
 }
 
@@ -111,8 +124,7 @@ async function parseMultipart(req) {
 }
 
 async function insertMessage(row) {
-  // Ensure buyer_name not null if buyer_email is present
-  if (!row.buyer_name && row.buyer_email) row.buyer_name = row.buyer_email;
+  log('INSERT row:', row);
   const { error, data } = await supabase.from('messages').insert([row]).select().single();
   if (error) throw new Error(error.message);
   return data;
@@ -120,29 +132,41 @@ async function insertMessage(row) {
 
 export default async function handler(req, res) {
   const contentType = req.headers['content-type'] || '';
+  log('REQUEST', { method: req.method, contentType });
+
   if (req.method !== 'POST') return bad(res, 'Method not allowed', 405);
 
   try {
     // ---------- MULTIPART ----------
     if (contentType.includes('multipart/form-data')) {
       const { fields, files } = await parseMultipart(req);
+      log('FIELDS (raw):', fields);
 
       const listing_id   = normalizeInt(fields.listing_id ?? fields.listingId);
       const buyer_email  = coerceNull(fields.buyer_email);
-      let   buyer_name   = coerceNull(fields.buyer_name);
+      const buyer_name   = coerceNull(fields.buyer_name);
       const seller_email = coerceNull(fields.seller_email);
       const message      = (coerceNull(fields.message) ?? '').toString();
       const topic        = (coerceNull(fields.topic) || 'business-inquiry').toString();
-      const is_deal_proposal = ['true','1','yes'].includes(String(first(fields.is_deal_proposal) || '').toLowerCase());
-      const from_seller  = ['true','1','yes'].includes(String(first(fields.from_seller) || '').toLowerCase());
+      const is_deal_proposal = truthy(fields.is_deal_proposal);
 
       if (!listing_id) return bad(res, 'Invalid listing_id');
 
+      // who is sending? (default buyer unless explicitly marked)
+      const explicitFromSeller =
+        truthy(fields.from_seller) ||
+        String(first(fields.actor) || '').toLowerCase() === 'seller';
+      const actorIsSeller = explicitFromSeller;
+      const actorRole  = actorIsSeller ? 'seller' : 'buyer';
+      const actorEmail = actorIsSeller ? (seller_email || 'seller') : (buyer_email || 'buyer');
+
+      // Resolve seller UUID (required by DB)
       let seller_id = coerceNull(fields.seller_id);
       if (!isUUID(seller_id)) seller_id = null;
       if (!seller_id) seller_id = await resolveSellerUUID({ listing_id, seller_email });
       if (!seller_id) return bad(res, 'Seller account missing auth_id; cannot send message. (Set sellers.auth_id or pass seller_email that maps to an auth user)');
 
+      // attachments
       const raw = files.attachments || files.attachment || files.file || null;
       const uploads = Array.isArray(raw) ? raw : raw ? [raw] : [];
       const attachments = [];
@@ -151,26 +175,24 @@ export default async function handler(req, res) {
           const att = await uploadOne({
             file: f,
             listingId: listing_id,
-            actorEmail: buyer_email || 'buyer',
-            actorRole: from_seller ? 'seller' : 'buyer',
+            actorEmail,
+            actorRole,
           });
           if (att) attachments.push(att);
         }
       }
 
-      if (!buyer_name && buyer_email) buyer_name = buyer_email;
-
       const row = {
         listing_id,
-        seller_id,
-        buyer_email,
-        buyer_name,
+        seller_id,                 // UUID, NOT NULL
         message,
         topic,
         is_deal_proposal: Boolean(is_deal_proposal),
         attachments,
-        from_seller: Boolean(from_seller),
+        from_seller: actorIsSeller, // 👈 mark direction
       };
+      if (buyer_email) row.buyer_email = buyer_email;
+      if (buyer_name)  row.buyer_name  = buyer_name;
 
       const out = await insertMessage(row);
       return ok(res, { message: out, uploaded: attachments.length });
@@ -181,20 +203,27 @@ export default async function handler(req, res) {
       let data = ''; req.on('data', c => data += c);
       req.on('end', () => resolve(data || '{}')); req.on('error', reject);
     });
+    log('JSON body (raw):', bodyText);
 
     let body; try { body = JSON.parse(bodyText); } catch { return bad(res, 'Invalid JSON'); }
 
     const listing_id   = normalizeInt(body.listing_id ?? body.listingId);
     const buyer_email  = coerceNull(body.buyer_email);
-    let   buyer_name   = coerceNull(body.buyer_name);
+    const buyer_name   = coerceNull(body.buyer_name);
     const seller_email = coerceNull(body.seller_email);
     const message      = (coerceNull(body.message) ?? '').toString();
     const topic        = (coerceNull(body.topic) || 'business-inquiry').toString();
     const is_deal_proposal = Boolean(body.is_deal_proposal);
-    const from_seller  = Boolean(body.from_seller);
 
     if (!listing_id) return bad(res, 'Invalid listing_id');
 
+    // who is sending? (default buyer unless explicitly marked)
+    const explicitFromSeller =
+      body.from_seller === true ||
+      String(body.actor || '').toLowerCase() === 'seller';
+    const actorIsSeller = explicitFromSeller;
+
+    // Resolve seller UUID (required by DB)
     let seller_id = coerceNull(body.seller_id);
     if (!isUUID(seller_id)) seller_id = null;
     if (!seller_id) seller_id = await resolveSellerUUID({ listing_id, seller_email });
@@ -209,19 +238,17 @@ export default async function handler(req, res) {
       }))
       .filter(a => a.kind === 'image' || a.kind === 'video');
 
-    if (!buyer_name && buyer_email) buyer_name = buyer_email;
-
     const row = {
       listing_id,
-      seller_id,
-      buyer_email,
-      buyer_name,
+      seller_id,                 // UUID, NOT NULL
       message,
       topic,
       is_deal_proposal: Boolean(is_deal_proposal),
       attachments,
-      from_seller: Boolean(from_seller),
+      from_seller: actorIsSeller, // 👈 mark direction
     };
+    if (buyer_email) row.buyer_email = buyer_email;
+    if (buyer_name)  row.buyer_name  = buyer_name;
 
     const out = await insertMessage(row);
     return ok(res, { message: out, uploaded: 0 });
