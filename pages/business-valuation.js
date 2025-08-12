@@ -131,6 +131,22 @@ function BusinessValuation() {
 
   const paybackYears = useMemo(() => (sdeUsed > 0 ? valueBase / sdeUsed : Infinity), [valueBase, sdeUsed]);
 
+  // Margin (context only)
+  const margin = useMemo(() => {
+    const rev = Number(annualRevenue || 0);
+    const sde = Number(sdeUsed || 0);
+    if (rev <= 0) return null;
+    return sde / rev; // 0..1
+  }, [annualRevenue, sdeUsed]);
+
+  function marginComment(m) {
+    if (m == null) return '—';
+    if (m >= 0.30) return 'Unusually high margin — double-check SDE and expenses are recast correctly.';
+    if (m >= 0.15) return 'Healthy margin common in many service businesses.';
+    if (m >= 0.10) return 'Thin margin — buyers will scrutinize costs and seasonality.';
+    return 'Very thin margin — expect buyers to negotiate hard.';
+  }
+
   // Optional add-ons (inventory on top; real estate separate; combined shown for convenience)
   const inv = Number(inventoryCost || 0);
   const bldg = includeRealEstate ? Number(realEstateFMV || 0) : 0;
@@ -143,6 +159,7 @@ function BusinessValuation() {
 
   /* ---------- Summary text for PDF/email ---------- */
   const summaryText = useMemo(() => {
+    const pct = margin == null ? null : (margin * 100);
     const lines = [];
     lines.push('Valuation Summary');
     if (ownerName || businessName) {
@@ -154,14 +171,15 @@ function BusinessValuation() {
     lines.push(`SDE used: ${formatMoney(sdeUsed)} • Industry: ${industry} • Years in business: ${yearsInBusiness || 'N/A'}`);
     if (Number(annualRevenue || 0) > 0) lines.push(`Annual revenue (context): ${formatMoney(Number(annualRevenue || 0))}`);
     lines.push(`Simple payback (Base ÷ SDE): ${Number.isFinite(paybackYears) ? paybackYears.toFixed(1) + ' years' : '—'}`);
+    if (pct != null) lines.push(`SDE margin: ${pct.toFixed(1)}% — ${marginComment(margin)}`);
     if (inv > 0) lines.push(`If including inventory at cost: Business + Inventory ≈ ${formatMoney(packageBusinessPlusInventory)}`);
     if (bldg > 0) lines.push(`Building (separate): ${formatMoney(bldg)}`);
     if (inv > 0 || bldg > 0) lines.push(`Combined (Business + Inventory${bldg > 0 ? ' + Building' : ''}): ${formatMoney(combinedWithBuilding)}`);
     lines.push('');
-    lines.push('Notes:');
-    lines.push('- Essential operating assets (e.g., ovens, trucks used daily) are assumed included in the business price.');
-    lines.push('- Inventory is typically added at cost on top of the business price.');
-    lines.push('- Real estate is usually priced and financed separately.');
+    lines.push('How we calculated this:');
+    lines.push(`• SDE × industry multiple (range ${baseTriplet[0]}–${baseTriplet[1]}–${baseTriplet[2]}×) with small bumps for track record, owner independence, and franchise.`);
+    lines.push(`• Adjustments applied: Years + Runs without you + Franchise = ${(bumpSum >= 0 ? '+' : '')}${bumpSum.toFixed(2)}× total.`);
+    lines.push('• Essential operating assets are assumed included; inventory is added at cost on top; real estate is separate.');
     lines.push('');
     lines.push('Important disclaimer: This is an indicative guide to help owners think about a fair asking range.');
     lines.push('It is not an appraisal and should not be used for bank loans, insurance, tax, or legal purposes.');
@@ -170,7 +188,8 @@ function BusinessValuation() {
   }, [
     ownerName, businessName, valueBase, valueLow, valueHigh, mLow, mBase, mHigh,
     sdeUsed, industry, yearsInBusiness, annualRevenue, paybackYears,
-    inv, bldg, packageBusinessPlusInventory, combinedWithBuilding
+    inv, bldg, packageBusinessPlusInventory, combinedWithBuilding,
+    baseTriplet, bumpSum, margin
   ]);
 
   /* ---------- Actions ---------- */
@@ -227,7 +246,6 @@ function BusinessValuation() {
           },
         }),
       });
-      // ok if /api/valuations doesn't exist; we still email
       await resp.json().catch(() => ({}));
     } catch (_) {}
 
@@ -290,6 +308,9 @@ function BusinessValuation() {
     doc.text(`SDE used: ${formatMoney(sdeUsed)}    Industry: ${industry}    Years in business: ${yearsInBusiness || 'N/A'}`, 40, y); y += lh;
     if (Number(annualRevenue || 0) > 0) { doc.text(`Annual revenue (gross sales): ${formatMoney(Number(annualRevenue || 0))}`, 40, y); y += lh; }
     doc.text(`Simple payback: ${Number.isFinite(paybackYears) ? paybackYears.toFixed(1) + ' years' : '—'}`, 40, y); y += lh;
+    if (margin != null) {
+      doc.text(`SDE margin: ${(margin * 100).toFixed(1)}% — ${marginComment(margin)}`, 40, y); y += lh;
+    }
 
     // Inventory / real estate
     if (Number(inventoryCost || 0) > 0) { doc.text(`Business + Inventory (at cost): ${formatMoney(packageBusinessPlusInventory)}`, 40, y); y += lh; }
@@ -298,18 +319,16 @@ function BusinessValuation() {
       doc.text(`Combined (Business + Inventory${includeRealEstate ? ' + Building' : ''}): ${formatMoney(combinedWithBuilding)}`, 40, y); y += lh + 6;
     }
 
-    // Notes
+    // How we calculated
     doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
-    doc.text('Notes', 40, y); y += lh;
+    doc.text('How we calculated this', 40, y); y += lh;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-    const notes = [
-      '• Essential operating assets (e.g., ovens, trucks used daily) are assumed included in the business price.',
-      '• Inventory is typically added at cost on top.',
-      '• Real estate is usually priced and financed separately.',
-      '• This is a guide, not an appraisal. Do not use for loans, insurance, tax, or legal purposes.',
-      '• Information provided has not been verified.',
+    const lines = [
+      `• SDE × industry multiple (range ${baseTriplet[0]}–${baseTriplet[1]}–${baseTriplet[2]}×) with small bumps (track record, owner independence, franchise).`,
+      `• Adjustments applied: Years + Runs without you + Franchise = ${(bumpSum >= 0 ? '+' : '')}${bumpSum.toFixed(2)}× total.`,
+      '• Essential operating assets are assumed included; inventory is added at cost on top; real estate is separate.',
     ];
-    notes.forEach(line => { doc.text(line, 40, y); y += 14; });
+    lines.forEach(t => { doc.text(t, 40, y); y += 14; });
 
     // Footer
     y += 6;
@@ -444,10 +463,48 @@ function BusinessValuation() {
                 Fair range: {formatMoney(valueLow)} – {formatMoney(valueHigh)} • Adjusted multiples: {mLow.toFixed(2)}× / {mBase.toFixed(2)}× / {mHigh.toFixed(2)}×
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
-                <InfoCard label="SDE used" value={formatMoney(sdeUsed)} />
-                <InfoCard label="Industry" value={industry} />
-                <InfoCard label="Simple payback" value={Number.isFinite(paybackYears) ? `${paybackYears.toFixed(1)} years` : '—'} />
+              {/* Narrative about visibility/market */}
+              <div className="mt-3 text-sm text-gray-700">
+                Valuations are a starting point. Actual sale prices depend on exposure and fit with the right buyer. SuccessionBridge exists to put your business in front of more qualified buyers — the more visibility you get, the better your odds of a great outcome. Exceptional strategic premiums can happen when a buyer needs your location, team, or contracts (not typical, but possible).
+              </div>
+
+              {/* How we calculated (accordion) */}
+              <details className="mt-4">
+                <summary className="cursor-pointer text-sm text-blue-700">How we calculated this</summary>
+                <div className="mt-2 text-sm text-gray-700 space-y-1">
+                  <div>• SDE used: {formatMoney(sdeUsed)} {Number(sdeDirect || 0) > 0 ? '(entered)' : Number(annualRevenue || 0) > 0 ? '(revenue − expenses)' : ''}</div>
+                  <div>• Industry range: {baseTriplet[0]}–{baseTriplet[1]}–{baseTriplet[2]}×</div>
+                  <div>• Adjustments: Years + Runs without you + Franchise = {(bumpSum >= 0 ? '+' : '')}{bumpSum.toFixed(2)}× total</div>
+                  <div>• Headline = SDE × Adjusted Base multiple</div>
+                  <div>• Essential assets assumed included; inventory added at cost; real estate separate.</div>
+                </div>
+              </details>
+            </Section>
+
+            {/* Cross-checks & Marketability */}
+            <Section title="Cross-checks & Marketability">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <InfoCard label="Simple payback (Base ÷ SDE)" value={Number.isFinite(paybackYears) ? `${paybackYears.toFixed(1)} years` : '—'} />
+                <InfoCard label="SDE margin (SDE ÷ Revenue)" value={margin == null ? '—' : `${(margin * 100).toFixed(1)}%`} />
+                <InfoCard label="Margin note" value={marginComment(margin)} />
+              </div>
+
+              <div className="mt-3 rounded-xl border p-4 bg-white">
+                <div className="text-sm font-semibold mb-1">Marketability checklist</div>
+                <div className="text-sm text-gray-700 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div>
+                    {Number(yearsInBusiness || 0) >= 3 ? '✅' : '⚠️'} Years in business: {yearsInBusiness || 'N/A'}
+                    <div className="text-xs text-gray-500">{Number(yearsInBusiness || 0) >= 5 ? 'Proven track record.' : Number(yearsInBusiness || 0) >= 3 ? 'Solid history.' : 'Short track record — expect questions.'}</div>
+                  </div>
+                  <div>
+                    {runsWithoutOwner ? '✅' : '⚠️'} Runs without owner
+                    <div className="text-xs text-gray-500">{runsWithoutOwner ? 'Transferable systems/manager in place.' : 'Owner-dependent — buyers may discount.'}</div>
+                  </div>
+                  <div>
+                    {isFranchise ? '✅' : '—'} Franchise
+                    <div className="text-xs text-gray-500">{isFranchise ? 'Brand & training support can help transfer.' : 'Independent brand.'}</div>
+                  </div>
+                </div>
               </div>
             </Section>
 
@@ -518,4 +575,3 @@ function BusinessValuation() {
 }
 
 export default dynamic(() => Promise.resolve(BusinessValuation), { ssr: false });
-
