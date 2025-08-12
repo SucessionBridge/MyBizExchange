@@ -1,8 +1,4 @@
 // pages/business-valuation.js
-// REPLACE your current file with this version if you haven't already pasted the previous "simplified" page.
-// If you already pasted it, you can paste this whole file to keep things in sync.
-// (Adds Download/Email PDF buttons + client-side PDF generation and upload)
-
 import React, { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
@@ -20,6 +16,9 @@ import {
   recommendedPrice,
   isAssetHeavy,
 } from '../lib/valuation';
+
+/* Route for seller onboarding (change if your route is different) */
+const LIST_ROUTE = '/seller-onboarding';
 
 /* ---------- Tiny UI helpers ---------- */
 function Section({ title, children, subtitle }) {
@@ -75,17 +74,29 @@ function MoneyInput(props) { return <Input type="number" {...props} />; }
 function BusinessValuation() {
   // Minimal inputs
   const [email, setEmail] = useState('');
+  const [ownerName, setOwnerName] = useState('');         // NEW
+  const [businessName, setBusinessName] = useState('');   // NEW
   const [industry, setIndustry] = useState('service');
+
+  // SDE direct entry, with optional calculator
   const [sdeDirect, setSdeDirect] = useState('');
   const [showSdeCalc, setShowSdeCalc] = useState(false);
-  const [annualRevenue, setAnnualRevenue] = useState('');
+
+  // Gross revenue (always visible) + calc parts
+  const [annualRevenue, setAnnualRevenue] = useState('');     // now top-level visible
   const [annualExpenses, setAnnualExpenses] = useState('');
   const [ownerAddBacks, setOwnerAddBacks] = useState('');
-  const [surplusFMV, setSurplusFMV] = useState('');
-  const [inventoryCost, setInventoryCost] = useState('');
+
+  // Minimal asset extras the seller may include
+  const [surplusFMV, setSurplusFMV] = useState('');         // extra truck, spare gear
+  const [inventoryCost, setInventoryCost] = useState('');   // inventory at cost
   const [includeRealEstate, setIncludeRealEstate] = useState(false);
   const [realEstateFMV, setRealEstateFMV] = useState('');
-  const [opsStrength, setOpsStrength] = useState('none');
+
+  // Plain-English ops control
+  const [opsStrength, setOpsStrength] = useState('none'); // none=0, some=0.10, yes=0.20, excellent=0.30
+
+  // Reveal the report
   const [showReport, setShowReport] = useState(false);
 
   // Report-only controls
@@ -248,9 +259,13 @@ function BusinessValuation() {
     [recommended, surplusFMV, inventoryCost, includeRealEstate, realEstateFMV]
   );
 
+  /* ---------- Summary text (includes names if provided) ---------- */
   const summaryText = useMemo(() => {
     const lines = [];
     lines.push('Valuation Summary');
+    if (ownerName || businessName) {
+      lines.push([ownerName && `Owner: ${ownerName}`, businessName && `Business: ${businessName}`].filter(Boolean).join(' • '));
+    }
     lines.push('');
     lines.push(`Recommended asking (earnings-based, lender-capped): ${formatMoney(recommended)}`);
     lines.push(`Fair range (SDE multiples): ${formatMoney(sdeValues.low)} – ${formatMoney(sdeValues.high)} (Base ${formatMoney(sdeValues.base)})`);
@@ -265,8 +280,11 @@ function BusinessValuation() {
     }
     lines.push('');
     lines.push(`DCF cross-check: ${formatMoney(dcfValue)} (projection method; not the headline)`);
+    lines.push('');
+    lines.push('Disclaimer: This tool provides an indicative value to help owners find a fair asking range. It is not an appraisal and should not be used for lending, tax, insurance, or legal purposes.');
     return lines.join('\n');
   }, [
+    ownerName, businessName,
     recommended, sdeValues.low, sdeValues.high, sdeValues.base,
     sdeUsed, industry, opsBump, anav.anavFMV, anav.anavOLV, olvFactor,
     assetHeavy, surplusFMV, inventoryCost, includeRealEstate, combinedIfSellingExtras, dcfValue
@@ -275,7 +293,7 @@ function BusinessValuation() {
   /* ---------- Actions ---------- */
   function handleSeeMyValuation() {
     if (!email) return alert('Please add your email so we can save/send your valuation.');
-    if (sdeUsed <= 0) return alert('Please enter SDE (or expand “Don’t know SDE?” to compute it).');
+    if (sdeUsed <= 0) return alert('Please enter SDE (or use the calculator to compute it).');
     setShowReport(true);
     if (!analyzePrice) setAnalyzePrice(String(recommended || sdeValues.base || 0));
   }
@@ -283,14 +301,21 @@ function BusinessValuation() {
   async function handleSaveAndEmail() {
     if (!email) return alert('Please add your email.');
     if (sdeUsed <= 0) return alert('Please enter SDE first.');
-    // Minimal save (unchanged logic) — your existing /api/valuations route
     const resp = await fetch('/api/valuations', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         listing_id: null,
         buyer_email: email,
-        inputs: { source: 'owner_prelist_simple', email, industry_label: industry, sde_used: sdeUsed },
+        inputs: {
+          source: 'owner_prelist_simple',
+          email,
+          owner_name: ownerName || null,
+          business_name: businessName || null,
+          industry_label: industry,
+          sde_used: sdeUsed,
+          annual_revenue: Number(annualRevenue || 0),
+        },
         outputs: { recommended_value: recommended, summary_text: summaryText },
       }),
     });
@@ -303,7 +328,7 @@ function BusinessValuation() {
     }
   }
 
-  // --- NEW: PDF generation + emailing helpers ---
+  // --- PDF generation + emailing helpers (unchanged) ---
   async function generatePdfBlob() {
     const { default: jsPDF } = await import('jspdf');
     const doc = new jsPDF({ unit: 'pt', format: 'letter' });
@@ -313,8 +338,17 @@ function BusinessValuation() {
 
     doc.setFont('helvetica', 'bold'); doc.setFontSize(18);
     doc.text('SuccessionBridge — Valuation Report', 40, y); y += lh;
+
+    // Top disclaimer line on PDF
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
-    doc.text('This is an indicative valuation for discussion only. Not for lending, legal, or tax use.', 40, y); y += lh + 10;
+    doc.text('Indicative valuation for guidance only — not for lending, tax, insurance, or legal use.', 40, y); y += lh + 10;
+
+    // Optional names
+    if (ownerName || businessName) {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+      doc.text(`${ownerName ? `Owner: ${ownerName}` : ''}${ownerName && businessName ? ' • ' : ''}${businessName ? `Business: ${businessName}` : ''}`, 40, y);
+      y += lh;
+    }
 
     // Headline
     doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
@@ -325,8 +359,14 @@ function BusinessValuation() {
     // SDE & industry
     doc.text(`SDE used: ${formatMoney(sdeUsed)}    Industry: ${industry}`, 40, y); y += lh;
 
+    // Revenue context
+    if (Number(annualRevenue || 0) > 0) {
+      doc.text(`Annual Revenue (gross sales): ${formatMoney(Number(annualRevenue || 0))}`, 40, y); y += lh;
+    }
+
     // Assets
-    doc.text(`Assets (context): FMV ${formatMoney(anav.anavFMV)} • OLV ~${(Number(olvFactor) * 100).toFixed(0)}%: ${formatMoney(anav.anavOLV)}`, 40, y); y += lh;
+    const { anavFMV, anavOLV } = anav;
+    doc.text(`Assets (context): FMV ${formatMoney(anavFMV)} • OLV ~${(Number(olvFactor) * 100).toFixed(0)}%: ${formatMoney(anavOLV)}`, 40, y); y += lh;
 
     // Optional combined
     const extras = Number(surplusFMV || 0) + Number(inventoryCost || 0) + (includeRealEstate ? Number(realEstateFMV || 0) : 0);
@@ -342,7 +382,6 @@ function BusinessValuation() {
     doc.text('Buyer Reality Check (snapshot)', 40, y); y += lh;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
     doc.text(`Analyzed price: ${formatMoney(priceForBuyerCheck)} • OCF before debt: ${formatMoney(econ.ocfBeforeDebt)} • DSCR: ${Number.isFinite(econ.dscr) ? econ.dscr.toFixed(2) : '∞'}`, 40, y); y += lh;
-    doc.text(`Y1 cash to buyer: ${formatMoney(econ.fcfToEquityYr1)} • Max price @ DSCR ${targetDSCR}: ${formatMoney(dscrCapPrice)}`, 40, y); y += lh;
 
     // Divider
     y += 8; doc.setDrawColor(200); doc.line(40, y, 572, y); y += 14;
@@ -353,6 +392,11 @@ function BusinessValuation() {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
     const wrap = (text, maxWidth) => doc.splitTextToSize(text, maxWidth);
     wrap(summaryText, 520).forEach(line => { doc.text(line, 40, y); y += 14; if (y > 730) { doc.addPage(); y = 54; } });
+
+    // Footer disclaimer
+    y += 12;
+    doc.setFont('helvetica', 'italic'); doc.setFontSize(9);
+    doc.text('Generated by SuccessionBridge. Not an appraisal; informational only.', 40, y);
 
     return doc.output('blob');
   }
@@ -386,10 +430,9 @@ function BusinessValuation() {
       const data = await resp.json();
       if (!resp.ok) return alert(data.error || 'Upload failed');
 
-      // Open a prefilled email in the user’s client including the public link
       const subject = 'Your Valuation Report';
       const body =
-        `Hi,\n\nHere is your valuation summary.\n\n${summaryText}\n\nDownload your PDF: ${data.url}\n\n— SuccessionBridge`;
+        `Hi${ownerName ? ' ' + ownerName : ''},\n\nHere is your valuation summary.${businessName ? `\nBusiness: ${businessName}` : ''}\n\n${summaryText}\n\nDownload your PDF: ${data.url}\n\n— SuccessionBridge`;
       const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       window.location.href = mailto;
     } catch (e) {
@@ -401,13 +444,28 @@ function BusinessValuation() {
   return (
     <main className="min-h-screen p-6 bg-gray-50">
       <div className="max-w-5xl mx-auto space-y-6">
+        {/* Top disclaimer */}
+        <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4">
+          <div className="text-sm">
+            <strong>Heads up:</strong> This valuation is an <em>indicative guide</em> to help business owners find a fair asking range.
+            It is <strong>not</strong> an appraisal and should <strong>not</strong> be used for bank loans, insurance claims, taxes, or legal purposes.
+          </div>
+        </div>
+
         {/* Minimal inputs */}
         <div className="bg-white rounded-xl shadow p-5">
           <h1 className="text-2xl font-bold">Value Your Business</h1>
           <p className="text-sm text-gray-600 mt-1">Just a few fields. We’ll do the math and show a clear valuation below.</p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+          {/* Names & contact */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
+            <Input label="Your Name (optional)" value={ownerName} onChange={setOwnerName} placeholder="Jane Doe" />
+            <Input label="Business Name (optional)" value={businessName} onChange={setBusinessName} placeholder="Acme Services" />
             <Input label="Your Email *" value={email} onChange={setEmail} placeholder="you@example.com" />
+          </div>
+
+          {/* Industry + revenue + SDE */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
             <div>
               <label className="block text-sm font-medium">Industry</label>
               <select className="w-full border rounded p-2" value={industry} onChange={(e) => setIndustry(e.target.value)}>
@@ -416,23 +474,32 @@ function BusinessValuation() {
                 ))}
               </select>
             </div>
+
+            <MoneyInput
+              label="Annual Revenue (gross sales)"
+              value={annualRevenue}
+              onChange={setAnnualRevenue}
+              placeholder="e.g., 1,200,000"
+              help="Revenue context matters: $100k profit on $200k sales vs. $2M sales are very different."
+            />
+
             <MoneyInput
               label="What you take home each year (SDE) *"
               value={sdeDirect}
               onChange={setSdeDirect}
               placeholder="e.g., 190000"
-              help="If you don’t know SDE, click the link below to calculate it from revenue, expenses, and add-backs."
+              help="If you don’t know SDE, use the calculator below."
             />
-            <div className="flex items-end">
-              <button type="button" className="text-sm text-blue-700 hover:underline" onClick={() => setShowSdeCalc((v) => !v)}>
-                {showSdeCalc ? 'Hide SDE calculator' : "Don't know SDE? Click to calculate"}
-              </button>
-            </div>
           </div>
 
+          {/* SDE calculator (now uses the revenue above; only asks for expenses & add-backs) */}
+          <div className="mt-2">
+            <button type="button" className="text-sm text-blue-700 hover:underline" onClick={() => setShowSdeCalc((v) => !v)}>
+              {showSdeCalc ? 'Hide SDE calculator' : "Don't know SDE? Click to calculate"}
+            </button>
+          </div>
           {showSdeCalc && (
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <MoneyInput label="Annual Revenue ($)" value={annualRevenue} onChange={setAnnualRevenue} />
               <MoneyInput label="Annual Expenses ($)" value={annualExpenses} onChange={setAnnualExpenses} />
               <MoneyInput label="Owner Add-backs ($)" value={ownerAddBacks} onChange={setOwnerAddBacks} />
               <div className="sm:col-span-3 text-xs text-gray-600">
@@ -441,6 +508,7 @@ function BusinessValuation() {
             </div>
           )}
 
+          {/* Extras, ops, real estate */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
             <MoneyInput label="Surplus / non-essential equipment ($)" value={surplusFMV} onChange={setSurplusFMV} placeholder="optional" help="Extra gear you could include (not needed day-to-day). Added 1:1 on top of the business price." />
             <MoneyInput label="Inventory at cost ($)" value={inventoryCost} onChange={setInventoryCost} placeholder="optional" help="Often priced at cost and added on top." />
@@ -448,7 +516,7 @@ function BusinessValuation() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
             <div>
-              <label className="block text-sm font-medium">Does it run without you?</label>
+              <label className="block text-sm font-medium">Does your business run without you?</label>
               <select className="w-full border rounded p-2" value={opsStrength} onChange={(e) => setOpsStrength(e.target.value)}>
                 <option value="none">Not really (no bump)</option>
                 <option value="some">Somewhat (+0.10×)</option>
@@ -495,10 +563,13 @@ function BusinessValuation() {
                 We start with your owner earnings (SDE) and apply a typical multiple for your industry. We then cap it using buyer finance math so the number is realistic to fund.
               </Collapsible>
               <div className="flex gap-2 mt-4">
+                <a href={`${LIST_ROUTE}${email ? `?email=${encodeURIComponent(email)}${businessName ? `&business=${encodeURIComponent(businessName)}` : ''}` : ''}`} className="bg-white border px-4 py-2 rounded hover:bg-gray-50">
+                  List your business
+                </a>
                 <button onClick={handleDownloadPdf} className="bg-white border px-4 py-2 rounded hover:bg-gray-50">Download PDF</button>
                 <button onClick={handleEmailPdf} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Email me the PDF</button>
               </div>
-              <div className="text-xs text-gray-500 mt-2">Email opens your email app with a link to the PDF.</div>
+              <div className="text-xs text-gray-500 mt-2">“List your business” takes you to onboarding. Change the route at the top of this file if needed.</div>
             </Section>
 
             <Section title="Business (earnings-based)">
@@ -582,6 +653,16 @@ function BusinessValuation() {
               </Collapsible>
             </Section>
 
+            {/* Report disclaimer */}
+            <Section title="Disclaimer">
+              <div className="text-sm text-gray-700">
+                This is a simple valuation to give you an idea of a standard earnings-based range. It is not an appraisal and
+                shouldn’t be used for bank loans, tax filings, insurance claims, or legal purposes. Ultimately, you can price
+                your business however you choose; marketability and buyer financing will determine the final outcome.
+              </div>
+            </Section>
+
+            {/* Plain-English summary */}
             <Section title="Valuation Summary (plain English)">
               <textarea className="w-full border rounded p-3 text-sm h-64" readOnly value={summaryText} />
               <div className="flex gap-2 mt-3">
@@ -590,6 +671,9 @@ function BusinessValuation() {
                 </button>
                 <button onClick={handleDownloadPdf} className="bg-white border px-4 py-2 rounded hover:bg-gray-50">Download PDF</button>
                 <button onClick={handleEmailPdf} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">Email me the PDF</button>
+                <a href={`${LIST_ROUTE}${email ? `?email=${encodeURIComponent(email)}${businessName ? `&business=${encodeURIComponent(businessName)}` : ''}` : ''}`} className="bg-white border px-4 py-2 rounded hover:bg-gray-50">
+                  List your business
+                </a>
               </div>
             </Section>
           </>
@@ -600,5 +684,4 @@ function BusinessValuation() {
 }
 
 export default dynamic(() => Promise.resolve(BusinessValuation), { ssr: false });
-
 
