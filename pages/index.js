@@ -110,23 +110,71 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ✅ Why We Built SuccessionBridge Section */}
-        <section className="bg-gray-50 py-16 px-6 md:px-12 mb-16 rounded-xl shadow-sm">
-          <div className="max-w-4xl mx-auto text-center">
-            <h2 className="text-3xl font-bold mb-6">Why We Built SuccessionBridge</h2>
-            <div className="text-lg text-gray-700 leading-relaxed space-y-4">
-              <p>After 8 years of running a profitable business, my partner and I decided to sell.</p>
-              <p>We were generating around <strong>$200K/year in revenue</strong> with approximately <strong>$150K/year in SDE</strong>, but when we called a business broker, we were told:</p>
-              <blockquote className="italic text-gray-600 border-l-4 border-blue-500 pl-4">
-                “Unless your asking price is $1M or more, no broker will give you the time.”
-              </blockquote>
-              <p>One year later, we sold the business for <strong>over $4M — without a broker.</strong></p>
-              <p><strong>The key?</strong><br />We got the listing in front of the right buyers and let the market create the value.</p>
-              <p className="font-semibold">That experience taught us a simple truth:<br />More eyes = more chances to sell.</p>
-              <p>SuccessionBridge was built to give business owners that same advantage — connecting sellers and buyers directly without relying on expensive brokers.</p>
-            </div>
-          </div>
-        </section>
+       // components/WhyWeBuilt.js
+export default function WhyWeBuilt({ variant = "owner" }) {
+  // variant: "owner" (default) or "broker"
+  return (
+    <section className="max-w-3xl mx-auto px-4 py-10">
+      <h2 className="text-3xl sm:text-4xl font-bold tracking-tight">
+        Why We Built SuccessionBridge
+      </h2>
+
+      <div className="mt-4 space-y-4 text-gray-700 text-lg leading-relaxed">
+        <p>
+          After years of running a profitable business, we decided to sell. We were
+          doing about $200K in revenue with roughly $150K in SDE. When we first
+          called around, we heard a version of:{" "}
+          <em>“Smaller deals don’t always get broker attention.”</em>
+        </p>
+        <p>
+          One year later, we sold for over $4M by getting the business in front of
+          the right buyers and letting the market set the value. The lesson was
+          simple: <strong>more qualified eyes = more chances to sell.</strong>
+        </p>
+
+        <p>
+          SuccessionBridge exists to give owners that same advantage—modern tools to
+          package your business and reach more buyers directly. Many great brokers
+          do valuable work; for some owners (especially main-street size), it’s
+          helpful to have a <em>DIY path</em> or a <em>complement</em> to broker efforts.
+        </p>
+      </div>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border p-4 bg-white">
+          <h3 className="font-semibold">What you get</h3>
+          <ul className="mt-2 list-disc list-inside text-gray-700">
+            <li>Simple valuation guidance (SDE × industry range)</li>
+            <li>Clear, copyable summaries and PDFs</li>
+            <li>Direct connection to interested buyers</li>
+            <li>Optional: use alongside a broker</li>
+          </ul>
+        </div>
+
+        <div className="rounded-xl border p-4 bg-white">
+          <h3 className="font-semibold">Our philosophy</h3>
+          <ul className="mt-2 list-disc list-inside text-gray-700">
+            <li>Visibility drives outcomes</li>
+            <li>Transparent, plain-English tools</li>
+            <li>You stay in control of the process</li>
+            <li>Respect for brokers and their role</li>
+          </ul>
+        </div>
+      </div>
+
+      {variant === "broker" && (
+        <div className="mt-6 rounded-lg bg-blue-50 border border-blue-200 p-4 text-blue-900">
+          <p className="text-sm">
+            <strong>Brokers:</strong> SuccessionBridge can complement your mandate—
+            more distribution and easier seller prep. If you’re interested in early
+            access, we’d love to talk.
+          </p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 
         {/* ⭐️ Featured Listings — mobile carousel; 4-up desktop with polish */}
         <section className="bg-white rounded-xl p-6 sm:p-8 mb-16 border border-gray-200 shadow-sm">
