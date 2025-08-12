@@ -2,13 +2,14 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from "../lib/supabaseClient";
+
 // --- who/colour for BUYER view ---
 function whoAndColorForBuyer(msg, buyerEmail) {
-  // New rows with the flag:
+  // Prefer the explicit flag when present
   if (msg.from_seller === true)  return { who: "Seller", color: "bg-green-100 text-green-900" };
   if (msg.from_seller === false) return { who: "You",    color: "bg-blue-100 text-blue-900" };
 
-  // Fallback for older rows (no flag):
+  // Fallback for older rows
   const isMine =
     msg?.buyer_email &&
     buyerEmail &&
@@ -18,7 +19,6 @@ function whoAndColorForBuyer(msg, buyerEmail) {
     ? { who: "You",    color: "bg-blue-100 text-blue-900" }
     : { who: "Seller", color: "bg-green-100 text-green-900" };
 }
-
 
 export default function BuyerDashboard() {
   const router = useRouter();
@@ -87,7 +87,7 @@ export default function BuyerDashboard() {
     setSavedListings(data || []);
   }
 
-  // ✅ Only query by buyer_email (compatible with your current schema)
+  // ✅ Only query by buyer_email
   async function fetchBuyerMessages(email) {
     setLoadingMessages(true);
     try {
@@ -97,7 +97,7 @@ export default function BuyerDashboard() {
         .eq('buyer_email', email)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+    if (error) throw error;
       setBuyerMessages(data || []);
     } catch (err) {
       console.error('❌ fetchBuyerMessages failed:', err);
@@ -112,7 +112,7 @@ export default function BuyerDashboard() {
     setReplyFiles(prev => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
 
-  // 🛠️ stays client-side (no /api/send-message)
+  // stays client-side (no /api/send-message)
   async function sendReply(listingId, sellerId) {
     try {
       const text = (replyText[listingId] || '').trim();
@@ -159,7 +159,7 @@ export default function BuyerDashboard() {
         topic: 'business-inquiry',
         is_deal_proposal: false,
         attachments,
-        // ❌ DO NOT send from_seller — we don’t need that column
+        from_seller: false, // 👈 label this as buyer-sent
       }]);
 
       if (insertErr) {
@@ -318,15 +318,14 @@ export default function BuyerDashboard() {
                     <div className="space-y-2">
                       {thread.map((msg) => (
                         <div key={msg.id}>
-                          <div
-                            className={`p-2 rounded-lg ${
-                              msg.buyer_email === buyerProfile.email
-                                ? "bg-blue-100 text-blue-900"
-                                : "bg-green-100 text-green-900"
-                            }`}
-                          >
-                            <strong>{msg.buyer_email === buyerProfile.email ? "You" : "Seller"}:</strong> {msg.message}
-                          </div>
+                          {(() => {
+                            const { who, color } = whoAndColorForBuyer(msg, buyerProfile?.email);
+                            return (
+                              <div className={`p-2 rounded-lg ${color}`}>
+                                <strong>{who}:</strong> {msg.message}
+                              </div>
+                            );
+                          })()}
 
                           {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
                             <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
