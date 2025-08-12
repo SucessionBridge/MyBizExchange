@@ -22,7 +22,6 @@ export default function BuyerDashboard() {
   useEffect(() => {
     const fetchProfileAndListings = async () => {
       const { data: { user }, error } = await supabase.auth.getUser();
-
       if (error || !user) {
         router.push('/login');
         return;
@@ -95,83 +94,72 @@ export default function BuyerDashboard() {
     const files = Array.from(e.target.files || []);
     setReplyFiles(prev => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
   }
-// 📨 Send (POST) via service-role API, not direct DB insert
-async function sendReply(listingId /* int */, _sellerIdIgnored) {
-  try {
-    const text = (replyText[listingId] || '').trim();
-    const files = replyFiles[listingId] || [];
-    if (!text && files.length === 0) return;
-    if (!buyerProfile) return;
 
-    // 0) Look up seller email for this listing (helps API resolve seller_id)
-    const { data: sellerRow } = await supabase
-      .from('sellers')
-      .select('email')
-      .eq('id', listingId)
-      .maybeSingle();
-    const seller_email = sellerRow?.email || null;
+  // 🛠️ stays client-side (no /api/send-message)
+  async function sendReply(listingId, sellerId) {
+    try {
+      const text = (replyText[listingId] || '').trim();
+      const files = replyFiles[listingId] || [];
+      if (!text && files.length === 0) return;
+      if (!buyerProfile) return;
 
-    // 1) Upload attachments (public bucket) — keep your current behavior
-    const attachments = [];
-    for (const file of files) {
-      const isImage = file.type?.startsWith('image/');
-      const isVideo = file.type?.startsWith('video/');
-      if (!isImage && !isVideo) continue;
+      // 1) Upload attachments (if any)
+      let attachments = [];
+      if (files.length > 0) {
+        for (const file of files) {
+          const isImage = file.type?.startsWith('image/');
+          const isVideo = file.type?.startsWith('video/');
+          if (!isImage && !isVideo) continue;
 
-      const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-      const path = `listing-${listingId}/buyer-${buyerProfile.email}/${Date.now()}-${safeName}`;
-      const { error: upErr } = await supabase.storage
-        .from(ATTACH_BUCKET)
-        .upload(path, file, { cacheControl: '3600', upsert: false });
-      if (upErr) {
-        console.error('❌ Upload failed:', upErr);
-        alert('Attachment upload failed. Please try again or remove the file(s).');
-        return;
+          const safeName = file.name.replace(/[^\w.\-]+/g, '_');
+          const path = `listing-${listingId}/buyer-${buyerProfile.email}/${Date.now()}-${safeName}`;
+          const { error: upErr } = await supabase.storage
+            .from(ATTACH_BUCKET)
+            .upload(path, file, { cacheControl: '3600', upsert: false });
+
+          if (upErr) {
+            console.error('❌ Upload failed:', upErr);
+            alert('Attachment upload failed. Please try again or remove the file(s).');
+            return;
+          }
+          attachments.push({
+            path,
+            name: file.name,
+            size: file.size,
+            mime: file.type,
+            kind: isImage ? 'image' : 'video',
+          });
+        }
       }
-      attachments.push({
-        path,
-        name: file.name,
-        size: file.size,
-        mime: file.type,
-        kind: isImage ? 'image' : 'video',
-      });
-    }
 
-    // 2) Call API (service role) so RLS can't block inserts
-    const resp = await fetch('/api/send-message', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        listing_id: Number(listingId),
+      // 2) Insert message with text + attachments
+      const { error: insertErr } = await supabase.from('messages').insert([{
+        buyer_name: buyerProfile.name,
         buyer_email: buyerProfile.email,
-        buyer_name: buyerProfile.name || buyerProfile.email,
-        seller_email,                          // helps resolve UUID
         message: text,
+        seller_id: sellerId || null,
+        listing_id: listingId,
         topic: 'business-inquiry',
         is_deal_proposal: false,
-        attachments,                           // already uploaded
-        from_seller: false,                    // direction flag for UI
-      }),
-    });
+        attachments,
+        // ❌ DO NOT send from_seller — we don’t need that column
+      }]);
 
-    const json = await resp.json().catch(() => ({}));
-    if (!resp.ok || json.ok === false) {
-      console.error('❌ API failed:', json?.error);
-      alert(json?.error || 'Sending failed.');
-      return;
+      if (insertErr) {
+        console.error('❌ Insert message failed:', insertErr);
+        alert('Sending message failed. Please try again.');
+        return;
+      }
+
+      // 3) Reset UI + reload
+      setReplyText(prev => ({ ...prev, [listingId]: '' }));
+      setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
+      await fetchBuyerMessages(buyerProfile.email);
+    } catch (err) {
+      console.error('❌ sendReply crashed:', err);
+      alert('Something went wrong while sending. Please try again.');
     }
-
-    // 3) Reset + refresh
-    setReplyText(prev => ({ ...prev, [listingId]: '' }));
-    setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
-    await fetchBuyerMessages(buyerProfile.email);
-  } catch (err) {
-    console.error('❌ sendReply crashed:', err);
-    alert('Something went wrong while sending. Please try again.');
   }
-}
-
-  
 
   async function handleUnsave(listingId) {
     await supabase
@@ -223,7 +211,6 @@ async function sendReply(listingId /* int */, _sellerIdIgnored) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {matches.map(listing => (
                   <div key={listing.id} className="bg-gray-50 border rounded-xl shadow-sm hover:shadow-md transition">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={listing.image_urls?.[0] || "/placeholder-listing.jpg"}
                       alt="Business"
@@ -254,7 +241,6 @@ async function sendReply(listingId /* int */, _sellerIdIgnored) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {savedListings.map(entry => (
                   <div key={entry.id} className="bg-gray-50 border rounded-xl shadow-sm hover:shadow-md transition">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={entry.sellers?.image_urls?.[0] || "/placeholder-listing.jpg"}
                       alt="Listing"
@@ -262,7 +248,7 @@ async function sendReply(listingId /* int */, _sellerIdIgnored) {
                     />
                     <div className="p-4">
                       <h3 className="text-lg font-bold">{entry.sellers?.industry} in {entry.sellers?.location}</h3>
-                      <p className="text-gray-700">Asking Price: ${entry.sellers?.asking_price?.toLocaleString?.()}</p>
+                      <p className="text-gray-700">Asking Price: ${entry.sellers?.asking_price?.toLocaleString()}</p>
                       <div className="mt-3 flex justify-between">
                         <button
                           onClick={() => router.push(`/listings/${entry.listing_id}`)}
@@ -322,20 +308,16 @@ async function sendReply(listingId /* int */, _sellerIdIgnored) {
                                 : "bg-green-100 text-green-900"
                             }`}
                           >
-                            <strong>{msg.buyer_email === buyerProfile.email ? "You" : "Seller"}:</strong>{" "}
-                            {msg.message}
+                            <strong>{msg.buyer_email === buyerProfile.email ? "You" : "Seller"}:</strong> {msg.message}
                           </div>
 
-                          {(() => {
-                            const safeAttachments = Array.isArray(msg.attachments) ? msg.attachments : [];
-                            return safeAttachments.length > 0 ? (
-                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {safeAttachments.map((att, i) => (
-                                  <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
-                                ))}
-                              </div>
-                            ) : null;
-                          })()}
+                          {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
+                            <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                              {msg.attachments.map((att, i) => (
+                                <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
+                              ))}
+                            </div>
+                          )}
 
                           <p className="text-[11px] text-gray-400 mt-1">
                             {new Date(msg.created_at).toLocaleString()}
@@ -408,7 +390,6 @@ async function sendReply(listingId /* int */, _sellerIdIgnored) {
               <div className="mt-4">
                 <p className="font-semibold mb-2">Intro Video / Photo:</p>
                 {buyerProfile.video_introduction.match(/\.(jpg|jpeg|png|gif)$/i) ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={buyerProfile.video_introduction} alt="Buyer" className="w-full rounded-lg border" />
                 ) : (
                   <video src={buyerProfile.video_introduction} controls className="w-full rounded-lg border" />
@@ -448,5 +429,4 @@ function AttachmentPreview({ att }) {
     </a>
   );
 }
-
 
