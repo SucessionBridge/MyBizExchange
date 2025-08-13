@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import supabase from '../../lib/supabaseClient'; // ✅ Fixed path
+import GrowthSimulator from '../../components/GrowthSimulator';
 
 export default function ListingDetail() {
   const router = useRouter();
@@ -98,47 +99,46 @@ export default function ListingDetail() {
     return sections;
   }
 
-async function handleSubmit(e) {
-  e.preventDefault();
-  if (!message || !buyer || !listing) return;
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!message || !buyer || !listing) return;
 
-  const formData = new FormData();
-  formData.append('message', message);
+    const formData = new FormData();
+    formData.append('message', message);
 
-  // ✅ Do NOT send seller_id; let API resolve by email if you have it
-  if (listing.email) formData.append('seller_email', listing.email);
+    // ✅ Do NOT send seller_id; let API resolve by email if you have it
+    if (listing.email) formData.append('seller_email', listing.email);
 
-  formData.append('listing_id', listing.id);
-  formData.append('buyer_name', buyer.name || buyer.full_name || buyer.email);
-  formData.append('buyer_email', buyer.email);
-  formData.append('topic', 'business-inquiry');
-  formData.append('extension', 'successionbridge');
+    formData.append('listing_id', listing.id);
+    formData.append('buyer_name', buyer.name || buyer.full_name || buyer.email);
+    formData.append('buyer_email', buyer.email);
+    formData.append('topic', 'business-inquiry');
+    formData.append('extension', 'successionbridge');
 
-  if (attachment) formData.append('attachment', attachment);
+    if (attachment) formData.append('attachment', attachment);
 
-  try {
-    const response = await fetch('/api/send-message', {
-      method: 'POST',
-      body: formData,
-    });
+    try {
+      const response = await fetch('/api/send-message', {
+        method: 'POST',
+        body: formData,
+      });
 
-    const result = await response.json();
+      const result = await response.json();
 
-    if (!response.ok) {
-      console.error('❌ send-message failed:', result);
-      alert(result?.error || 'Message failed to send.');
-    } else {
-      alert('✅ Message sent to the seller!');
-      setMessage('');
-      setAttachment(null);
-      setSuccess(true);
+      if (!response.ok) {
+        console.error('❌ send-message failed:', result);
+        alert(result?.error || 'Message failed to send.');
+      } else {
+        alert('✅ Message sent to the seller!');
+        setMessage('');
+        setAttachment(null);
+        setSuccess(true);
+      }
+    } catch (err) {
+      console.error('❌ Error sending message:', err);
+      alert('Something went wrong.');
     }
-  } catch (err) {
-    console.error('❌ Error sending message:', err);
-    alert('Something went wrong.');
   }
-}
-
 
   async function handleSaveListing() {
     if (!buyer) {
@@ -192,26 +192,25 @@ async function handleSubmit(e) {
         >
           ← Back to Marketplace
         </a>
-  
-{/* Hero */}
-<div className="relative w-full h-72 md:h-96 rounded-2xl overflow-hidden shadow-lg">
-  <img src={mainImage} alt="Business" className="w-full h-full object-cover" />
-  <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-end p-8">
-    <h1 className="text-4xl md:text-5xl font-serif font-bold text-white drop-shadow-lg">
-      {toTitleCase(
-        listing.hide_business_name
-          ? 'Confidential Business Listing'
-          : listing.business_name || `${listing.industry} Business`
-      )}
-    </h1>
-    <p className="bg-black bg-opacity-60 text-white px-3 py-1 rounded text-sm font-mono inline-block mt-2">
-      Ad ID: {listing.ad_id}
-    </p>
-    <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
-  </div>
-</div>
 
-       
+        {/* Hero */}
+        <div className="relative w-full h-72 md:h-96 rounded-2xl overflow-hidden shadow-lg">
+          <img src={mainImage} alt="Business" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-end p-8">
+            <h1 className="text-4xl md:text-5xl font-serif font-bold text-white drop-shadow-lg">
+              {toTitleCase(
+                listing.hide_business_name
+                  ? 'Confidential Business Listing'
+                  : listing.business_name || `${listing.industry} Business`
+              )}
+            </h1>
+            <p className="bg-black bg-opacity-60 text-white px-3 py-1 rounded text-sm font-mono inline-block mt-2">
+              Ad ID: {listing.ad_id}
+            </p>
+            <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
+          </div>
+        </div>
+
         {/* Financial Highlights */}
         <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
           <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-6 border-b-2 border-[#F59E0B] pb-2">
@@ -263,6 +262,20 @@ async function handleSubmit(e) {
             </div>
           </div>
         </section>
+
+        {/* 📈 Growth & Valuation Simulator */}
+        {listing && (
+          <div className="mt-10">
+            <GrowthSimulator
+              baseRevenue={listing.annual_revenue || 0}
+              baseSDE={listing.sde ?? listing.annual_profit ?? 0}
+              askingPrice={listing.asking_price || undefined}
+              multiples={{ low: 2.5, mid: 3.0, high: 3.5 }}
+              defaultGrowthPct={5}
+              defaultYears={3}
+            />
+          </div>
+        )}
 
         {/* Business Description */}
         <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
