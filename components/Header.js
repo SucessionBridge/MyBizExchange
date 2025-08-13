@@ -60,8 +60,14 @@ export default function Header() {
           <Link href="/sellers"><span className="hover:text-blue-600 cursor-pointer">Sell a Business</span></Link>
           <Link href="/business-valuation"><span className="hover:text-blue-600 cursor-pointer">Value Your Business</span></Link>
           <Link href="/scorecard"><span className="hover:text-blue-600 cursor-pointer">Sellability Scorecard</span></Link>
+
+          {/* ⭐️ New: Blog link (points to /guides list) */}
+          <Link href="/guides"><span className="hover:text-blue-600 cursor-pointer">Blog</span></Link>
+
+          {/* Existing Guides hub (keep if you want both; or rename it to just “Guides”) */}
           <Link href="/guides"><span className="hover:text-blue-600 cursor-pointer">Guides & Tools</span></Link>
-          {/* ⭐️ New: Pricing link */}
+
+          {/* ⭐️ Pricing */}
           <Link href="/pricing"><span className="hover:text-blue-600 cursor-pointer">Pricing</span></Link>
 
           {user && (
@@ -126,8 +132,14 @@ export default function Header() {
             <Link href="/sellers"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Sell a Business</span></Link>
             <Link href="/business-valuation"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Value Your Business</span></Link>
             <Link href="/scorecard"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Sellability Scorecard</span></Link>
+
+            {/* ⭐️ New: Blog link (mobile) */}
+            <Link href="/guides"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Blog</span></Link>
+
+            {/* Existing Guides hub (mobile) */}
             <Link href="/guides"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Guides & Tools</span></Link>
-            {/* ⭐️ New: Pricing link (mobile) */}
+
+            {/* ⭐️ Pricing (mobile) */}
             <Link href="/pricing"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Pricing</span></Link>
 
             {user && (
@@ -167,3 +179,4 @@ export default function Header() {
     </header>
   );
 }
+
