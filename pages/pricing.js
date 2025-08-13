@@ -1,200 +1,74 @@
-// pages/pricing.js
-import Head from 'next/head'
-import Link from 'next/link'
+import { useEffect, useState } from 'react';
+import supabase from '../lib/supabaseClient';
 
-export default function PricingPage() {
+export default function Pricing() {
+  const [user, setUser] = useState(null);
+  const [email, setEmail] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user || null);
+      setEmail(user?.email || '');
+    })();
+  }, []);
+
+  const buy = async (plan) => {
+    if (!email) {
+      alert('Please log in first so we can attach the purchase to your account.');
+      window.location.href = '/login?redirect=/pricing';
+      return;
+    }
+
+    const r = await fetch('/api/checkout/create-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ plan, email }),
+    });
+    const data = await r.json();
+    if (!r.ok || !data?.url) {
+      alert(data?.error || 'Failed to start checkout');
+      return;
+    }
+    window.location.href = data.url;
+  };
+
   return (
-    <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937]">
-      <Head>
-        <title>Pricing — SuccessionBridge</title>
-        <meta name="description" content="Simple, transparent pricing for listing your business on SuccessionBridge." />
-      </Head>
+    <main className="max-w-5xl mx-auto px-4 py-10">
+      <h1 className="text-3xl font-bold">Pricing</h1>
+      <p className="text-gray-700 mt-2">
+        Simple, no auto-renew. You’ll get a reminder email 7 days before your plan ends.
+      </p>
 
-      <div className="max-w-6xl mx-auto px-4 py-12 md:py-16">
-        {/* Hero */}
-        <section className="text-center mb-10 md:mb-14">
-          <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight text-[#2E3A59]">
-            Simple, transparent pricing
-          </h1>
-          <p className="mt-4 text-lg md:text-xl text-gray-700 max-w-3xl mx-auto">
-            List your business and reach qualified buyers. Most sales take
-            <span className="font-semibold"> 100–189 days</span>, so pick the plan that fits your runway.
-          </p>
-        </section>
-
-        {/* Plans */}
-        <section className="grid md:grid-cols-3 gap-6 md:gap-8">
-          {/* Monthly (3-mo min) */}
-          <PlanCard
-            name="Monthly Flex"
-            price="$55"
-            cadence="/ month"
-            badge="3-month minimum"
-            description="Get listed fast. Best if you’re testing the market."
-            features={[
-              'Public listing + messaging',
-              'Valuation summary PDF',
-              'AI description polish (basic)',
-              'Cancel anytime after 3 months',
-            ]}
-            ctaHref="/sellers?plan=monthly"
-            cta="Start with Monthly"
-            finePrint="Billed monthly. 3-month minimum term."
-          />
-
-          {/* 6-month (recommended) */}
-          <PlanCard
-            name="6-Month Saver"
-            price="$50"
-            cadence="/ month"
-            badge="Recommended"
-            highlight
-            description="Covers the typical time-to-sell window."
-            features={[
-              'Everything in Monthly',
-              'Homepage/category boost rotations',
-              'Priority in buyer alerts',
-              'Best fit for 100–189 day sell cycle',
-            ]}
-            ctaHref="/sellers?plan=semiannual"
-            cta="Choose 6-Month ($300)"
-            finePrint="Billed $300 every 6 months."
-          />
-
-          {/* Annual */}
-          <PlanCard
-            name="1-Year"
-            price="$500"
-            cadence="/ year"
-            description="Maximum exposure over a full year."
-            features={[
-              'Everything in 6-Month',
-              'Featured in newsletter at least once',
-              'Great for seasonal or niche businesses',
-            ]}
-            ctaHref="/sellers?plan=annual"
-            cta="Choose Annual"
-            finePrint="Billed once per year."
-          />
-        </section>
-
-        {/* Notes / assurances */}
-        <section className="mt-10 md:mt-14 grid md:grid-cols-3 gap-4">
-          <Note title="No success fees">
-            We don’t charge a broker-style commission. Your subscription covers distribution and tools.
-          </Note>
-          <Note title="Cancel renewals anytime">
-            You can turn off auto-renew. Monthly plans require 3 months minimum.
-          </Note>
-          <Note title="Upgrade anytime">
-            Move from Monthly to 6-Month or Annual without losing visibility.
-          </Note>
-        </section>
-
-        {/* FAQ */}
-        <section className="mt-12 md:mt-16 bg-white rounded-xl border border-gray-200 shadow-sm p-6 md:p-8">
-          <h2 className="text-2xl font-semibold text-[#2E3A59]">FAQ</h2>
-          <div className="mt-4 space-y-4">
-            <Faq q="What if I sell before my plan ends?">
-              Congrats! You can turn off auto-renew at any time. We don’t prorate partial periods.
-            </Faq>
-            <Faq q="Do you verify my numbers or provide an appraisal?">
-              No. Our valuation tool is an indicative guide to help you price; it’s not an appraisal for lending, tax, insurance, or legal use.
-            </Faq>
-            <Faq q="Can I use my own broker?">
-              Yes. Many owners use SuccessionBridge alongside a broker to increase exposure.
-            </Faq>
+      <div className="grid sm:grid-cols-3 gap-6 mt-8">
+        {[
+          { key:'3m', title:'3 Months', price:'$165', note:'$55/mo · one-time', features:['List your business','Messaging','Valuation tool'], },
+          { key:'6m', title:'6 Months', price:'$300', note:'$50/mo · one-time', features:['Everything in 3 months','Longer exposure'], },
+          { key:'12m', title:'1 Year', price:'$500', note:'Best value · one-time', features:['Everything in 6 months','Full year visibility'], },
+        ].map(p => (
+          <div key={p.key} className="rounded-xl border shadow-sm p-6 bg-white">
+            <h3 className="text-xl font-semibold">{p.title}</h3>
+            <div className="mt-2 text-3xl font-bold">{p.price}</div>
+            <div className="text-sm text-gray-500">{p.note}</div>
+            <ul className="mt-4 text-sm text-gray-700 space-y-1">
+              {p.features.map(f => <li key={f}>• {f}</li>)}
+            </ul>
+            <button
+              className="mt-6 w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700"
+              onClick={() => buy(p.key)}
+            >
+              Get {p.title}
+            </button>
+            <div className="mt-3 text-xs text-gray-500">
+              No auto-renew. We’ll email you a renewal link 7 days before expiry.
+            </div>
           </div>
+        ))}
+      </div>
 
-          <div className="mt-6 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <strong>Disclaimer:</strong> The valuation outputs and materials are guidance only and must not be used for bank loans,
-            insurance, tax filings, or legal purposes. We have not verified the information you provide.
-          </div>
-        </section>
-
-        {/* CTA footer */}
-        <section className="text-center mt-10 md:mt-16">
-          <Link href="/sellers">
-            <a className="inline-block bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg">
-              List my business
-            </a>
-          </Link>
-        </section>
+      <div className="mt-8 text-xs text-gray-500">
+        Typical SMB sale timelines range ~100–180 days; duration varies by industry, price, and preparedness.
       </div>
     </main>
-  )
-}
-
-/* ——— components-in-file to keep this page self-contained ——— */
-
-function PlanCard({ name, price, cadence, description, features, ctaHref, cta, finePrint, badge, highlight }) {
-  return (
-    <div
-      className={[
-        'relative rounded-2xl border shadow-sm bg-white p-6 flex flex-col',
-        highlight ? 'border-blue-300 ring-2 ring-blue-200' : 'border-gray-200',
-      ].join(' ')}
-    >
-      {badge && (
-        <div
-          className={[
-            'absolute -top-3 left-4 px-2 py-1 text-xs font-semibold rounded-md',
-            highlight ? 'bg-blue-600 text-white' : 'bg-gray-900 text-white',
-          ].join(' ')}
-        >
-          {badge}
-        </div>
-      )}
-
-      <h3 className="text-xl font-semibold text-[#2E3A59]">{name}</h3>
-      <div className="mt-2 flex items-baseline gap-1">
-        <div className="text-4xl font-bold">{price}</div>
-        <div className="text-gray-600">{cadence}</div>
-      </div>
-      <p className="mt-2 text-gray-700">{description}</p>
-
-      <ul className="mt-4 space-y-2 text-sm text-gray-700">
-        {features.map((f, i) => (
-          <li key={i} className="flex items-start gap-2">
-            <span className="mt-1 inline-block h-2 w-2 rounded-full bg-green-500" />
-            <span>{f}</span>
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-5">
-        <Link href={ctaHref}>
-          <a
-            className={[
-              'block text-center w-full px-4 py-2 rounded-lg font-semibold',
-              highlight
-                ? 'bg-blue-600 text-white hover:bg-blue-700'
-                : 'bg-gray-900 text-white hover:bg-black/90',
-            ].join(' ')}
-          >
-            {cta}
-          </a>
-        </Link>
-        {finePrint && <p className="mt-2 text-xs text-gray-500 text-center">{finePrint}</p>}
-      </div>
-    </div>
-  )
-}
-
-function Note({ title, children }) {
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
-      <div className="font-semibold">{title}</div>
-      <div className="text-sm text-gray-700 mt-1">{children}</div>
-    </div>
-  )
-}
-
-function Faq({ q, children }) {
-  return (
-    <details className="rounded-lg border border-gray-200 bg-white p-4">
-      <summary className="cursor-pointer font-medium text-[#2E3A59]">{q}</summary>
-      <div className="mt-2 text-gray-700 text-sm">{children}</div>
-    </details>
-  )
+  );
 }
