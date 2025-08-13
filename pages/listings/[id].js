@@ -183,6 +183,17 @@ export default function ListingDetail() {
     listing.image_urls?.length > 0 ? listing.image_urls[0] : '/placeholder-listing.jpg';
   const otherImages = listing.image_urls?.slice(1) || [];
 
+  // 🔢 Helper to sanitize numbers coming from DB (handles "267,630" or "$267,630")
+  const toNum = (v) => {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === 'number' && isFinite(v)) return v;
+    if (typeof v === 'string') {
+      const n = Number(v.replace(/[^0-9.-]/g, ''));
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  };
+
   return (
     <main className="bg-gray-50 min-h-screen pb-16 font-sans">
       <div className="max-w-5xl mx-auto px-4">
@@ -219,7 +230,7 @@ export default function ListingDetail() {
 
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
             <div className="text-3xl md:text-4xl font-bold text-emerald-700">
-              Asking Price: {listing.asking_price ? `$${listing.asking_price.toLocaleString()}` : 'Inquire'}
+              Asking Price: {listing.asking_price ? `$${toNum(listing.asking_price).toLocaleString()}` : 'Inquire'}
             </div>
 
             {(listing.seller_financing_considered === 'yes' || listing.seller_financing_considered === 'maybe') && (
@@ -228,7 +239,7 @@ export default function ListingDetail() {
               </span>
             )}
             {listing.seller_financing_considered &&
-              ['yes', 'maybe'].includes(listing.seller_financing_considered.toLowerCase()) && (
+              ['yes', 'maybe'].includes(String(listing.seller_financing_considered).toLowerCase()) && (
                 <span className="mt-4 md:mt-0 inline-block bg-green-50 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
                   Seller Financing Possible
                 </span>
@@ -238,23 +249,23 @@ export default function ListingDetail() {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-gray-800">
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-xs uppercase text-gray-500 font-semibold">Annual Revenue</p>
-              <p className="text-lg font-bold">{listing.annual_revenue ? `$${listing.annual_revenue.toLocaleString()}` : 'N/A'}</p>
+              <p className="text-lg font-bold">{listing.annual_revenue ? `$${toNum(listing.annual_revenue).toLocaleString()}` : 'N/A'}</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-xs uppercase text-gray-500 font-semibold">Annual Profit</p>
-              <p className="text-lg font-bold">{listing.annual_profit ? `$${listing.annual_profit.toLocaleString()}` : 'N/A'}</p>
+              <p className="text-lg font-bold">{listing.annual_profit ? `$${toNum(listing.annual_profit).toLocaleString()}` : 'N/A'}</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-xs uppercase text-gray-500 font-semibold">SDE</p>
-              <p className="text-lg font-bold">{listing.sde ? `$${listing.sde.toLocaleString()}` : 'N/A'}</p>
+              <p className="text-lg font-bold">{listing.sde ? `$${toNum(listing.sde).toLocaleString()}` : 'N/A'}</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-xs uppercase text-gray-500 font-semibold">Inventory Value</p>
-              <p className="text-lg font-bold">{listing.inventory_value ? `$${listing.inventory_value.toLocaleString()}` : 'N/A'}</p>
+              <p className="text-lg font-bold">{listing.inventory_value ? `$${toNum(listing.inventory_value).toLocaleString()}` : 'N/A'}</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-xs uppercase text-gray-500 font-semibold">Equipment Value</p>
-              <p className="text-lg font-bold">{listing.equipment_value ? `$${listing.equipment_value.toLocaleString()}` : 'N/A'}</p>
+              <p className="text-lg font-bold">{listing.equipment_value ? `$${toNum(listing.equipment_value).toLocaleString()}` : 'N/A'}</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-xs uppercase text-gray-500 font-semibold">Employees</p>
@@ -263,19 +274,23 @@ export default function ListingDetail() {
           </div>
         </section>
 
-        {/* 📈 Growth & Valuation Simulator */}
-        {listing && (
-          <div className="mt-10">
-            <GrowthSimulator
-              baseRevenue={listing.annual_revenue || 0}
-              baseSDE={listing.sde ?? listing.annual_profit ?? 0}
-              askingPrice={listing.asking_price || undefined}
-              multiples={{ low: 2.5, mid: 3.0, high: 3.5 }}
-              defaultGrowthPct={5}
-              defaultYears={3}
-            />
-          </div>
-        )}
+        {/* 📈 Growth & Value Simulator */}
+        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+          <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4">
+            Growth & Value Simulator
+          </h2>
+          <p className="text-gray-700 mb-4">
+            See how modest revenue growth can increase SDE and potential exit value over time.
+            Buyers often price on earnings × a multiple.
+          </p>
+          <GrowthSimulator
+            baseRevenue={toNum(listing.annual_revenue)}
+            baseSDE={toNum(listing.sde ?? listing.annual_profit)}
+            defaultGrowthPct={5}
+            defaultYears={3}
+            defaultMultiple={2.5}
+          />
+        </section>
 
         {/* Business Description */}
         <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
@@ -304,7 +319,7 @@ export default function ListingDetail() {
           <div className="grid md:grid-cols-2 gap-6 text-gray-800">
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-xs uppercase text-gray-500 font-semibold">Monthly Lease</p>
-              <p className="text-lg font-bold">{listing.monthly_lease ? `$${listing.monthly_lease.toLocaleString()}` : 'N/A'}</p>
+              <p className="text-lg font-bold">{listing.monthly_lease ? `$${toNum(listing.monthly_lease).toLocaleString()}` : 'N/A'}</p>
             </div>
             <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
               <p className="text-xs uppercase text-gray-500 font-semibold">Home-Based</p>
@@ -456,4 +471,3 @@ export default function ListingDetail() {
     </main>
   );
 }
-
