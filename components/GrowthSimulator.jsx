@@ -1,144 +1,132 @@
-// components/GrowthSimulator.js
+// components/GrowthSimulator.jsx
 import { useMemo, useState } from "react";
 
-function fmtMoney(n) {
-  if (n == null || !isFinite(n)) return "—";
-  return `$${Math.round(n).toLocaleString()}`;
+function formatMoney(n) {
+  if (n == null || !isFinite(n)) return "$0";
+  return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+}
+
+// Safely turn "267,630" or "$267,630" into 267630
+function numify(v, fallback = 0) {
+  if (typeof v === "number" && isFinite(v)) return v;
+  if (typeof v === "string") {
+    const s = v.replace(/[^0-9.-]/g, "");
+    const n = Number(s);
+    return isFinite(n) ? n : fallback;
+  }
+  return fallback;
 }
 
 export default function GrowthSimulator({
   baseRevenue = 0,
-  baseSde = 0,
-  defaultMultiple = 3.0, // starts at 3.0, but clamps to 2.5× minimum
+  baseSDE = 0,
+  defaultGrowthPct = 5,
+  defaultYears = 3,
+  defaultMultiple = 2.5, // start at 2.5× as requested
 }) {
-  // Inputs (simple + friendly defaults)
-  const [growthPct, setGrowthPct] = useState(5);   // % per year
-  const [years, setYears] = useState(3);          // years
-  const [multipleRaw, setMultipleRaw] = useState(defaultMultiple);
+  // sanitize incoming props in case they arrive as strings with commas
+  const baseRev = numify(baseRevenue, 0);
+  const baseSde = numify(baseSDE, 0);
 
-  // Clamp multiple to 2.5× minimum
-  const multiple = Math.max(2.5, Number(multipleRaw || 0));
+  const [growthPct, setGrowthPct] = useState(String(defaultGrowthPct));
+  const [years, setYears] = useState(String(defaultYears));
+  const [multiple, setMultiple] = useState(String(defaultMultiple));
 
-  // Base expenses derived from "expenses stay the same" assumption
-  const baseExpenses = Math.max(0, Number(baseRevenue || 0) - Number(baseSde || 0));
+  const g = useMemo(() => Math.max(-100, Math.min(100, Number(growthPct) || 0)) / 100, [growthPct]);
+  const y = useMemo(() => Math.max(1, Math.min(15, Math.floor(Number(years) || 1))), [years]);
+  const m = useMemo(() => Math.max(1.0, Math.min(10, Number(multiple) || 2.5)), [multiple]);
 
-  // Forward projection with flat expenses
-  const g = Math.max(-100, Number(growthPct || 0)) / 100; // guard against NaN / silly values
-  const yr = Math.max(1, Math.round(Number(years || 1)));
+  // Compound revenue with flat expenses (incremental revenue flows to SDE)
+  const yearNRevenue = useMemo(() => baseRev * Math.pow(1 + g, y), [baseRev, g, y]);
+  const incRevenue   = useMemo(() => Math.max(0, yearNRevenue - baseRev), [yearNRevenue, baseRev]);
+  const yearNSDE     = useMemo(() => baseSde + incRevenue, [baseSde, incRevenue]);
 
-  const revenueYearN = useMemo(() => Number(baseRevenue || 0) * Math.pow(1 + g, yr), [baseRevenue, g, yr]);
-  const sdeYearN = useMemo(() => Math.max(0, revenueYearN - baseExpenses), [revenueYearN, baseExpenses]);
-
-  // Implied values (today vs year N)
-  const todayValue = useMemo(() => Math.max(0, Number(baseSde || 0) * multiple), [baseSde, multiple]);
-  const yearNValue = useMemo(() => Math.max(0, sdeYearN * multiple), [sdeYearN, multiple]);
-  const addedValue = Math.max(0, yearNValue - todayValue);
+  const todayImplied   = useMemo(() => baseSde * m, [baseSde, m]);
+  const yearNImplied   = useMemo(() => yearNSDE * m, [yearNSDE, m]);
+  const addedValueDiff = useMemo(() => Math.max(0, yearNImplied - todayImplied), [yearNImplied, todayImplied]);
 
   return (
-    <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-      <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-3">
-        Revenue Growth → Value Upside
-      </h2>
-
-      {/* WHY this exists */}
-      <p className="text-gray-700">
-        <strong>Why this is here:</strong> See what this business <em>could</em> be worth if you grow revenue while
-        keeping costs steady.
-      </p>
-      <p className="text-gray-600 text-sm mt-2">
-        Many small businesses are valued at a multiple of profit (SDE). If revenue rises and expenses don’t, more drops
-        to profit—so value goes up. Tweak the inputs to explore the upside.
-      </p>
-      <p className="text-gray-600 text-xs mt-1">
-        Tiny example: a $100 sale at +5% becomes $105. Small per order, meaningful across thousands.
-      </p>
+    <div className="space-y-6">
+      {/* Explainer */}
+      <div className="rounded-lg border border-blue-100 bg-blue-50 text-blue-900 p-4 text-sm">
+        <strong>Why this is here:</strong> If you buy this business and grow revenue while expenses stay flat,
+        that extra revenue usually drops to the bottom line. A modest growth rate can translate into
+        a much higher exit value because buyers price businesses on earnings × a multiple.
+      </div>
 
       {/* Inputs */}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-800">
-            Annual revenue growth (%)
-          </label>
+          <label className="block text-sm font-medium">Annual revenue growth (%)</label>
           <input
             type="number"
-            min="0"
-            max="100"
-            step="0.5"
             value={growthPct}
             onChange={(e) => setGrowthPct(e.target.value)}
-            className="mt-1 w-full border rounded p-2"
+            className="w-full border rounded p-2"
             placeholder="e.g., 5"
           />
           <div className="text-xs text-gray-500 mt-1">Assumes expenses stay flat.</div>
         </div>
-
         <div>
-          <label className="block text-sm font-medium text-gray-800">Years</label>
+          <label className="block text-sm font-medium">Years</label>
           <input
             type="number"
-            min="1"
-            max="10"
-            step="1"
             value={years}
             onChange={(e) => setYears(e.target.value)}
-            className="mt-1 w-full border rounded p-2"
-            placeholder="3"
+            className="w-full border rounded p-2"
+            placeholder="e.g., 3"
+            min={1}
           />
         </div>
-
         <div>
-          <label className="block text-sm font-medium text-gray-800">Valuation multiple (×)</label>
+          <label className="block text-sm font-medium">Valuation multiple (×)</label>
           <input
             type="number"
-            min="2.5"
+            value={multiple}
+            onChange={(e) => setMultiple(e.target.value)}
+            className="w-full border rounded p-2"
+            placeholder="e.g., 2.5"
             step="0.1"
-            value={multipleRaw}
-            onChange={(e) => setMultipleRaw(e.target.value)}
-            className="mt-1 w-full border rounded p-2"
-            placeholder="3.0"
           />
-          <div className="text-xs text-gray-500 mt-1">Minimum 2.5× (common main-street range is ~2.5–3.5×).</div>
+          <div className="text-xs text-gray-500 mt-1">Minimum 2.5× is common on main-street deals.</div>
         </div>
       </div>
 
-      {/* Base snapshot */}
-      <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <InfoCard label="Base Revenue" value={fmtMoney(baseRevenue)} />
-        <InfoCard label="Base SDE (today)" value={fmtMoney(baseSde)} />
-        <InfoCard label="Implied Value (today)" value={`${fmtMoney(todayValue)} @ ${multiple.toFixed(2)}×`} />
+      {/* Base vs Year N cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Stat title="Base Revenue" value={formatMoney(baseRev)} />
+        <Stat title="Base SDE (today)" value={formatMoney(baseSde)} />
+        <Stat title="Implied Value (today)" value={`${formatMoney(todayImplied)} @ ${m.toFixed(2)}×`} />
       </div>
 
-      {/* Projection summary */}
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <InfoCard label={`Year ${yr} Revenue`} value={fmtMoney(revenueYearN)} />
-        <InfoCard label={`Year ${yr} SDE (flat expenses)`} value={fmtMoney(sdeYearN)} />
-        <InfoCard label={`Year ${yr} Implied Value`} value={`${fmtMoney(yearNValue)} @ ${multiple.toFixed(2)}×`} />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Stat title={`Year ${y} Revenue`} value={formatMoney(yearNRevenue)} />
+        <Stat title={`Year ${y} SDE (flat expenses)`} value={formatMoney(yearNSDE)} />
+        <Stat title={`Year ${y} Implied Value`} value={`${formatMoney(yearNImplied)} @ ${m.toFixed(2)}×`} />
       </div>
 
-      {/* Added value highlight */}
-      <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-        <div className="text-sm font-semibold text-emerald-900">
-          Added value after {yr} year{yr > 1 ? "s" : ""} (vs. today)
+      {/* Added value */}
+      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+        <div className="text-sm text-emerald-900 font-medium">
+          Added value after {y} {y === 1 ? "year" : "years"} (vs. today)
         </div>
-        <div className="text-2xl font-bold text-emerald-700 mt-1">{fmtMoney(addedValue)}</div>
+        <div className="text-3xl font-bold text-emerald-700 mt-1">{formatMoney(addedValueDiff)}</div>
       </div>
 
-      {/* Assumptions & caution */}
-      <div className="mt-4 text-xs text-gray-600">
-        Assumes revenue grows by <strong>{Number(growthPct || 0)}%</strong> per year,{" "}
-        <strong>expenses stay the same</strong>, and the valuation multiple stays constant at{" "}
-        <strong>{multiple.toFixed(2)}×</strong>. This is a quick, directional gut-check—not a forecast. Real-world costs
-        and multiples can change.
+      <div className="text-xs text-gray-600">
+        Assumes revenue grows by <strong>{(g * 100).toFixed(1)}%</strong> per year, <strong>expenses stay the same</strong>, and the
+        valuation multiple stays constant at <strong>{m.toFixed(2)}×</strong>. This is a quick, directional gut-check — not a forecast.
+        Real-world costs and multiples can change.
       </div>
-    </section>
+    </div>
   );
 }
 
-function InfoCard({ label, value }) {
+function Stat({ title, value }) {
   return (
-    <div className="rounded-lg bg-gray-50 p-4 border">
-      <div className="text-xs uppercase tracking-wide text-gray-500 font-semibold">{label}</div>
-      <div className="text-lg font-bold text-gray-900 mt-1">{value}</div>
+    <div className="bg-white rounded-lg shadow-sm p-4">
+      <div className="text-xs uppercase text-gray-500 font-semibold">{title}</div>
+      <div className="text-lg font-bold">{value}</div>
     </div>
   );
 }
