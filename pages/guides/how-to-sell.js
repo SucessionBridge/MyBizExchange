@@ -6,10 +6,10 @@ export default function HowToSell() {
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937]">
       <Head>
-        <title>How to Sell Your Business &mdash; SuccessionBridge</title>
+        <title>How to Sell Your Business — Quick Start (List Now, Prep As You Go)</title>
         <meta
           name="description"
-          content="Plain-English playbook for selling a small business: pricing, prep, packaging the listing, screening buyers, LOI, diligence, and closing."
+          content="Plain-English quick start: list your business now, then prepare documents and details in stages while buyers discover your listing."
         />
       </Head>
 
@@ -17,22 +17,23 @@ export default function HowToSell() {
         {/* Hero */}
         <header className="mb-8 md:mb-10">
           <h1 className="text-3xl md:text-4xl font-serif font-bold tracking-tight text-[#2E3A59]">
-            How to Sell Your Business (Plain-English Playbook)
+            How to Sell Your Business (Quick Start)
           </h1>
           <p className="mt-3 text-lg text-gray-700">
-            No jargon. Just the steps that move a main-street deal from &quot;thinking about it&quot; to closed.
-            Every business is different, but the fundamentals are the same: prepare cleanly, price clearly, package
-            well, screen smart, and protect yourself on terms.
+            Don’t wait months to make everything “perfect.” The fastest path is:
+            <strong> get listed now</strong> so qualified buyers can find you, then
+            <strong> prep the deeper materials in stages</strong> while conversations begin.
           </p>
+
           <div className="mt-4 flex gap-2 flex-wrap">
             <Link href="/sellers">
               <a className="inline-block bg-[#F59E0B] hover:bg-[#D97706] text-white px-4 py-2 rounded-lg text-sm font-semibold">
-                List Your Business
+                List Your Business (Takes Minutes)
               </a>
             </Link>
             <Link href="/business-valuation">
               <a className="inline-block bg-white border border-gray-300 hover:bg-gray-50 text-gray-800 px-4 py-2 rounded-lg text-sm font-semibold">
-                Price It With Our Valuation Tool
+                Get a Price Range
               </a>
             </Link>
             <Link href="/scorecard">
@@ -43,75 +44,81 @@ export default function HowToSell() {
           </div>
         </header>
 
-        {/* Timeline */}
+        {/* Quick Start — what to do this week */}
         <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h2 className="text-xl font-semibold text-[#2E3A59]">Typical timeline</h2>
-          <div className="mt-3 grid md:grid-cols-2 gap-3">
-            <Step n="1" title="Prepare (2&ndash;6 weeks)">
-              Clean financials, recast SDE, organize documents, light &quot;curb appeal&quot; fixes.
+          <h2 className="text-xl font-semibold text-[#2E3A59]">This week: list it, then iterate</h2>
+          <div className="grid md:grid-cols-2 gap-3 mt-3">
+            <Step n="1" title="Create your listing (15–30 min)">
+              Business name (or “Confidential”), location, short description, headline photo, revenue/SDE rough numbers, and your target price range.
             </Step>
-            <Step n="2" title="Price &amp; strategy (1 week)">
-              Use an SDE &times; multiple range; decide what is included (inventory at cost? equipment? real estate separate?).
+            <Step n="2" title="Price with a simple range">
+              Use SDE × industry multiple. Our tool gives a low/base/high range you can explain in plain English.
             </Step>
-            <Step n="3" title="Launch listing (days)">
-              Clear headline, strong photos, a short memo. Start fielding inquiries.
+            <Step n="3" title="Publish & start fielding inquiries">
+              Visibility matters. You can polish the listing, photos, and docs over the next 1–2 weeks while buyers begin discovering it.
             </Step>
-            <Step n="4" title="Screen buyers (ongoing)">
-              Quick fit checks before sharing deeper info. Optional NDA.
+            <Step n="4" title="Prep in parallel (lightweight)">
+              Add 6–12 good photos, a short memo (1–2 pages), and a simple SDE recast. Share deeper info only after fit checks.
             </Step>
-            <Step n="5" title="Negotiate &amp; LOI (1&ndash;3 weeks)">
-              Agree on price &amp; terms in a non-binding LOI with an exclusivity period.
-            </Step>
-            <Step n="6" title="Diligence (2&ndash;6 weeks)">
-              Buyer verifies numbers, lease, licenses, and operations.
-            </Step>
-            <Step n="7" title="Contracts &amp; closing (1&ndash;3 weeks)">
-              Attorney-prepared Asset Purchase Agreement (most common), bill of sale, assignments, and funding.
-            </Step>
-            <Step n="8" title="Transition (4&ndash;12 weeks)">
-              Training, handoff, vendor and customer intros; stay available as agreed.
-            </Step>
+          </div>
+          <div className="mt-3 text-sm text-gray-700">
+            <strong>Goal:</strong> get in front of buyers early, then tighten the package as interest builds.
           </div>
         </section>
 
-        {/* Prep checklist */}
+        {/* What you need today vs later */}
         <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#2E3A59]">Preparation checklist</h3>
+          <h3 className="text-lg font-semibold text-[#2E3A59]">What you need TODAY vs LATER</h3>
           <div className="grid md:grid-cols-2 gap-3 mt-2">
-            <Card title="Financial">
+            <Card title="Today (to go live fast)">
               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>P&amp;L and balance sheet for last 2&ndash;3 years + YTD</li>
-                <li>Tax returns for last 2 years (if available)</li>
-                <li>Recast SDE schedule (owner pay, add-backs, one-offs)</li>
-                <li>Revenue proof (POS exports, bank deposits)</li>
-                <li>Payroll summary; AR/AP aging (if relevant)</li>
-                <li>Inventory list at cost; major equipment list</li>
+                <li>Clear headline + short description</li>
+                <li>City/region and basic category</li>
+                <li>Revenue and SDE (rough is fine)</li>
+                <li>Price range (from our valuation)</li>
+                <li>1–3 good photos</li>
               </ul>
             </Card>
-            <Card title="Operational &amp; legal">
+            <Card title="Later (polish over 1–2 weeks)">
               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Org chart; key employee status and agreements</li>
-                <li>Vendor &amp; customer concentration notes</li>
-                <li>Entity docs; licenses &amp; permits current</li>
-                <li>Lease: assignability, remaining term, options</li>
-                <li>Website/domain, phone numbers, social accounts</li>
-                <li>Simple SOPs: how the business actually runs</li>
+                <li>More photos (interior, equipment, product)</li>
+                <li>1–2 page memo: story, team, lease highlights</li>
+                <li>Simple SDE recast schedule (add-backs)</li>
+                <li>High-level customer/vendor notes (no secrets yet)</li>
+                <li>Optional: inventory list at cost; equipment list</li>
               </ul>
             </Card>
           </div>
-          <p className="mt-3 text-sm text-gray-700">
-            Pro tip: minor cleanup goes a long way&mdash;tidy premises, fix obvious maintenance, replace missing
-            small tools, and standardize simple processes.
+        </section>
+
+        {/* Staged sharing policy */}
+        <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
+          <h3 className="text-lg font-semibold text-[#2E3A59]">Share info in stages (protect your time)</h3>
+          <div className="grid md:grid-cols-2 gap-3 mt-2">
+            <Card title="Stage 1: teaser & quick screen">
+              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                <li>Public listing + short answers</li>
+                <li>Screen for fit, capital, and timeline</li>
+              </ul>
+            </Card>
+            <Card title="Stage 2: summary pack (optional NDA)">
+              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
+                <li>Summary P&amp;L + SDE, lease terms, more photos</li>
+                <li>Confirm landlord path and key approvals</li>
+              </ul>
+            </Card>
+          </div>
+          <p className="mt-2 text-sm text-gray-700">
+            Save full document dumps for later stages. Early buyers mostly need clarity, not a data room.
           </p>
         </section>
 
         {/* Pricing basics */}
         <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#2E3A59]">Pricing basics (what most buyers expect)</h3>
+          <h3 className="text-lg font-semibold text-[#2E3A59]">Pricing that buyers understand</h3>
           <p className="mt-2 text-gray-700">
-            For main-street SMBs, the core method is <strong>SDE &times; industry multiple</strong>, after recasting SDE.
-            Show a <em>range</em> (low/base/high) and explain any small adjustments (years in business, runs without owner,
-            franchise). Inventory at cost is usually <em>added on top</em>. Real estate is priced separately.
+            Main-street buyers expect <strong>SDE × industry multiple</strong>. Show a range (low/base/high) and
+            explain what’s included. Inventory at cost is usually added on top; real estate is priced separately.
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Link href="/business-valuation">
@@ -127,151 +134,40 @@ export default function HowToSell() {
           </div>
         </section>
 
-        {/* Packaging the listing */}
+        {/* Handling inquiries quickly */}
         <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#2E3A59]">Package your listing</h3>
+          <h3 className="text-lg font-semibold text-[#2E3A59]">Handling inquiries (fast & fair)</h3>
           <div className="grid md:grid-cols-2 gap-3 mt-2">
-            <Card title="Essentials">
+            <Card title="Quick screen (2–4 questions)">
               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Headline: what it is, where, rough scale (&quot;Profitable HVAC, Central FL&quot;)</li>
-                <li>Photo set: exterior, interior, equipment, product, team</li>
-                <li>Snapshot: revenue, SDE, years, staff, lease highlights</li>
-                <li>What is included vs. excluded (inventory, vehicles, IP)</li>
-                <li>Transition offered (e.g., 4 weeks training)</li>
+                <li>Relevant experience or plan to hire</li>
+                <li>Down payment &amp; working capital rough amount</li>
+                <li>Timeline to close if it’s a fit</li>
+                <li>Intent to keep what works vs. change everything</li>
               </ul>
             </Card>
-            <Card title="Short memo outline">
+            <Card title="Next step if it’s a fit">
               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Overview &amp; history</li>
-                <li>Financial summary (3 yrs + YTD) &amp; SDE</li>
-                <li>Operations: staffing, systems, seasonality</li>
-                <li>Customers, vendors, and any concentration</li>
-                <li>Growth opportunities and easy wins</li>
-                <li>Deal terms guidance: what you will consider</li>
+                <li>Optional NDA, then share summary pack</li>
+                <li>Set a short call; align on diligence scope &amp; timing</li>
               </ul>
             </Card>
           </div>
         </section>
 
-        {/* Screening + buyer flow */}
+        {/* Terms & seller note cautions (brief) */}
         <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#2E3A59]">Handle inquiries like a pro</h3>
-          <div className="grid md:grid-cols-2 gap-3 mt-2">
-            <Card title="Quick screen questions">
-              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Have you owned/managed this type of business before?</li>
-                <li>Rough capital available for down payment &amp; working capital?</li>
-                <li>Timeline to close if we both like the fit?</li>
-                <li>Plan to keep team/brand &mdash; or change things quickly?</li>
-              </ul>
-            </Card>
-            <Card title="Share info in stages">
-              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Stage 1: teaser, high-level answers</li>
-                <li>Stage 2 (optional NDA): summary P&amp;L, lease terms, more photos</li>
-                <li>Stage 3 (LOI signed): full diligence pack</li>
-              </ul>
-            </Card>
-          </div>
-          <p className="mt-2 text-sm text-gray-700">
-            Keep a buyer log: dates, notes, what you shared. It speeds follow-up and protects confidentiality.
-          </p>
-        </section>
-
-        {/* Negotiation & LOI */}
-        <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#2E3A59]">Negotiation &amp; LOI (letter of intent)</h3>
-          <div className="grid md:grid-cols-2 gap-3 mt-2">
-            <Card title="Price vs. terms">
-              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Cash at close vs. seller note; earn-out only for growth claims</li>
-                <li>Deposit amount and whether it becomes non-refundable</li>
-                <li>Exclusivity window (30&ndash;60 days typical)</li>
-                <li>Financing contingencies and timelines</li>
-              </ul>
-            </Card>
-            <Card title="LOI outline (non-binding)">
-              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Structure (asset vs. stock), price, inclusions/exclusions</li>
-                <li>Down payment, note terms (rate, term, amortization)</li>
-                <li>Working capital target or &quot;cash-free, debt-free&quot;</li>
-                <li>Diligence scope and document list</li>
-                <li>Exclusivity period and deposits</li>
-                <li>Target closing date; key approvals (landlord, licenses)</li>
-              </ul>
-            </Card>
-          </div>
-        </section>
-
-        {/* Diligence */}
-        <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#2E3A59]">Due diligence (what they will check)</h3>
-          <div className="grid md:grid-cols-2 gap-3 mt-2">
-            <Card title="Common requests">
-              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Monthly P&amp;L and bank statements (12&ndash;24 months)</li>
-                <li>Sales tax and payroll filings (as applicable)</li>
-                <li>Customer and vendor lists (summary first)</li>
-                <li>Copies of key contracts, equipment titles</li>
-                <li>Lease &amp; landlord consent path</li>
-              </ul>
-            </Card>
-            <Card title="Make it smooth">
-              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Set a weekly check-in; answer in batches</li>
-                <li>Stage documents in folders; label clearly</li>
-                <li>Flag quirks upfront (seasonality, one-offs)</li>
-                <li>Confirm transferability of licenses and utilities</li>
-              </ul>
-            </Card>
-          </div>
-        </section>
-
-        {/* Contracts & closing */}
-        <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#2E3A59]">Contracts &amp; closing</h3>
+          <h3 className="text-lg font-semibold text-[#2E3A59]">Price vs. terms (keep it simple)</h3>
           <p className="text-gray-700">
-            Most small deals are <strong>asset sales</strong> (buyer purchases assets and assumes selected liabilities).
-            Your attorney will tailor the Asset Purchase Agreement, bill of sale, assignments, allocation of purchase price,
-            and non-compete/non-solicit (as permitted). Coordinate landlord consent and any license transfers so funding can occur.
+            Cash at close is cleanest. If you consider a seller note, keep the docs simple and protect yourself
+            (personal guarantee, UCC-1 on business assets, insurance, ACH autopay). Be careful with buyers who want
+            to change everything on day one—if you carry a note, that can add risk.
           </p>
-        </section>
-
-        {/* Seller financing protections */}
-        <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#2E3A59]">If you carry a seller note, protect yourself</h3>
-          <div className="grid md:grid-cols-2 gap-3 mt-2">
-            <Card title="Safeguards to discuss">
-              <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Personal guarantee from buyer/owners</li>
-                <li>Security interest (UCC-1) on business assets &amp; titled equipment</li>
-                <li>Insurance with you as loss payee; additional insured</li>
-                <li>ACH autopay and monthly reporting covenants</li>
-                <li>No major brand/menu changes for [months] months without consent</li>
-              </ul>
-            </Card>
-            <Card title="Learn more">
-              <p className="text-sm text-gray-700">
-                See our guide to&nbsp;
-                <Link href="/guides/financing-options">
-                  <a className="text-blue-700 hover:underline">financing options</a>
-                </Link>
-                &nbsp;for structure ideas and red flags.
-              </p>
-            </Card>
+          <div className="mt-3">
+            <Link href="/guides/financing-options">
+              <a className="text-blue-700 hover:underline text-sm font-semibold">Financing options &amp; red flags</a>
+            </Link>
           </div>
-        </section>
-
-        {/* Pitfalls */}
-        <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#2E3A59]">Common pitfalls (and fixes)</h3>
-          <ul className="mt-2 list-disc list-inside text-gray-700 space-y-1">
-            <li>Asking price with no SDE math &mdash; provide the range and show add-backs.</li>
-            <li>Owner dependence &mdash; line up a lead or SOPs to reduce key-person risk.</li>
-            <li>Lease surprises &mdash; confirm assignability and landlord process early.</li>
-            <li>Data sprawl &mdash; organize docs into a simple folder structure.</li>
-            <li>Buyer wants to &quot;change everything&quot; Day 1 &mdash; protect with covenants if you carry a note.</li>
-          </ul>
         </section>
 
         {/* CTA */}
@@ -279,7 +175,7 @@ export default function HowToSell() {
           <div className="inline-flex flex-wrap items-center justify-center gap-3">
             <Link href="/sellers">
               <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-5 py-2.5 rounded-xl font-semibold">
-                Start Listing
+                List Now (You Can Edit Anytime)
               </a>
             </Link>
             <Link href="/business-valuation">
@@ -325,4 +221,6 @@ function Step({ n, title, children }) {
     </div>
   )
 }
+
+
 
