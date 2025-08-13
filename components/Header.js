@@ -45,10 +45,10 @@ export default function Header() {
                 <path
                   d="M0 60h200v4H0z M20 60V30h4v30z M180 60V30h-4v30z M0 30 C60 0 140 0 200 30"
                   fill="none"
-                  stroke="#F59E0B"   // ✅ Golden bridge line
+                  stroke="#F59E0B"
                   strokeWidth="4"
                 />
-                <path d="M95 60V20h4v40z" fill="#F59E0B" /> {/* ✅ Golden center pillar */}
+                <path d="M95 60V20h4v40z" fill="#F59E0B" />
               </svg>
             </span>
           </span>
@@ -61,6 +61,8 @@ export default function Header() {
           <Link href="/business-valuation"><span className="hover:text-blue-600 cursor-pointer">Value Your Business</span></Link>
           <Link href="/scorecard"><span className="hover:text-blue-600 cursor-pointer">Sellability Scorecard</span></Link>
           <Link href="/guides"><span className="hover:text-blue-600 cursor-pointer">Guides & Tools</span></Link>
+          {/* ⭐️ New: Pricing link */}
+          <Link href="/pricing"><span className="hover:text-blue-600 cursor-pointer">Pricing</span></Link>
 
           {user && (
             <div className="relative">
@@ -125,6 +127,8 @@ export default function Header() {
             <Link href="/business-valuation"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Value Your Business</span></Link>
             <Link href="/scorecard"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Sellability Scorecard</span></Link>
             <Link href="/guides"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Guides & Tools</span></Link>
+            {/* ⭐️ New: Pricing link (mobile) */}
+            <Link href="/pricing"><span onClick={() => setIsOpen(false)} className="hover:text-blue-600 cursor-pointer">Pricing</span></Link>
 
             {user && (
               <>
@@ -163,5 +167,3 @@ export default function Header() {
     </header>
   );
 }
-
-
