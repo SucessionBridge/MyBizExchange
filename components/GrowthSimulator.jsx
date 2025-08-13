@@ -1,184 +1,145 @@
-// components/GrowthSimulator.jsx
-import { useMemo, useState } from 'react';
+// components/GrowthSimulator.js
+import { useMemo, useState } from "react";
 
-function fmt(n) {
-  if (n === null || n === undefined || isNaN(n)) return '—';
+function fmtMoney(n) {
+  if (n == null || !isFinite(n)) return "—";
   return `$${Math.round(n).toLocaleString()}`;
 }
 
 export default function GrowthSimulator({
   baseRevenue = 0,
-  baseSDE = 0,
-  askingPrice,                // optional, displayed if provided
-  multiples,                  // optional: { low, mid, high }
-  defaultGrowthPct = 5,
-  defaultYears = 3,
-  defaultMultiple,            // optional: starting multiple
+  baseSde = 0,
+  defaultMultiple = 3.0, // starts at 3.0, but clamps to 2.5× minimum
 }) {
-  const initialMultiple = Math.max(
-    2.5,
-    Number(
-      defaultMultiple ??
-      (multiples && (multiples.mid ?? multiples.low ?? 2.5)) ??
-      2.5
-    ) || 2.5
-  );
+  // Inputs (simple + friendly defaults)
+  const [growthPct, setGrowthPct] = useState(5);   // % per year
+  const [years, setYears] = useState(3);          // years
+  const [multipleRaw, setMultipleRaw] = useState(defaultMultiple);
 
-  const [growthPct, setGrowthPct] = useState(defaultGrowthPct);
-  const [years, setYears] = useState(defaultYears);
-  const [multiple, setMultiple] = useState(initialMultiple);
+  // Clamp multiple to 2.5× minimum
+  const multiple = Math.max(2.5, Number(multipleRaw || 0));
 
-  const baseExpenses = useMemo(() => {
-    const rev = Number(baseRevenue) || 0;
-    const sde = Number(baseSDE) || 0;
-    const exp = rev - sde;
-    return exp > 0 ? exp : 0;
-  }, [baseRevenue, baseSDE]);
+  // Base expenses derived from "expenses stay the same" assumption
+  const baseExpenses = Math.max(0, Number(baseRevenue || 0) - Number(baseSde || 0));
 
-  const today = useMemo(() => {
-    const sde0 = Math.max(0, Number(baseSDE) || 0);
-    const val0 = sde0 * (Number(multiple) || 0);
-    return { sde: sde0, value: val0 };
-  }, [baseSDE, multiple]);
+  // Forward projection with flat expenses
+  const g = Math.max(-100, Number(growthPct || 0)) / 100; // guard against NaN / silly values
+  const yr = Math.max(1, Math.round(Number(years || 1)));
 
-  const future = useMemo(() => {
-    const g = (Number(growthPct) || 0) / 100;
-    const t = Math.max(0, Math.floor(Number(years) || 0));
-    const revT = (Number(baseRevenue) || 0) * Math.pow(1 + g, t);
-    const sdeT = Math.max(0, revT - baseExpenses);
-    const valT = sdeT * (Number(multiple) || 0);
-    return { year: t, revenue: revT, sde: sdeT, value: valT };
-  }, [baseRevenue, baseExpenses, growthPct, years, multiple]);
+  const revenueYearN = useMemo(() => Number(baseRevenue || 0) * Math.pow(1 + g, yr), [baseRevenue, g, yr]);
+  const sdeYearN = useMemo(() => Math.max(0, revenueYearN - baseExpenses), [revenueYearN, baseExpenses]);
 
-  const addedValue = Math.max(0, future.value - today.value);
-  const extraAnnualProfit = Math.max(0, future.sde - today.sde);
-
-  const disabled = !baseRevenue || !baseSDE;
+  // Implied values (today vs year N)
+  const todayValue = useMemo(() => Math.max(0, Number(baseSde || 0) * multiple), [baseSde, multiple]);
+  const yearNValue = useMemo(() => Math.max(0, sdeYearN * multiple), [sdeYearN, multiple]);
+  const addedValue = Math.max(0, yearNValue - todayValue);
 
   return (
-    <section className="bg-white rounded-2xl shadow-md p-6 md:p-8">
-      <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-2">
-        Growth & Valuation Simulator
+    <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
+      <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-3">
+        Revenue Growth → Value Upside
       </h2>
-      <p className="text-sm text-gray-700">
-        Tiny price moves add up. If <strong>revenue grows</strong> each year and
-        <strong> expenses stay the same</strong>, more of each sale drops to profit (SDE).
-        Since many buyers value small businesses at a multiple of SDE, even a{' '}
-        <strong>{growthPct}%</strong> lift can move the valuation.
+
+      {/* WHY this exists */}
+      <p className="text-gray-700">
+        <strong>Why this is here:</strong> See what this business <em>could</em> be worth if you grow revenue while
+        keeping costs steady.
+      </p>
+      <p className="text-gray-600 text-sm mt-2">
+        Many small businesses are valued at a multiple of profit (SDE). If revenue rises and expenses don’t, more drops
+        to profit—so value goes up. Tweak the inputs to explore the upside.
+      </p>
+      <p className="text-gray-600 text-xs mt-1">
+        Tiny example: a $100 sale at +5% becomes $105. Small per order, meaningful across thousands.
       </p>
 
-      {/* Controls */}
-      <div className="grid sm:grid-cols-3 gap-4 mt-5">
+      {/* Inputs */}
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-medium">Annual revenue growth</label>
-          <div className="flex items-center gap-2">
-            <input
-              type="number"
-              className="w-28 border rounded p-2"
-              value={growthPct}
-              onChange={(e) => setGrowthPct(Number(e.target.value))}
-              min={0}
-              max={100}
-              step={0.5}
-            />
-            <span className="text-gray-600 text-sm">%</span>
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            Example: a $100 sale at +5% becomes $105 — small on one ticket, big across thousands.
-          </div>
+          <label className="block text-sm font-medium text-gray-800">
+            Annual revenue growth (%)
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="100"
+            step="0.5"
+            value={growthPct}
+            onChange={(e) => setGrowthPct(e.target.value)}
+            className="mt-1 w-full border rounded p-2"
+            placeholder="e.g., 5"
+          />
+          <div className="text-xs text-gray-500 mt-1">Assumes expenses stay flat.</div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Years</label>
+          <label className="block text-sm font-medium text-gray-800">Years</label>
           <input
             type="number"
-            className="w-28 border rounded p-2"
+            min="1"
+            max="10"
+            step="1"
             value={years}
-            onChange={(e) => setYears(Number(e.target.value))}
-            min={0}
-            max={10}
+            onChange={(e) => setYears(e.target.value)}
+            className="mt-1 w-full border rounded p-2"
+            placeholder="3"
           />
-          <div className="text-xs text-gray-500 mt-1">Run a quick 1–5 year view.</div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium">SDE multiple</label>
+          <label className="block text-sm font-medium text-gray-800">Valuation multiple (×)</label>
           <input
             type="number"
-            className="w-28 border rounded p-2"
-            value={multiple}
-            onChange={(e) => setMultiple(Math.max(2.5, Number(e.target.value)))}
-            min={2.5}
-            step={0.1}
+            min="2.5"
+            step="0.1"
+            value={multipleRaw}
+            onChange={(e) => setMultipleRaw(e.target.value)}
+            className="mt-1 w-full border rounded p-2"
+            placeholder="3.0"
           />
-          <div className="text-xs text-gray-500 mt-1">Starts at 2.5× by default.</div>
+          <div className="text-xs text-gray-500 mt-1">Minimum 2.5× (common main-street range is ~2.5–3.5×).</div>
         </div>
       </div>
 
-      {/* Summary cards */}
-      <div className="grid sm:grid-cols-3 gap-4 mt-6">
-        <div className="rounded-xl border p-4 bg-gray-50">
-          <div className="text-xs uppercase text-gray-500 font-semibold">Today</div>
-          <div className="mt-2 text-sm text-gray-700">SDE</div>
-          <div className="text-xl font-bold">{fmt(today.sde)}</div>
-          <div className="mt-1 text-sm text-gray-700">Implied value (@ {multiple.toFixed(1)}×)</div>
-          <div className="text-xl font-bold">{fmt(today.value)}</div>
-        </div>
-
-        <div className="rounded-xl border p-4 bg-gray-50">
-          <div className="text-xs uppercase text-gray-500 font-semibold">
-            Year {future.year}
-          </div>
-          <div className="mt-2 text-sm text-gray-700">Projected SDE</div>
-          <div className="text-xl font-bold">{fmt(future.sde)}</div>
-          <div className="mt-1 text-sm text-gray-700">Implied value (@ {multiple.toFixed(1)}×)</div>
-          <div className="text-xl font-bold">{fmt(future.value)}</div>
-        </div>
-
-        <div className="rounded-xl border p-4 bg-emerald-50 border-emerald-200">
-          <div className="text-xs uppercase text-emerald-800 font-semibold">
-            Added value after {future.year} {future.year === 1 ? 'year' : 'years'}
-          </div>
-          <div className="mt-2 text-2xl font-extrabold text-emerald-800">{fmt(addedValue)}</div>
-          <div className="mt-1 text-sm text-emerald-900">
-            Extra annual profit by Year {future.year}: <strong>{fmt(extraAnnualProfit)}</strong>
-          </div>
-        </div>
+      {/* Base snapshot */}
+      <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <InfoCard label="Base Revenue" value={fmtMoney(baseRevenue)} />
+        <InfoCard label="Base SDE (today)" value={fmtMoney(baseSde)} />
+        <InfoCard label="Implied Value (today)" value={`${fmtMoney(todayValue)} @ ${multiple.toFixed(2)}×`} />
       </div>
 
-      {/* Context row */}
-      <div className="mt-4 grid sm:grid-cols-3 gap-4 text-sm">
-        <div className="rounded-lg border p-3 bg-white">
-          <div className="text-gray-500">Assumptions</div>
-          <div className="text-gray-700">
-            Revenue grows by <strong>{growthPct}%</strong> per year; <strong>expenses stay flat</strong>.
-          </div>
-        </div>
-        <div className="rounded-lg border p-3 bg-white">
-          <div className="text-gray-500">Why it matters</div>
-          <div className="text-gray-700">
-            More revenue on the same cost base =&gt; higher SDE =&gt; higher value at a given multiple.
-          </div>
-        </div>
-        <div className="rounded-lg border p-3 bg-white">
-          <div className="text-gray-500">Asking price (optional)</div>
-          <div className="text-gray-700">
-            {askingPrice ? (
-              <>Current ask: <strong>{fmt(askingPrice)}</strong></>
-            ) : (
-              <>No asking price provided.</>
-            )}
-          </div>
-        </div>
+      {/* Projection summary */}
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <InfoCard label={`Year ${yr} Revenue`} value={fmtMoney(revenueYearN)} />
+        <InfoCard label={`Year ${yr} SDE (flat expenses)`} value={fmtMoney(sdeYearN)} />
+        <InfoCard label={`Year ${yr} Implied Value`} value={`${fmtMoney(yearNValue)} @ ${multiple.toFixed(2)}×`} />
       </div>
 
-      {/* Guard if no data */}
-      {disabled && (
-        <div className="mt-4 text-xs text-red-600">
-          Add Revenue and SDE on the listing to use this tool.
+      {/* Added value highlight */}
+      <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+        <div className="text-sm font-semibold text-emerald-900">
+          Added value after {yr} year{yr > 1 ? "s" : ""} (vs. today)
         </div>
-      )}
+        <div className="text-2xl font-bold text-emerald-700 mt-1">{fmtMoney(addedValue)}</div>
+      </div>
+
+      {/* Assumptions & caution */}
+      <div className="mt-4 text-xs text-gray-600">
+        Assumes revenue grows by <strong>{Number(growthPct || 0)}%</strong> per year,{" "}
+        <strong>expenses stay the same</strong>, and the valuation multiple stays constant at{" "}
+        <strong>{multiple.toFixed(2)}×</strong>. This is a quick, directional gut-check—not a forecast. Real-world costs
+        and multiples can change.
+      </div>
     </section>
+  );
+}
+
+function InfoCard({ label, value }) {
+  return (
+    <div className="rounded-lg bg-gray-50 p-4 border">
+      <div className="text-xs uppercase tracking-wide text-gray-500 font-semibold">{label}</div>
+      <div className="text-lg font-bold text-gray-900 mt-1">{value}</div>
+    </div>
   );
 }
 
