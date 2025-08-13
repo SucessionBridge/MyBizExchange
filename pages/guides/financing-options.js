@@ -20,8 +20,8 @@ export default function FinancingOptions() {
             Financing Options for Small Business Deals
           </h1>
           <p className="mt-3 text-lg text-gray-700">
-            There isn’t one “right” structure. Every buyer and seller trades risk, speed, and price differently.
-            This guide highlights the most common paths—with a practical focus on <strong>seller financing</strong>
+            There isn&apos;t one &quot;right&quot; structure. Every buyer and seller trades risk, speed, and price differently.
+            This guide highlights the most common paths&mdash;with a practical focus on <strong>seller financing</strong>
             and what to watch out for.
           </p>
           <div className="mt-4 flex gap-2">
@@ -50,8 +50,8 @@ export default function FinancingOptions() {
             </Card>
             <Card title="SBA/Bank + Seller Note">
               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Lender funds most; seller carries 5–15% as a standby note.</li>
-                <li>Heavier diligence; timing 45–90 days typical.</li>
+                <li>Lender funds most; seller carries 5&ndash;15% as a standby note.</li>
+                <li>Heavier diligence; timing 45&ndash;90 days typical.</li>
               </ul>
             </Card>
             <Card title="Pure Seller Financing">
@@ -83,18 +83,18 @@ export default function FinancingOptions() {
 
         {/* Deep dive: Seller Financing */}
         <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#2E3A59]">Seller Financing: what it is & why it’s popular</h3>
+          <h3 className="text-lg font-semibold text-[#2E3A59]">Seller Financing: what it is &amp; why it&apos;s popular</h3>
           <p className="mt-2 text-gray-700">
             The seller accepts a <strong>down payment</strong> at closing and a <strong>promissory note</strong> for the balance,
-            paid over time. It often gets deals done when buyers can run the business but can’t (or don’t want to) borrow the whole price.
+            paid over time. It often gets deals done when buyers can run the business but can&apos;t (or don&apos;t want to) borrow the whole price.
           </p>
 
           <div className="mt-4 grid md:grid-cols-2 gap-3">
             <Card title="Typical levers">
               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li>Down payment (10–40% common)</li>
+                <li>Down payment (10&ndash;40% common)</li>
                 <li>Interest rate (fixed or variable)</li>
-                <li>Term (e.g., 24–60 months), amortization &amp; any balloon</li>
+                <li>Term (e.g., 24&ndash;60 months), amortization &amp; any balloon</li>
                 <li>Payment timing (monthly; seasonal schedules are possible)</li>
                 <li>Security (UCC-1 on assets, titles, personal guarantee)</li>
               </ul>
@@ -102,51 +102,51 @@ export default function FinancingOptions() {
             <Card title="Add protections (seller)">
               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
                 <li>Personal guarantee from buyer/owners</li>
-                <li>Security interest (UCC-1) on business assets & key equipment</li>
-                <li>Landlord consent & assignment rights (for step-in if default)</li>
+                <li>Security interest (UCC-1) on business assets &amp; key equipment</li>
+                <li>Landlord consent &amp; assignment rights (for step-in if default)</li>
                 <li>Insurance with seller as loss payee; name seller as additional insured</li>
                 <li>ACH autopay + monthly financial reporting covenants</li>
               </ul>
             </Card>
           </div>
 
-          {/* Seasonal / your example */}
+          {/* Seasonal / example */}
           <div className="mt-4 rounded-lg bg-gray-50 border border-gray-200 p-4">
             <h4 className="font-semibold text-[#2E3A59]">Seasonal businesses: match payments to cash flow</h4>
             <p className="mt-1 text-sm text-gray-700">
               If the business operates, say, <strong>7 months a year</strong>, consider either (a) payments only during those months,
-              or (b) smaller off-season payments with catch-up in season. The goal is to keep the note serviceable from business cash flow—
+              or (b) smaller off-season payments with catch-up in season. The goal is to keep the note serviceable from business cash flow&mdash;
               while still protecting the seller.
             </p>
             <div className="mt-3 text-sm text-gray-800">
               <strong>Real-world cautionary tale (from a seller):</strong> A profitable food-truck was sold with a
               down payment and monthly note over 4 years. The buyer immediately changed the <em>name, menu, hours, and quality</em>.
               Results declined, the business failed within ~2 years, and the seller had to take it back and re-sell at a fraction of the price.
-              The initial down payment plus the second sale ultimately made the seller whole—but only after disruption and effort.
+              The initial down payment plus the second sale ultimately made the seller whole&mdash;but only after disruption and effort.
             </div>
             <p className="mt-2 text-sm text-gray-700">
-              <em>Takeaway:</em> Seller financing works best when the buyer respects the playbook that created the cash flow—or when
-              the note includes covenants and remedies if they decide to “change everything” too fast.
+              <em>Takeaway:</em> Seller financing works best when the buyer respects the playbook that created the cash flow&mdash;or when
+              the note includes covenants and remedies if they decide to &quot;change everything&quot; too fast.
             </p>
           </div>
         </section>
 
         {/* Red flags & covenants */}
         <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#2E3A59]">Red flags & smart covenants</h3>
+          <h3 className="text-lg font-semibold text-[#2E3A59]">Red flags &amp; smart covenants</h3>
           <div className="grid md:grid-cols-2 gap-3">
             <Card title="Red flags (before you carry a note)">
               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
                 <li>Buyer wants radical changes on Day 1 (brand/menu/offer)</li>
                 <li>No operator experience and no plan to retain key staff</li>
-                <li>Weak personal credit & no guarantor</li>
+                <li>Weak personal credit &amp; no guarantor</li>
                 <li>No cushion for working capital / seasonality</li>
                 <li>Unwilling to share monthly P&amp;L and bank statements</li>
               </ul>
             </Card>
             <Card title="Covenants that help">
               <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                <li><strong>Operating covenants</strong>: no major brand/menu changes for 6–12 months without seller consent</li>
+                <li><strong>Operating covenants</strong>: no major brand/menu changes for 6&ndash;12 months without seller consent</li>
                 <li><strong>Reporting</strong>: monthly P&amp;L + revenue proof (POS exports) to the seller</li>
                 <li><strong>Cash controls</strong>: ACH autopay on note; late fees; cure periods; default triggers</li>
                 <li><strong>Security &amp; step-in</strong>: UCC-1, titled vehicles, landlord consent to assign, domain/phone/brand in escrow</li>
@@ -162,14 +162,14 @@ export default function FinancingOptions() {
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-800">
             <ul className="list-disc list-inside space-y-1">
               <li><strong>Purchase structure</strong>: Asset sale (typical) or equity sale</li>
-              <li><strong>Price</strong>: $___ ; <strong>Down payment</strong>: $___ ; <strong>Note</strong>: $___</li>
-              <li><strong>Interest</strong>: ___% fixed; <strong>Term</strong>: ___ months; <strong>Amortization</strong>: ___ ; Balloon: $___</li>
-              <li><strong>Payments</strong>: $___ monthly; seasonal schedule if applicable</li>
+              <li><strong>Price</strong>: $[price] ; <strong>Down payment</strong>: $[down] ; <strong>Note</strong>: $[balance]</li>
+              <li><strong>Interest</strong>: [rate]% fixed; <strong>Term</strong>: [months] months; <strong>Amortization</strong>: [schedule]; Balloon: $[balloon]</li>
+              <li><strong>Payments</strong>: $[amount] monthly; seasonal schedule if applicable</li>
               <li><strong>Security</strong>: 1st/2nd lien on assets; UCC-1; titles; PG from owners</li>
-              <li><strong>Covenants</strong>: reporting, no major changes for __ months, insurance, taxes current</li>
-              <li><strong>Default</strong>: late > __ days, 2 missed payments in __ months, breach of covenants</li>
+              <li><strong>Covenants</strong>: reporting, no major changes for [months] months, insurance, taxes current</li>
+              <li><strong>Default</strong>: late &gt; [days] days, [misses] missed payments in [window] months, breach of covenants</li>
               <li><strong>Remedies</strong>: late fees, interest step-up, acceleration, step-in/assignment rights</li>
-              <li><strong>Transition</strong>: __ hours training; brand/IP license terms; escrowed logins/domains</li>
+              <li><strong>Transition</strong>: [hours] hours training; brand/IP license terms; escrowed logins/domains</li>
               <li><strong>Working capital</strong>: target &amp; true-up method at close</li>
             </ul>
           </div>
@@ -180,7 +180,7 @@ export default function FinancingOptions() {
 
         {/* Taxes + legal */}
         <section className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 md:p-6 mb-6">
-          <h3 className="text-lg font-semibold text-[#2E3A59]">Taxes & legal (talk to pros)</h3>
+          <h3 className="text-lg font-semibold text-[#2E3A59]">Taxes &amp; legal (talk to pros)</h3>
           <ul className="mt-2 list-disc list-inside text-gray-700 space-y-1">
             <li><strong>Asset vs. stock</strong>: affects depreciation, goodwill, and taxes for both sides.</li>
             <li><strong>Installment sale</strong>: spreads gain over years (seller); specifics depend on your situation.</li>
@@ -226,3 +226,5 @@ function Card({ title, children }) {
     </div>
   )
 }
+
+
