@@ -1,497 +1,341 @@
 pages/buyer-dashboard.js
-
-// pages/buyer-onboarding.js
+// pages/buyer-dashboard.js
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
-import supabase from "../lib/supabaseClient";
-import React, { useState, useEffect } from 'react';
-import { toast } from 'react-hot-toast';
+import Link from 'next/link';
+import supabase from '../lib/supabaseClient';
 
-export default function BuyerOnboarding() {
+export default function BuyerDashboard() {
   const router = useRouter();
 
-  const [user, setUser] = useState(null);
-  const [loadingUser, setLoadingUser] = useState(true);
+  // Auth + profile
+  const [authUser, setAuthUser] = useState(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    financingType: 'self-financing',
-    experience: '3',              // keep as string for controlled <input type="number">
-    industryPreference: '',
-    capitalInvestment: '',        // string so empty is allowed
-    shortIntroduction: '',
-    priorIndustryExperience: 'No',
-    willingToRelocate: 'No',
-    city: '',
-    stateOrProvince: '',
-    video: null,                  // File or null
-    budgetForPurchase: '',
-    priority_one: '',
-    priority_two: '',
-    priority_three: ''
-  });
+  const [profile, setProfile] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
 
-  const [errorMessage, setErrorMessage] = useState('');
-  const [videoPreview, setVideoPreview] = useState(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [existingId, setExistingId] = useState(null);
+  // Saved listings
+  const [saved, setSaved] = useState([]);                // rows from saved_listings
+  const [savedListings, setSavedListings] = useState([]); // seller rows for saved listing_ids
+  const [loadingSaved, setLoadingSaved] = useState(true);
 
-  // 1) Load auth user and existing buyer profile (prefill)
+  // Recent messages
+  const [messages, setMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(true);
+
+  // 1) Auth check
   useEffect(() => {
-    let mounted = true;
-
-    const load = async () => {
-      setLoadingUser(true);
-      const { data, error } = await supabase.auth.getUser();
-      const currUser = data?.user || null;
-
-      if (!mounted) return;
-
-      if (!currUser) {
-        setUser(null);
-        setLoadingUser(false);
-        return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (cancelled) return;
+      const user = data?.user || null;
+      setAuthUser(user);
+      setLoadingAuth(false);
+      if (!user) {
+        router.replace('/login?next=/buyer-dashboard');
       }
+    })();
+    return () => { cancelled = true; };
+  }, [router]);
 
-      setUser(currUser);
+  // 2) Load buyer profile; only redirect to onboarding if none exists
+  useEffect(() => {
+    if (!authUser) return;
+    let cancelled = false;
 
-      // lock email to auth email
-      setFormData(prev => ({ ...prev, email: currUser.email || '' }));
-
-      // fetch existing buyer profile by auth_id OR email (legacy)
-      const { data: existingProfile, error: selErr } = await supabase
+    (async () => {
+      setLoadingProfile(true);
+      const { data: buyer, error } = await supabase
         .from('buyers')
         .select('*')
-        .or(`auth_id.eq.${currUser.id},email.eq.${currUser.email}`)
-        .order('created_at', { ascending: false })
-        .limit(1)
+        .eq('auth_id', authUser.id)
         .maybeSingle();
 
-      if (selErr) {
-        console.warn('Buyer profile lookup error:', selErr.message);
-      }
+      if (cancelled) return;
 
-      if (mounted && existingProfile) {
-        setExistingId(existingProfile.id);
-        setFormData(prev => ({
-          ...prev,
-          name: existingProfile.name ?? '',
-          email: currUser.email ?? '',
-          financingType: existingProfile.financing_type ?? 'self-financing',
-          experience: existingProfile.experience != null ? String(existingProfile.experience) : '3',
-          industryPreference: existingProfile.industry_preference ?? '',
-          capitalInvestment: existingProfile.capital_investment != null ? String(existingProfile.capital_investment) : '',
-          shortIntroduction: existingProfile.short_introduction ?? '',
-          priorIndustryExperience: existingProfile.prior_industry_experience ?? 'No',
-          willingToRelocate: existingProfile.willing_to_relocate ?? 'No',
-          city: existingProfile.city ?? '',
-          stateOrProvince: existingProfile.state_or_province ?? '',
-          budgetForPurchase: existingProfile.budget_for_purchase != null ? String(existingProfile.budget_for_purchase) : '',
-          priority_one: existingProfile.priority_one ?? '',
-          priority_two: existingProfile.priority_two ?? '',
-          priority_three: existingProfile.priority_three ?? ''
-        }));
-      }
-
-      setLoadingUser(false);
-    };
-
-    load();
-    return () => { mounted = false; };
-  }, []);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    // keep everything controlled; allow empty string
-    setFormData(prev => ({ ...prev, [name]: value ?? '' }));
-  };
-
-  const handleVideoUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const maxMB = 50;
-    if (file.size > maxMB * 1024 * 1024) {
-      setErrorMessage(`File too large. Max ${maxMB}MB.`);
-      return;
-    }
-
-    setErrorMessage('');
-    setFormData(prev => ({ ...prev, video: file }));
-    setVideoPreview(URL.createObjectURL(file));
-  };
-
-  const validateForm = () => {
-    // validate required fields as non-empty strings
-    const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
-    for (let field of requiredFields) {
-      if ((formData[field] ?? '') === '') {
-        setErrorMessage('Please fill in all required fields.');
-        return false;
-      }
-    }
-    setErrorMessage('');
-    return true;
-  };
-
-  // Upload media to Supabase Storage (if provided)
-  const uploadIntroMedia = async (userId) => {
-    if (!formData.video) return { url: null, type: null };
-
-    try {
-      setIsUploading(true);
-      const file = formData.video;
-      const kind = file.type?.startsWith('image') ? 'image' : 'video';
-      const extFromName = file.name?.split('.').pop()?.toLowerCase();
-      const fallbackExt = kind === 'image' ? 'jpg' : 'mp4';
-      const ext = extFromName || fallbackExt;
-      const path = `buyers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
-      const { error: upErr } = await supabase.storage
-        .from('buyers-videos')
-        .upload(path, file, {
-          cacheControl: '3600',
-          upsert: false,
-          contentType: file.type || (kind === 'image' ? 'image/jpeg' : 'video/mp4')
-        });
-
-      if (upErr) {
-        console.error('Upload error:', upErr);
-        setErrorMessage('Upload failed. Please try a smaller file or a different format.');
-        return { url: null, type: null };
-      }
-
-      const { data: pub } = supabase.storage.from('buyers-videos').getPublicUrl(path);
-      return { url: pub?.publicUrl || null, type: kind };
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!validateForm()) return;
-
-    // Require login to submit (but do NOT crash the page)
-    const { data } = await supabase.auth.getUser();
-    const currUser = data?.user || null;
-    if (!currUser) {
-      setErrorMessage('Please sign in to submit your profile.');
-      return;
-    }
-
-    const { url: introUrl } = await uploadIntroMedia(currUser.id);
-
-    // Build payload (strings stay strings; server can cast as needed)
-    const payload = {
-      auth_id: currUser.id,
-      name: formData.name,
-      email: formData.email || currUser.email,
-      financing_type: formData.financingType,
-      experience: formData.experience === '' ? null : Number(formData.experience),
-      industry_preference: formData.industryPreference,
-      capital_investment: formData.capitalInvestment === '' ? null : Number(formData.capitalInvestment),
-      short_introduction: formData.shortIntroduction,
-      prior_industry_experience: formData.priorIndustryExperience,
-      willing_to_relocate: formData.willingToRelocate,
-      city: formData.city,
-      state_or_province: formData.stateOrProvince,
-      budget_for_purchase: formData.budgetForPurchase === '' ? null : Number(formData.budgetForPurchase),
-      priority_one: formData.priority_one,
-      priority_two: formData.priority_two,
-      priority_three: formData.priority_three,
-      intro_video_url: introUrl || null,
-    };
-
-    if (existingId) {
-      const { error } = await supabase.from('buyers').update(payload).eq('id', existingId);
       if (error) {
-        console.error(error);
-        setErrorMessage('Could not update your profile right now.');
+        console.warn('Buyer profile fetch error:', error.message);
+      }
+
+      if (!buyer) {
+        router.replace('/buyer-onboarding?next=/buyer-dashboard');
         return;
       }
-      toast.success('Your buyer profile was updated.');
-    } else {
-      const { error } = await supabase.from('buyers').insert([payload]);
-      if (error) {
-        console.error(error);
-        setErrorMessage('Could not create your profile right now.');
+
+      setProfile(buyer);
+      setLoadingProfile(false);
+    })();
+
+    return () => { cancelled = true; };
+  }, [authUser, router]);
+
+  // 3) Load saved listings (after profile is ready)
+  useEffect(() => {
+    if (!authUser || !profile) return;
+    let cancelled = false;
+
+    (async () => {
+      setLoadingSaved(true);
+
+      // Be flexible: match by auth id OR email
+      const { data: savedRows, error: savedErr } = await supabase
+        .from('saved_listings')
+        .select('*')
+        .or(`buyer_auth_id.eq.${authUser.id},buyer_email.eq.${profile.email}`)
+        .order('created_at', { ascending: false });
+
+      if (cancelled) return;
+
+      if (savedErr) {
+        console.warn('Saved listings fetch error:', savedErr.message);
+        setSaved([]);
+        setSavedListings([]);
+        setLoadingSaved(false);
         return;
       }
-      toast.success('Your buyer profile was created.');
+
+      const rows = savedRows || [];
+      setSaved(rows);
+
+      const ids = Array.from(new Set(rows.map(r => r.listing_id).filter(Boolean)));
+      if (ids.length === 0) {
+        setSavedListings([]);
+        setLoadingSaved(false);
+        return;
+      }
+
+      const { data: sellers, error: sellersErr } = await supabase
+        .from('sellers')
+        .select('id,business_name,location,asking_price,image_urls')
+        .in('id', ids);
+
+      if (sellersErr) {
+        console.warn('Saved sellers fetch error:', sellersErr.message);
+        setSavedListings([]);
+      } else {
+        const byId = new Map((sellers || []).map(s => [String(s.id), s]));
+        const ordered = ids.map(id => byId.get(String(id))).filter(Boolean);
+        setSavedListings(ordered);
+      }
+      setLoadingSaved(false);
+    })();
+
+    return () => { cancelled = true; };
+  }, [authUser, profile]);
+
+  // 4) Load recent messages (by buyer email)
+  useEffect(() => {
+    if (!profile?.email) return;
+    let cancelled = false;
+
+    (async () => {
+      setLoadingMessages(true);
+      const { data: msgs, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('buyer_email', profile.email)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (cancelled) return;
+
+      if (error) {
+        console.warn('Messages fetch error:', error.message);
+        setMessages([]);
+      } else {
+        setMessages(msgs || []);
+      }
+      setLoadingMessages(false);
+    })();
+
+    return () => { cancelled = true; };
+  }, [profile?.email]);
+
+  // Group messages by listing and surface last message
+  const latestByListing = useMemo(() => {
+    const by = new Map();
+    for (const m of messages) {
+      const key = String(m.listing_id || '');
+      if (!key) continue;
+      const prev = by.get(key);
+      if (!prev || new Date(m.created_at) > new Date(prev.created_at)) {
+        by.set(key, m);
+      }
     }
+    return Array.from(by.entries())
+      .sort((a, b) => new Date(b[1].created_at) - new Date(a[1].created_at));
+  }, [messages]);
 
-    // Route back to dashboard after a short tick (so toast can flash)
-    setTimeout(() => router.replace('/buyer-dashboard'), 200);
-  };
-
-  // Simple unauth state: allow reading but indicate sign-in needed on submit
-  const emailDisabled = !!user; // lock to auth email when logged in
-
-  if (loadingUser) {
+  if (loadingAuth || loadingProfile) {
     return (
       <main className="min-h-screen bg-blue-50 p-8">
-        <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
-          <p className="text-gray-600">Loading your profile…</p>
+        <div className="max-w-6xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
+          <p className="text-gray-600">Loading your dashboard…</p>
         </div>
       </main>
     );
   }
 
-  return (
-    <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
-      <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center">
-          {existingId ? 'Edit Buyer Profile' : 'Buyer Onboarding'}
-        </h1>
-
-        {/* Trust banner */}
-        <div className="mt-3 mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4">
-          <p className="text-sm text-amber-900">
-            <strong>Optional but recommended:</strong> add a short video or photo introduction.
-            This is <em>only shared with sellers you contact</em>. It’s especially important if you’re requesting <strong>seller financing</strong>.
+  if (!profile) {
+    return (
+      <main className="min-h-screen bg-blue-50 p-8">
+        <div className="max-w-6xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
+          <p className="text-gray-700">
+            We couldn’t find your buyer profile.{' '}
+            <Link href="/buyer-onboarding?next=/buyer-dashboard">
+              <a className="text-blue-600 underline">Create it now</a>
+            </Link>.
           </p>
         </div>
+      </main>
+    );
+  }
 
-        {errorMessage && <p className="text-red-600 mb-4">{errorMessage}</p>}
+  const placeholder = '/images/placeholders/listing-placeholder.jpg';
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+  return (
+    <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header / Actions */}
+        <div className="bg-white rounded-xl shadow border border-gray-200 p-6 flex items-center justify-between">
           <div>
-            <label className="block text-sm font-medium mb-1">Name</label>
-            <input
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              className="w-full border p-3 rounded text-black"
-              placeholder="Your full name"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              disabled={emailDisabled}
-              className={`w-full border p-3 rounded text-black ${emailDisabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-              placeholder="you@example.com"
-            />
-            <p className="text-[11px] text-gray-500 mt-1">
-              {emailDisabled ? 'Email is set from your account.' : 'No account detected — you can type your email.'}
+            <h1 className="text-2xl sm:text-3xl font-bold text-blue-800">Buyer Dashboard</h1>
+            <p className="text-gray-600 mt-1">
+              Welcome back{profile?.name ? `, ${profile.name}` : ''}.
             </p>
           </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/buyer-onboarding?next=/buyer-dashboard">
+              <a className="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold">
+                ✏️ Edit Profile
+              </a>
+            </Link>
+            <Link href="/listings">
+              <a className="inline-flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-semibold">
+                🔎 Browse Listings
+              </a>
+            </Link>
+          </div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Financing Type</label>
-            <select
-              name="financingType"
-              value={formData.financingType}
-              onChange={handleChange}
-              className="w-full border p-3 rounded text-black"
-            >
-              <option value="self-financing">Self Financing</option>
-              <option value="seller-financing">Seller Financing</option>
-              <option value="rent-to-own">Rent-to-Own</option>
-              <option value="third-party">3rd-Party Financing</option>
-            </select>
+        {/* Profile summary */}
+        <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
+          <h2 className="text-xl font-semibold text-blue-700 mb-3">Your Buying Preferences</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+            <InfoTile label="Location" value={`${profile.city || '—'}${(profile.city && profile.state_or_province) ? ', ' : ''}${profile.state_or_province || '—'}`} />
+            <InfoTile label="Financing" value={profile.financing_type || '—'} />
+            <InfoTile label="Budget" value={profile.budget_for_purchase ? `$${Number(profile.budget_for_purchase).toLocaleString()}` : '—'} />
+            <InfoTile label="Capital" value={profile.capital_investment ? `$${Number(profile.capital_investment).toLocaleString()}` : '—'} />
+            <InfoTile label="Industry" value={profile.industry_preference || '—'} />
+            <InfoTile label="Relocate?" value={profile.willing_to_relocate || '—'} />
+          </div>
+          <p className="text-xs text-gray-500 mt-3">
+            Update your profile anytime to improve matching with sellers.
+          </p>
+        </section>
+
+        {/* Saved listings */}
+        <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xl font-semibold text-gray-800">Saved Listings</h2>
+            <Link href="/listings">
+              <a className="text-blue-600 hover:underline text-sm font-semibold">See all →</a>
+            </Link>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Experience in Business Ownership (1–5)</label>
-            <input
-              type="number"
-              name="experience"
-              min="1"
-              max="5"
-              value={formData.experience}
-              onChange={handleChange}
-              className="w-full border p-3 rounded text-black"
-            />
+          {loadingSaved ? (
+            <p className="text-gray-600">Loading saved listings…</p>
+          ) : savedListings.length === 0 ? (
+            <p className="text-gray-600">
+              You haven’t saved any listings yet.{' '}
+              <Link href="/listings"><a className="text-blue-600 underline">Browse available businesses</a></Link>.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5">
+              {savedListings.map((lst) => {
+                const cover = Array.isArray(lst.image_urls) && lst.image_urls.length > 0 ? lst.image_urls[0] : placeholder;
+                return (
+                  <Link key={lst.id} href={`/listings/${lst.id}`}>
+                    <a className="group block rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-lg">
+                      <div className="bg-gray-100 overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={cover}
+                          alt={lst.business_name || 'Business listing'}
+                          className="w-full h-auto aspect-[4/3] object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
+                          loading="lazy"
+                          onError={(e) => { e.currentTarget.src = placeholder; }}
+                        />
+                      </div>
+                      <div className="p-3">
+                        <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
+                          {lst.business_name || 'Unnamed Business'}
+                        </h3>
+                        <div className="mt-1.5 flex items-center justify-between">
+                          <p className="text-[14px] font-semibold text-gray-900">
+                            {lst.asking_price ? `$${Number(lst.asking_price).toLocaleString()}` : 'Inquire'}
+                          </p>
+                          <p className="text-[13px] text-gray-600 truncate max-w-[60%] text-right">
+                            {lst.location || 'Location undisclosed'}
+                          </p>
+                        </div>
+                      </div>
+                    </a>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
+        {/* Recent conversations */}
+        <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xl font-semibold text-gray-800">Recent Conversations</h2>
+            <Link href="/listings">
+              <a className="text-blue-600 hover:underline text-sm font-semibold">Find more opportunities →</a>
+            </Link>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Industry Preference</label>
-            <input
-              name="industryPreference"
-              value={formData.industryPreference}
-              onChange={handleChange}
-              className="w-full border p-3 rounded text-black"
-              placeholder="e.g., Home services, e-commerce"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Available Capital</label>
-              <input
-                type="number"
-                name="capitalInvestment"
-                value={formData.capitalInvestment}
-                onChange={handleChange}
-                className="w-full border p-3 rounded text-black"
-                placeholder="e.g., 50000"
-              />
+          {loadingMessages ? (
+            <p className="text-gray-600">Loading messages…</p>
+          ) : latestByListing.length === 0 ? (
+            <p className="text-gray-600">No conversations yet. Start by contacting a seller on a listing.</p>
+          ) : (
+            <div className="divide-y">
+              {latestByListing.map(([lid, last]) => (
+                <div key={lid} className="py-3 flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm text-gray-500">Listing #{lid}</div>
+                    <div className="text-gray-900">{last.message || '(Attachment sent)'}</div>
+                    <div className="text-[11px] text-gray-400">
+                      {new Date(last.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                  <Link href={`/listings/${lid}`}>
+                    <a className="shrink-0 inline-flex items-center bg-white border border-gray-300 hover:border-gray-400 px-3 py-1.5 rounded-lg text-sm font-medium">
+                      Open
+                    </a>
+                  </Link>
+                </div>
+              ))}
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Budget for Purchase</label>
-              <input
-                type="number"
-                name="budgetForPurchase"
-                value={formData.budgetForPurchase}
-                onChange={handleChange}
-                className="w-full border p-3 rounded text-black"
-                placeholder="e.g., 200000"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">City</label>
-              <input
-                name="city"
-                value={formData.city}
-                onChange={handleChange}
-                className="w-full border p-3 rounded text-black"
-                placeholder="Where are you based?"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">State / Province</label>
-              <input
-                name="stateOrProvince"
-                value={formData.stateOrProvince}
-                onChange={handleChange}
-                className="w-full border p-3 rounded text-black"
-                placeholder="e.g., NY, ON"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Short Introduction</label>
-            <textarea
-              name="shortIntroduction"
-              value={formData.shortIntroduction}
-              onChange={handleChange}
-              rows="3"
-              className="w-full border p-3 rounded text-black"
-              placeholder="2–3 sentences about you and the type of business you want to buy."
-            />
-            <p className="text-xs text-gray-500 mt-1">Sellers see this first. Build trust and show your goals.</p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Prior Industry Experience</label>
-              <select
-                name="priorIndustryExperience"
-                value={formData.priorIndustryExperience}
-                onChange={handleChange}
-                className="w-full border p-3 rounded text-black"
-              >
-                <option value="No">No</option>
-                <option value="Yes">Yes</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Willing to Relocate?</label>
-              <select
-                name="willingToRelocate"
-                value={formData.willingToRelocate}
-                onChange={handleChange}
-                className="w-full border p-3 rounded text-black"
-              >
-                <option value="No">No</option>
-                <option value="Yes">Yes</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Top Priority #1</label>
-              <input
-                name="priority_one"
-                value={formData.priority_one}
-                onChange={handleChange}
-                className="w-full border p-3 rounded text-black"
-                placeholder="e.g., Cash flow"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Top Priority #2</label>
-              <input
-                name="priority_two"
-                value={formData.priority_two}
-                onChange={handleChange}
-                className="w-full border p-3 rounded text-black"
-                placeholder="e.g., Location"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Top Priority #3</label>
-              <input
-                name="priority_three"
-                value={formData.priority_three}
-                onChange={handleChange}
-                className="w-full border p-3 rounded text-black"
-                placeholder="e.g., Hours"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium">Upload Intro Video or Photo</label>
-            <div className="mt-1 space-y-1">
-              <input
-                type="file"
-                accept="video/*,image/*"
-                onChange={handleVideoUpload}
-                className="w-full border p-3 rounded"
-              />
-              <p className="text-[11px] leading-4 text-gray-600 -mt-1">
-                Record a 30–60s video or upload a clear photo. <strong>Only shown to sellers you contact.</strong>
-              </p>
-            </div>
-
-            {videoPreview && (
-              <div className="mt-3">
-                {formData.video?.type?.startsWith('image') ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={videoPreview} alt="Preview" className="w-48 rounded border" />
-                ) : (
-                  <video width="240" controls className="rounded border">
-                    <source src={videoPreview} />
-                  </video>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormData(prev => ({ ...prev, video: null }));
-                    setVideoPreview(null);
-                  }}
-                  className="mt-2 text-sm text-red-600 hover:underline block"
-                >
-                  Remove file
-                </button>
-              </div>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={isUploading}
-            className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold disabled:opacity-60"
-          >
-            {isUploading ? 'Uploading…' : existingId ? 'Update Buyer Profile' : 'Submit Buyer Profile'}
-          </button>
-        </form>
+          )}
+        </section>
       </div>
     </main>
   );
 }
+
+/** Small presentational tile */
+function InfoTile({ label, value }) {
+  return (
+    <div className="bg-gray-50 rounded-lg p-3">
+      <div className="text-gray-500">{label}</div>
+      <div className="font-medium text-gray-900">{value}</div>
+    </div>
+  );
+}
+
