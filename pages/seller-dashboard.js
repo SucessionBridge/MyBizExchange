@@ -19,6 +19,10 @@ function whoAndColorForSeller(msg, sellerAuthId) {
     : { who: "Buyer", color: "bg-blue-100 text-blue-900" };
 }
 
+// helper key for per-buyer composer state
+const convKey = (listingId, buyerEmail) =>
+  `${listingId}__${(buyerEmail || 'unknown').toLowerCase()}`;
+
 export default function SellerDashboard() {
   const router = useRouter();
 
@@ -31,9 +35,9 @@ export default function SellerDashboard() {
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
 
-  // One composer per listing
-  const [replyText, setReplyText] = useState({});   // { [listingId]: string }
-  const [replyFiles, setReplyFiles] = useState({}); // { [listingId]: File[] }
+  // One composer per (listing, buyer)
+  const [replyText, setReplyText] = useState({});   // { ["<lid>__<buyer>"]: string }
+  const [replyFiles, setReplyFiles] = useState({}); // { ["<lid>__<buyer>"]: File[] }
 
   const ATTACH_BUCKET = 'message-attachments';
 
@@ -99,54 +103,52 @@ export default function SellerDashboard() {
     })();
   }, [sellerListings]);
 
-  // Group messages by listing_id
-  const threadsByListing = useMemo(() => {
+  // Group messages: listing_id -> buyer_email -> [msgs]
+  const groupedByListingBuyer = useMemo(() => {
     const map = {};
     for (const msg of messages) {
       const lid = msg.listing_id;
       if (!lid) continue;
-      if (!map[lid]) map[lid] = [];
-      map[lid].push(msg);
+      const buyer = (msg.buyer_email || 'Unknown').toLowerCase();
+
+      if (!map[lid]) map[lid] = {};
+      if (!map[lid][buyer]) map[lid][buyer] = [];
+      map[lid][buyer].push(msg);
     }
+    // sort each sub-thread by created_at
     Object.keys(map).forEach((lid) => {
-      map[lid].sort(
-        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-      );
+      Object.keys(map[lid]).forEach((buyer) => {
+        map[lid][buyer].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+      });
     });
     return map;
   }, [messages]);
 
-  const listingIds = useMemo(() => Object.keys(threadsByListing), [threadsByListing]);
+  const listingIds = useMemo(() => Object.keys(groupedByListingBuyer), [groupedByListingBuyer]);
 
-  function onPickFiles(listingId, e) {
+  function onPickFiles(listingId, buyerEmail, e) {
     const files = Array.from(e.target.files || []);
-    setReplyFiles((prev) => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
+    const key = convKey(listingId, buyerEmail);
+    setReplyFiles((prev) => ({ ...prev, [key]: files.slice(0, 5) })); // cap at 5
   }
 
-  // Seller reply: sets from_seller: true + includes buyer info
-  async function sendReply(listingId) {
+  // Seller reply: explicit (listingId, buyerEmail)
+  async function sendReply(listingId, buyerEmail) {
     try {
       if (!sellerEmail || !user) return;
-      const text = (replyText[listingId] || '').trim();
-      const files = replyFiles[listingId] || [];
+      const key = convKey(listingId, buyerEmail);
+      const text = (replyText[key] || '').trim();
+      const files = replyFiles[key] || [];
       if (!text && files.length === 0) return;
 
-      // Determine buyer participant from this thread
-      const thread = threadsByListing[listingId] || [];
+      // derive buyerName from the specific sub-thread
+      const buyerKey = (buyerEmail || 'Unknown').toLowerCase();
+      const thread = groupedByListingBuyer[listingId]?.[buyerKey] || [];
       const knownBuyerMsg =
-        [...thread].reverse().find(m => m.buyer_email && m.buyer_email.trim()) ||
-        thread.find(m => m.buyer_email && m.buyer_email.trim());
-
-      const buyerEmail = knownBuyerMsg?.buyer_email || null;
-      const buyerName =
-        (knownBuyerMsg?.buyer_name && knownBuyerMsg.buyer_name.trim())
-          ? knownBuyerMsg.buyer_name
-          : (buyerEmail ?? 'Buyer');
-
-      if (!buyerEmail) {
-        alert('No buyer participant found in this thread yet.');
-        return;
-      }
+        [...thread].reverse().find(m => m.buyer_name && m.buyer_name.trim()) || thread[0];
+      const buyerName = knownBuyerMsg?.buyer_name?.trim() || buyerEmail || 'Buyer';
 
       // Upload attachments
       let attachments = [];
@@ -176,7 +178,7 @@ export default function SellerDashboard() {
         }
       }
 
-      // Insert message from seller
+      // Insert message from seller (explicit buyer)
       const { error: insertErr } = await supabase.from('messages').insert([{
         listing_id: listingId,
         buyer_email: buyerEmail,
@@ -186,7 +188,7 @@ export default function SellerDashboard() {
         topic: 'business-inquiry',
         is_deal_proposal: false,
         attachments,
-        from_seller: true,          // 👈 flag drives label/colour
+        from_seller: true,
       }]);
 
       if (insertErr) {
@@ -195,8 +197,8 @@ export default function SellerDashboard() {
         return;
       }
 
-      setReplyText((prev) => ({ ...prev, [listingId]: '' }));
-      setReplyFiles((prev) => ({ ...prev, [listingId]: [] }));
+      setReplyText((prev) => ({ ...prev, [key]: '' }));
+      setReplyFiles((prev) => ({ ...prev, [key]: [] }));
 
       // Refresh messages
       const ids = (sellerListings || []).map((l) => l.id).filter(Boolean);
@@ -299,7 +301,9 @@ export default function SellerDashboard() {
               <p className="text-gray-600">No conversations yet.</p>
             ) : (
               listingIds.map((lid) => {
-                const thread = threadsByListing[lid] || [];
+                const buyersMap = groupedByListingBuyer[lid] || {};
+                const buyerKeys = Object.keys(buyersMap);
+
                 const listing = sellerListings.find((l) => String(l.id) === String(lid));
 
                 return (
@@ -316,74 +320,108 @@ export default function SellerDashboard() {
                       </button>
                     </div>
 
-                    {/* Thread bubbles */}
-                    <div className="space-y-2">
-                      {thread.map((msg) => {
-                        const { who, color } = whoAndColorForSeller(msg, user?.id);
+                    {/* Sub-threads per buyer */}
+                    <div className="space-y-4">
+                      {buyerKeys.map((buyerKey) => {
+                        const thread = buyersMap[buyerKey] || [];
+                        // Derive a nice label
+                        const latestWithName =
+                          [...thread].reverse().find(m => m.buyer_name && m.buyer_name.trim());
+                        const buyerName = latestWithName?.buyer_name?.trim();
+                        // The canonical email for this sub-thread (case-insensitive key)
+                        const canonicalEmail =
+                          (thread.find(m => m.buyer_email)?.buyer_email) || 'Unknown';
+
                         return (
-                          <div key={msg.id}>
-                            <div className={`p-2 rounded-lg ${color}`}>
-                              <strong>{who}:</strong> {msg.message}
+                          <div key={`${lid}-${buyerKey}`} className="bg-white border rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-900 px-2 py-0.5 text-xs font-semibold">
+                                  {buyerName || canonicalEmail || 'Unknown buyer'}
+                                </span>
+                                {canonicalEmail && canonicalEmail !== 'Unknown' && (
+                                  <span className="text-[11px] text-gray-500">
+                                    {canonicalEmail}
+                                  </span>
+                                )}
+                              </div>
                             </div>
 
-                            {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
-                              <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                {msg.attachments.map((att, i) => (
-                                  <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
-                                ))}
-                              </div>
-                            )}
+                            {/* Thread bubbles */}
+                            <div className="space-y-2">
+                              {thread.map((msg) => {
+                                const { who, color } = whoAndColorForSeller(msg, user?.id);
+                                return (
+                                  <div key={msg.id}>
+                                    <div className={`p-2 rounded-lg ${color}`}>
+                                      <strong>{who}:</strong> {msg.message}
+                                    </div>
 
-                            <p className="text-[11px] text-gray-400 mt-1">
-                              {new Date(msg.created_at).toLocaleString()}
-                            </p>
+                                    {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
+                                      <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                        {msg.attachments.map((att, i) => (
+                                          <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    <p className="text-[11px] text-gray-400 mt-1">
+                                      {new Date(msg.created_at).toLocaleString()}
+                                    </p>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Composer for this buyer */}
+                            <div className="mt-3 border-t pt-3">
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                <input
+                                  type="file"
+                                  accept="image/*,video/*"
+                                  multiple
+                                  onChange={(e) => onPickFiles(lid, canonicalEmail, e)}
+                                  className="text-xs"
+                                />
+                                <div className="flex-1 flex gap-2">
+                                  <input
+                                    type="text"
+                                    placeholder="Reply to this buyer…"
+                                    value={replyText[convKey(lid, canonicalEmail)] || ''}
+                                    onChange={(e) =>
+                                      setReplyText((prev) => ({
+                                        ...prev,
+                                        [convKey(lid, canonicalEmail)]: e.target.value
+                                      }))
+                                    }
+                                    className="border p-1 rounded flex-1"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => sendReply(lid, canonicalEmail)}
+                                    className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded"
+                                  >
+                                    Send
+                                  </button>
+                                </div>
+                              </div>
+
+                              {replyFiles[convKey(lid, canonicalEmail)]?.length > 0 && (
+                                <div className="mt-1 text-xs text-gray-600">
+                                  {replyFiles[convKey(lid, canonicalEmail)].map((f, idx) => (
+                                    <span
+                                      key={idx}
+                                      className="inline-block mr-2 truncate max-w-[12rem] align-middle"
+                                    >
+                                      📎 {f.name}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
-                    </div>
-
-                    {/* Single composer per listing */}
-                    <div className="mt-3 border-t pt-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <input
-                          type="file"
-                          accept="image/*,video/*"
-                          multiple
-                          onChange={(e) => onPickFiles(lid, e)}
-                          className="text-xs"
-                        />
-                        <div className="flex-1 flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Reply to buyer…"
-                            value={replyText[lid] || ''}
-                            onChange={(e) =>
-                              setReplyText((prev) => ({ ...prev, [lid]: e.target.value }))
-                            }
-                            className="border p-1 rounded flex-1"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => sendReply(lid)}
-                            className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-1 rounded"
-                          >
-                            Send
-                          </button>
-                        </div>
-                      </div>
-
-                      {replyFiles[lid]?.length > 0 && (
-                        <div className="mt-1 text-xs text-gray-600">
-                          {replyFiles[lid].map((f, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-block mr-2 truncate max-w-[12rem] align-middle"
-                            >
-                              📎 {f.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
@@ -399,8 +437,7 @@ export default function SellerDashboard() {
             <strong>Email:</strong> {sellerEmail || '—'}
           </p>
           <p className="text-sm text-gray-600 mt-2">
-            Messages with buyers appear here grouped by listing. You can attach photos or short videos
-            in replies.
+            Messages are grouped by listing, then by buyer. Each buyer has their own thread and reply box.
           </p>
         </div>
       </div>
