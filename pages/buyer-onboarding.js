@@ -107,20 +107,15 @@ export default function BuyerOnboarding() {
     setVideoPreview(URL.createObjectURL(file));
   };
 
+  // Require fields that are actually rendered: name, email, and State/Province for location matching
   const validateForm = () => {
     const emailValue = String(formData.email || session?.user?.email || '').trim();
-    const required = {
-      name: String(formData.name ?? '').trim(),
-      email: emailValue,
-      city: String(formData.city ?? '').trim(),
-      stateOrProvince: String(formData.stateOrProvince ?? '').trim(),
-    };
+    const nameValue = String(formData.name ?? '').trim();
+    const stateValue = String(formData.stateOrProvince ?? '').trim();
 
-    for (const key of Object.keys(required)) {
-      if (required[key] === '') {
-        setErrorMessage('Please fill in all required fields.');
-        return false;
-      }
+    if (!nameValue || !emailValue || !stateValue) {
+      setErrorMessage('Please fill in all required fields.');
+      return false;
     }
     setErrorMessage('');
     return true;
@@ -264,6 +259,47 @@ export default function BuyerOnboarding() {
             </p>
           </div>
 
+          {/* Preferred Location */}
+          <div>
+            <label className="block text-sm font-medium mb-1">Preferred Location</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <input
+                  name="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  className="w-full border p-3 rounded text-black"
+                  placeholder="City (optional)"
+                />
+              </div>
+              <div>
+                <input
+                  name="stateOrProvince"
+                  value={formData.stateOrProvince}
+                  onChange={handleChange}
+                  className="w-full border p-3 rounded text-black"
+                  placeholder="State/Province (required)"
+                />
+              </div>
+            </div>
+
+            {/* NEW: Willing to Relocate checkbox */}
+            <div className="mt-3 flex items-center gap-2">
+              <input
+                id="wtr"
+                type="checkbox"
+                checked={formData.willingToRelocate === 'Yes'}
+                onChange={(e) =>
+                  setFormData(prev => ({ ...prev, willingToRelocate: e.target.checked ? 'Yes' : 'No' }))
+                }
+                className="h-4 w-4"
+              />
+              <label htmlFor="wtr" className="text-sm">I’m willing to relocate</label>
+            </div>
+
+            <p className="text-xs text-gray-500 mt-1">We use this to match you with nearby listings (or relocation-friendly opportunities).</p>
+          </div>
+
           <div>
             <label className="block text-sm font-medium mb-1">Financing Type</label>
             <select
@@ -391,3 +427,4 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
+
