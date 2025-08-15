@@ -35,7 +35,7 @@ const REGIONS = [
 
 function BuyerOnboardingInner() {
   const router = useRouter();
-  const session = useSession();
+  const session = useSession(); // may be null during first paint or if user not logged in
   const user = session?.user || null;
 
   const [formData, setFormData] = useState({
@@ -61,53 +61,12 @@ function BuyerOnboardingInner() {
   const [successMessage, setSuccessMessage] = useState('');
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [alreadySubmitted, setAlreadySubmitted] = useState(false);
-  const [existingId, setExistingId] = useState(null);
 
-  // Hydrate from user (if present) and load existing profile
+  // Prefill email if session appears
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const authUser = user || (await supabase.auth.getUser()).data?.user || null;
-      if (!authUser || !mounted) return;
-
-      setFormData(prev => ({ ...prev, email: authUser.email || prev.email || '' }));
-
-      const { data: existingProfile, error } = await supabase
-        .from('buyers')
-        .select('*')
-        .or(`auth_id.eq.${authUser.id},email.eq.${authUser.email}`)
-        .maybeSingle();
-
-      if (error) {
-        console.error('buyers select error', error);
-        return;
-      }
-
-      if (existingProfile && mounted) {
-        setAlreadySubmitted(true);
-        setExistingId(existingProfile.id);
-        setFormData(prev => ({
-          ...prev,
-          name: existingProfile.name || '',
-          email: authUser.email || existingProfile.email || '',
-          financingType: existingProfile.financing_type || 'self-financing',
-          experience: existingProfile.experience ?? 3,
-          industryPreference: existingProfile.industry_preference || '',
-          capitalInvestment: existingProfile.capital_investment ?? '',
-          shortIntroduction: existingProfile.short_introduction || '',
-          priorIndustryExperience: existingProfile.prior_industry_experience || 'No',
-          willingToRelocate: existingProfile.willing_to_relocate || 'No',
-          city: existingProfile.city || '',
-          stateOrProvince: existingProfile.state_or_province || '',
-          budgetForPurchase: existingProfile.budget_for_purchase ?? '',
-          priority_one: existingProfile.priority_one || '',
-          priority_two: existingProfile.priority_two || '',
-          priority_three: existingProfile.priority_three || ''
-        }));
-      }
-    })();
-    return () => { mounted = false; };
+    if (user?.email) {
+      setFormData(prev => (prev.email ? prev : { ...prev, email: user.email }));
+    }
   }, [user]);
 
   const handleChange = (e) => {
@@ -147,14 +106,16 @@ function BuyerOnboardingInner() {
     return true;
   };
 
-  const uploadIntroMedia = async (userId) => {
+  // Upload media to Supabase Storage (if provided)
+  const uploadIntroMedia = async (userIdOrAnon) => {
     if (!formData.video) return { url: null, type: null };
+
     try {
       setIsUploading(true);
       const file = formData.video;
       const ext = file.name?.split('.').pop()?.toLowerCase() || (file.type.startsWith('image') ? 'jpg' : 'mp4');
       const kind = file.type.startsWith('image') ? 'image' : 'video';
-      const path = `buyers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const path = `buyers/${userIdOrAnon}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
       const { error: upErr } = await supabase.storage
         .from('buyers-videos')
@@ -179,26 +140,23 @@ function BuyerOnboardingInner() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
 
-    // Derive user from session, then fallback to getUser (handles occasional race)
+    // Resolve user lazily; proceed even if not logged in
     let localUser = user;
     if (!localUser) {
       const { data } = await supabase.auth.getUser();
       localUser = data?.user || null;
     }
-    if (!localUser) {
-      setErrorMessage('Please sign in to submit your profile.');
-      return;
-    }
 
-    if (!validateForm()) return;
+    const emailValue = (formData.email || localUser?.email || '').trim();
 
-    const emailValue = (formData.email || localUser.email || '').trim();
+    // 1) Upload media if provided (use 'anon' folder if no auth)
+    const { url: introUrl } = await uploadIntroMedia(localUser?.id || 'anon');
 
-    const { url: introUrl } = await uploadIntroMedia(localUser.id);
-
+    // 2) Manual upsert by email (works with/without auth)
     const payload = {
-      auth_id: localUser.id,
+      auth_id: localUser?.id || null,
       name: formData.name,
       email: emailValue,
       financing_type: formData.financingType,
@@ -217,10 +175,23 @@ function BuyerOnboardingInner() {
       intro_video_url: introUrl || null,
     };
 
-    if (existingId) {
-      const { error } = await supabase.from('buyers').update(payload).eq('id', existingId);
+    // Try update by email; if none, insert
+    const { data: existing, error: findErr } = await supabase
+      .from('buyers')
+      .select('id')
+      .eq('email', emailValue)
+      .maybeSingle();
+
+    if (findErr) {
+      console.error('Find buyer error', findErr);
+      setErrorMessage('Could not save your profile right now.');
+      return;
+    }
+
+    if (existing?.id) {
+      const { error } = await supabase.from('buyers').update(payload).eq('id', existing.id);
       if (error) {
-        console.error(error);
+        console.error('Update buyer error', error);
         setErrorMessage('Could not update your profile right now.');
         return;
       }
@@ -228,14 +199,14 @@ function BuyerOnboardingInner() {
     } else {
       const { error } = await supabase.from('buyers').insert([payload]);
       if (error) {
-        console.error(error);
+        console.error('Insert buyer error', error);
         setErrorMessage('Could not create your profile right now.');
         return;
       }
       setSuccessMessage('Your profile has been created.');
     }
 
-    // Small delay to show the success message, then redirect
+    // Let user see success, then redirect
     setTimeout(() => router.push('/buyer-dashboard'), 900);
   };
 
@@ -243,9 +214,10 @@ function BuyerOnboardingInner() {
     <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
       <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
         <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center">
-          {existingId ? 'Edit Buyer Profile' : 'Buyer Onboarding'}
+          Buyer Onboarding
         </h1>
 
+        {/* Trust banner – emphasize for seller financing */}
         <div className="mt-3 mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4">
           <p className="text-sm text-amber-900">
             <strong>Optional but recommended:</strong> add a short video or photo introduction.
@@ -458,9 +430,7 @@ function BuyerOnboardingInner() {
             disabled={isUploading}
             className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold disabled:opacity-60"
           >
-            {isUploading
-              ? 'Uploading...'
-              : existingId ? 'Update Buyer Profile' : 'Submit Buyer Profile'}
+            {isUploading ? 'Uploading...' : 'Submit Buyer Profile'}
           </button>
         </form>
       </div>
@@ -468,10 +438,7 @@ function BuyerOnboardingInner() {
   );
 }
 
-// Export as client-only to eliminate hydration mismatches that cause React #418/#423
+// Client-only export eliminates hydration mismatches (React #418/#423)
 export default dynamic(() => Promise.resolve(BuyerOnboardingInner), { ssr: false });
-
- 
-
 
 
