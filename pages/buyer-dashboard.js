@@ -1,4 +1,3 @@
-pages/buyer-dashboard.js
 // pages/buyer-dashboard.js
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
@@ -16,8 +15,8 @@ export default function BuyerDashboard() {
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   // Saved listings
-  const [saved, setSaved] = useState([]);                // rows from saved_listings
-  const [savedListings, setSavedListings] = useState([]); // seller rows for saved listing_ids
+  const [saved, setSaved] = useState([]);
+  const [savedListings, setSavedListings] = useState([]);
   const [loadingSaved, setLoadingSaved] = useState(true);
 
   // Recent messages
@@ -40,17 +39,20 @@ export default function BuyerDashboard() {
     return () => { cancelled = true; };
   }, [router]);
 
-  // 2) Load buyer profile; only redirect to onboarding if none exists
+  // 2) Load buyer profile; redirect to onboarding only if truly none exists
   useEffect(() => {
     if (!authUser) return;
     let cancelled = false;
 
     (async () => {
       setLoadingProfile(true);
+      // Be backward-compatible: match by auth_id OR email (legacy rows)
       const { data: buyer, error } = await supabase
         .from('buyers')
         .select('*')
-        .eq('auth_id', authUser.id)
+        .or(`auth_id.eq.${authUser.id},email.eq.${authUser.email}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (cancelled) return;
@@ -71,7 +73,7 @@ export default function BuyerDashboard() {
     return () => { cancelled = true; };
   }, [authUser, router]);
 
-  // 3) Load saved listings (after profile is ready)
+  // 3) Load saved listings after profile is ready
   useEffect(() => {
     if (!authUser || !profile) return;
     let cancelled = false;
@@ -79,7 +81,7 @@ export default function BuyerDashboard() {
     (async () => {
       setLoadingSaved(true);
 
-      // Be flexible: match by auth id OR email
+      // Saved by auth_id or (legacy) email
       const { data: savedRows, error: savedErr } = await supabase
         .from('saved_listings')
         .select('*')
@@ -153,7 +155,7 @@ export default function BuyerDashboard() {
     return () => { cancelled = true; };
   }, [profile?.email]);
 
-  // Group messages by listing and surface last message
+  // Group messages by listing (latest only)
   const latestByListing = useMemo(() => {
     const by = new Map();
     for (const m of messages) {
@@ -202,9 +204,7 @@ export default function BuyerDashboard() {
         <div className="bg-white rounded-xl shadow border border-gray-200 p-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-blue-800">Buyer Dashboard</h1>
-            <p className="text-gray-600 mt-1">
-              Welcome back{profile?.name ? `, ${profile.name}` : ''}.
-            </p>
+            <p className="text-gray-600 mt-1">Welcome back{profile?.name ? `, ${profile.name}` : ''}.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/buyer-onboarding?next=/buyer-dashboard">
@@ -231,9 +231,7 @@ export default function BuyerDashboard() {
             <InfoTile label="Industry" value={profile.industry_preference || '—'} />
             <InfoTile label="Relocate?" value={profile.willing_to_relocate || '—'} />
           </div>
-          <p className="text-xs text-gray-500 mt-3">
-            Update your profile anytime to improve matching with sellers.
-          </p>
+          <p className="text-xs text-gray-500 mt-3">Update your profile anytime to improve matching with sellers.</p>
         </section>
 
         {/* Saved listings */}
@@ -339,3 +337,11 @@ function InfoTile({ label, value }) {
   );
 }
 
+/**
+ * Force SSR (so Next doesn't try to pre-render/SSG this page at build time).
+ * This avoids "Failed to collect page data" build errors and keeps all Supabase
+ * calls on the client via useEffect.
+ */
+export async function getServerSideProps() {
+  return { props: {} };
+}
