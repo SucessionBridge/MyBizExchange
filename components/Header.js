@@ -83,15 +83,11 @@ export default function Header() {
                 onMouseLeave={() => closeWithDelay(setBuyOpen, buyTimer)}
               >
                 <Link href="/listings"><a className="block px-3 py-2 rounded hover:bg-gray-50">Browse Listings</a></Link>
-                {/* NEW: direct link to create/edit buyer profile */}
+                {/* Direct link to create/edit buyer profile */}
                 <Link href="/buyer-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Your Buyer Profile</a></Link>
                 <Link href="/guides/how-buyers-value"><a className="block px-3 py-2 rounded hover:bg-gray-50">How Buyers Value Businesses</a></Link>
                 <Link href="/guides/financing-options"><a className="block px-3 py-2 rounded hover:bg-gray-50">Financing Options</a></Link>
-                {user ? (
-                  <Link href="/buyer-dashboard"><a className="block px-3 py-2 rounded hover:bg-gray-50">Buyer Dashboard</a></Link>
-                ) : (
-                  <Link href="/login?next=/buyer-dashboard"><a className="block px-3 py-2 rounded hover:bg-gray-50">Buyer Dashboard</a></Link>
-                )}
+                {/* Removed: Buyer Dashboard link to avoid confusion */}
               </div>
             )}
           </div>
@@ -186,15 +182,11 @@ export default function Header() {
             {buyOpenM && (
               <div className="pl-3 pb-2 space-y-2">
                 <Link href="/listings"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Browse Listings</span></Link>
-                {/* NEW (mobile): direct link to create/edit buyer profile */}
+                {/* Direct link to create/edit buyer profile */}
                 <Link href="/buyer-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Create Your Buyer Profile</span></Link>
                 <Link href="/guides/how-buyers-value"><span className="block py-1.5" onClick={() => setIsOpen(false)}>How Buyers Value</span></Link>
                 <Link href="/guides/financing-options"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Financing Options</span></Link>
-                {user ? (
-                  <Link href="/buyer-dashboard"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Buyer Dashboard</span></Link>
-                ) : (
-                  <Link href="/login?next=/buyer-dashboard"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Buyer Dashboard</span></Link>
-                )}
+                {/* Removed: Buyer Dashboard link to avoid confusion */}
               </div>
             )}
 
@@ -254,5 +246,4 @@ export default function Header() {
     </header>
   );
 }
-
 
