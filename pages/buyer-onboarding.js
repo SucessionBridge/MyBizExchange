@@ -8,6 +8,10 @@ export default function BuyerOnboarding() {
   const router = useRouter();
   const session = useSession();
 
+  // Prevent SSR/client hydration mismatches
+  const [isClient, setIsClient] = useState(false);
+  useEffect(() => { setIsClient(true); }, []);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -38,7 +42,9 @@ export default function BuyerOnboarding() {
     const checkExistingProfile = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user || !mounted) return;
-      setFormData(prev => ({ ...prev, email: user.email }));
+
+      // seed email from auth (keeps input controlled even while disabled)
+      setFormData(prev => ({ ...prev, email: user.email || '' }));
 
       const { data: existingProfile } = await supabase
         .from('buyers')
@@ -52,32 +58,32 @@ export default function BuyerOnboarding() {
         setFormData(prev => ({
           ...prev,
           name: existingProfile.name || '',
-          email: user.email,
+          email: user.email || '',
           financingType: existingProfile.financing_type || 'self-financing',
-          experience: existingProfile.experience || 3,
+          experience: existingProfile.experience ?? 3,
           industryPreference: existingProfile.industry_preference || '',
-          capitalInvestment: existingProfile.capital_investment || '',
+          capitalInvestment: existingProfile.capital_investment ?? '',
           shortIntroduction: existingProfile.short_introduction || '',
           priorIndustryExperience: existingProfile.prior_industry_experience || 'No',
           willingToRelocate: existingProfile.willing_to_relocate || 'No',
           city: existingProfile.city || '',
           stateOrProvince: existingProfile.state_or_province || '',
-          budgetForPurchase: existingProfile.budget_for_purchase || '',
+          budgetForPurchase: existingProfile.budget_for_purchase ?? '',
           priority_one: existingProfile.priority_one || '',
           priority_two: existingProfile.priority_two || '',
           priority_three: existingProfile.priority_three || ''
         }));
-        // If you already have media stored, you could also prefill a preview here.
       }
     };
     checkExistingProfile();
     return () => { mounted = false; };
   }, []);
 
-  // Keep formData.email in sync with the authenticated session (covers race/refresh cases)
+  // Keep email synced if session appears later (no-op if already set)
   useEffect(() => {
-    if (session?.user?.email) {
-      setFormData(prev => (prev.email ? prev : { ...prev, email: session.user.email }));
+    const authEmail = session?.user?.email;
+    if (authEmail) {
+      setFormData(prev => (prev.email ? prev : { ...prev, email: authEmail }));
     }
   }, [session]);
 
@@ -90,7 +96,6 @@ export default function BuyerOnboarding() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // quick client-side guardrails (optional)
     const maxMB = 50;
     if (file.size > maxMB * 1024 * 1024) {
       setErrorMessage(`File too large. Max ${maxMB}MB.`);
@@ -103,9 +108,7 @@ export default function BuyerOnboarding() {
   };
 
   const validateForm = () => {
-    // Prefer the auth email if the field is disabled/empty
     const emailValue = String(formData.email || session?.user?.email || '').trim();
-
     const required = {
       name: String(formData.name ?? '').trim(),
       email: emailValue,
@@ -123,7 +126,7 @@ export default function BuyerOnboarding() {
     return true;
   };
 
-  // Upload media to Supabase Storage (if provided) — using existing 'buyers-videos' bucket
+  // Upload media to Supabase Storage (if provided)
   const uploadIntroMedia = async (userId) => {
     if (!formData.video) return { url: null, type: null };
 
@@ -135,7 +138,7 @@ export default function BuyerOnboarding() {
       const path = `buyers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
       const { error: upErr } = await supabase.storage
-        .from('buyers-videos') // <-- your existing bucket
+        .from('buyers-videos')
         .upload(path, file, {
           cacheControl: '3600',
           upsert: false,
@@ -162,13 +165,12 @@ export default function BuyerOnboarding() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return alert('You must be logged in to submit.');
 
-    // Derive the final email one more time for payload safety
     const emailValue = (formData.email || session?.user?.email || '').trim();
 
     // 1) Upload media if provided
-    const { url: introUrl, type: introType } = await uploadIntroMedia(user.id);
+    const { url: introUrl } = await uploadIntroMedia(user.id);
 
-    // 2) Build payload (save media URL into intro_video_url for now)
+    // 2) Build payload
     const payload = {
       auth_id: user.id,
       name: formData.name,
@@ -186,7 +188,6 @@ export default function BuyerOnboarding() {
       priority_one: formData.priority_one,
       priority_two: formData.priority_two,
       priority_three: formData.priority_three,
-      // Save whatever was uploaded (video or image) here for now
       intro_video_url: introUrl || null,
     };
 
@@ -210,6 +211,11 @@ export default function BuyerOnboarding() {
     router.push('/buyer-dashboard');
   };
 
+  // Avoid hydration mismatch: render a stable shell until mounted
+  if (!isClient) {
+    return <main className="min-h-screen bg-blue-50 p-6 sm:p-8" />;
+  }
+
   return (
     <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
       <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
@@ -230,8 +236,12 @@ export default function BuyerOnboarding() {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium mb-1">Name</label>
-            <input name="name" value={formData.name} onChange={handleChange}
-              className="w-full border p-3 rounded text-black" />
+            <input
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              className="w-full border p-3 rounded text-black"
+            />
           </div>
 
           <div>
@@ -256,8 +266,12 @@ export default function BuyerOnboarding() {
 
           <div>
             <label className="block text-sm font-medium mb-1">Financing Type</label>
-            <select name="financingType" value={formData.financingType} onChange={handleChange}
-              className="w-full border p-3 rounded text-black">
+            <select
+              name="financingType"
+              value={formData.financingType}
+              onChange={handleChange}
+              className="w-full border p-3 rounded text-black"
+            >
               <option value="self-financing">Self Financing</option>
               <option value="seller-financing">Seller Financing</option>
               <option value="rent-to-own">Rent-to-Own</option>
@@ -267,41 +281,65 @@ export default function BuyerOnboarding() {
 
           <div>
             <label className="block text-sm font-medium mb-1">Experience in Business Ownership (1–5)</label>
-            <input type="number" name="experience" min="1" max="5" value={formData.experience}
-              onChange={handleChange} className="w-full border p-3 rounded text-black" />
+            <input
+              type="number"
+              name="experience"
+              min="1"
+              max="5"
+              value={formData.experience}
+              onChange={handleChange}
+              className="w-full border p-3 rounded text-black"
+            />
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Industry Preference</label>
-            <input name="industryPreference" value={formData.industryPreference} onChange={handleChange}
-              className="w-full border p-3 rounded text-black" />
+            <input
+              name="industryPreference"
+              value={formData.industryPreference}
+              onChange={handleChange}
+              className="w-full border p-3 rounded text-black"
+            />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Available Capital</label>
-              <input type="number" name="capitalInvestment" value={formData.capitalInvestment}
-                onChange={handleChange} className="w-full border p-3 rounded text-black" />
+              <input
+                type="number"
+                name="capitalInvestment"
+                value={formData.capitalInvestment}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Budget for Purchase</label>
-              <input type="number" name="budgetForPurchase" value={formData.budgetForPurchase}
-                onChange={handleChange} className="w-full border p-3 rounded text-black" />
+              <input
+                type="number"
+                name="budgetForPurchase"
+                value={formData.budgetForPurchase}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+              />
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Short Introduction</label>
-            <textarea name="shortIntroduction" value={formData.shortIntroduction} onChange={handleChange}
-              rows="3" className="w-full border p-3 rounded text-black"
-              placeholder="Write 2–3 sentences about yourself and the type of business you want to buy." />
+            <textarea
+              name="shortIntroduction"
+              value={formData.shortIntroduction}
+              onChange={handleChange}
+              rows="3"
+              className="w-full border p-3 rounded text-black"
+              placeholder="Write 2–3 sentences about yourself and the type of business you want to buy."
+            />
             <p className="text-xs text-gray-500 mt-1">Sellers see this first. Build trust and show your goals.</p>
           </div>
 
           <div>
             <label className="block text-sm font-medium">Upload Intro Video or Photo</label>
-
-            {/* file input + helper text grouped tightly */}
             <div className="mt-1 space-y-1">
               <input
                 type="file"
@@ -353,7 +391,3 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
-
-
-
- 
