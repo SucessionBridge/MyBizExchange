@@ -1,447 +1,495 @@
-// pages/buyer-dashboard.js
-import { useEffect, useState } from 'react';
+// pages/buyer-onboarding.js
 import { useRouter } from 'next/router';
 import supabase from "../lib/supabaseClient";
+import React, { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 
-// --- who/colour for BUYER view ---
-function whoAndColorForBuyer(msg, buyerEmail) {
-  // Prefer the explicit flag when present
-  if (msg.from_seller === true)  return { who: "Seller", color: "bg-green-100 text-green-900" };
-  if (msg.from_seller === false) return { who: "You",    color: "bg-blue-100 text-blue-900" };
-
-  // Fallback for older rows
-  const isMine =
-    msg?.buyer_email &&
-    buyerEmail &&
-    String(msg.buyer_email).toLowerCase() === String(buyerEmail).toLowerCase();
-
-  return isMine
-    ? { who: "You",    color: "bg-blue-100 text-blue-900" }
-    : { who: "Seller", color: "bg-green-100 text-green-900" };
-}
-
-export default function BuyerDashboard() {
+export default function BuyerOnboarding() {
   const router = useRouter();
-  const [buyerProfile, setBuyerProfile] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [savedListings, setSavedListings] = useState([]);
-  const [matches, setMatches] = useState([]);
-  const [loadingMatches, setLoadingMatches] = useState(true);
 
-  const [buyerMessages, setBuyerMessages] = useState([]);
-  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [user, setUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(true);
 
-  // One composer per listing thread
-  const [replyText, setReplyText] = useState({});   // { [listingId]: string }
-  const [replyFiles, setReplyFiles] = useState({}); // { [listingId]: File[] }
-  const ATTACH_BUCKET = 'message-attachments';
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    financingType: 'self-financing',
+    experience: '3',              // keep as string for controlled <input type="number">
+    industryPreference: '',
+    capitalInvestment: '',        // string so empty is allowed
+    shortIntroduction: '',
+    priorIndustryExperience: 'No',
+    willingToRelocate: 'No',
+    city: '',
+    stateOrProvince: '',
+    video: null,                  // File or null
+    budgetForPurchase: '',
+    priority_one: '',
+    priority_two: '',
+    priority_three: ''
+  });
 
+  const [errorMessage, setErrorMessage] = useState('');
+  const [videoPreview, setVideoPreview] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [existingId, setExistingId] = useState(null);
+
+  // 1) Load auth user and existing buyer profile (prefill)
   useEffect(() => {
-    const fetchProfileAndListings = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      if (error || !user) {
-        router.push('/login');
+    let mounted = true;
+
+    const load = async () => {
+      setLoadingUser(true);
+      const { data, error } = await supabase.auth.getUser();
+      const currUser = data?.user || null;
+
+      if (!mounted) return;
+
+      if (!currUser) {
+        setUser(null);
+        setLoadingUser(false);
         return;
       }
 
-      const { data: profileData } = await supabase
+      setUser(currUser);
+
+      // lock email to auth email
+      setFormData(prev => ({ ...prev, email: currUser.email || '' }));
+
+      // fetch existing buyer profile by auth_id OR email (legacy)
+      const { data: existingProfile, error: selErr } = await supabase
         .from('buyers')
         .select('*')
-        .eq('auth_id', user.id)
+        .or(`auth_id.eq.${currUser.id},email.eq.${currUser.email}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (!profileData) {
-        setBuyerProfile(null);
-      } else {
-        setBuyerProfile(profileData);
-        fetchSavedListings(profileData.email);
-        fetchMatches(user.id);
-        fetchBuyerMessages(profileData.email);
+      if (selErr) {
+        console.warn('Buyer profile lookup error:', selErr.message);
       }
 
-      setLoading(false);
+      if (mounted && existingProfile) {
+        setExistingId(existingProfile.id);
+        setFormData(prev => ({
+          ...prev,
+          name: existingProfile.name ?? '',
+          email: currUser.email ?? '',
+          financingType: existingProfile.financing_type ?? 'self-financing',
+          experience: existingProfile.experience != null ? String(existingProfile.experience) : '3',
+          industryPreference: existingProfile.industry_preference ?? '',
+          capitalInvestment: existingProfile.capital_investment != null ? String(existingProfile.capital_investment) : '',
+          shortIntroduction: existingProfile.short_introduction ?? '',
+          priorIndustryExperience: existingProfile.prior_industry_experience ?? 'No',
+          willingToRelocate: existingProfile.willing_to_relocate ?? 'No',
+          city: existingProfile.city ?? '',
+          stateOrProvince: existingProfile.state_or_province ?? '',
+          budgetForPurchase: existingProfile.budget_for_purchase != null ? String(existingProfile.budget_for_purchase) : '',
+          priority_one: existingProfile.priority_one ?? '',
+          priority_two: existingProfile.priority_two ?? '',
+          priority_three: existingProfile.priority_three ?? ''
+        }));
+      }
+
+      setLoadingUser(false);
     };
 
-    fetchProfileAndListings();
-  }, [router]);
+    load();
+    return () => { mounted = false; };
+  }, []);
 
-  async function fetchMatches(userId) {
-    setLoadingMatches(true);
-    try {
-      const res = await fetch(`/api/get-matches?userId=${userId}`);
-      const data = await res.json();
-      setMatches(data.matches || []);
-    } catch (err) {
-      console.error('Error fetching matches:', err);
-    } finally {
-      setLoadingMatches(false);
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    // keep everything controlled; allow empty string
+    setFormData(prev => ({ ...prev, [name]: value ?? '' }));
+  };
+
+  const handleVideoUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const maxMB = 50;
+    if (file.size > maxMB * 1024 * 1024) {
+      setErrorMessage(`File too large. Max ${maxMB}MB.`);
+      return;
     }
-  }
 
-  async function fetchSavedListings(email) {
-    const { data } = await supabase
-      .from('saved_listings')
-      .select('id, listing_id, sellers(*)')
-      .eq('buyer_email', email);
+    setErrorMessage('');
+    setFormData(prev => ({ ...prev, video: file }));
+    setVideoPreview(URL.createObjectURL(file));
+  };
 
-    setSavedListings(data || []);
-  }
-
-  // ✅ Only query by buyer_email
-  async function fetchBuyerMessages(email) {
-    setLoadingMessages(true);
-    try {
-      const { data, error } = await supabase
-        .from('messages')
-        .select('*')
-        .eq('buyer_email', email)
-        .order('created_at', { ascending: true });
-
-    if (error) throw error;
-      setBuyerMessages(data || []);
-    } catch (err) {
-      console.error('❌ fetchBuyerMessages failed:', err);
-      setBuyerMessages([]);
-    } finally {
-      setLoadingMessages(false);
+  const validateForm = () => {
+    // validate required fields as non-empty strings
+    const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
+    for (let field of requiredFields) {
+      if ((formData[field] ?? '') === '') {
+        setErrorMessage('Please fill in all required fields.');
+        return false;
+      }
     }
-  }
+    setErrorMessage('');
+    return true;
+  };
 
-  function onPickFiles(listingId, e) {
-    const files = Array.from(e.target.files || []);
-    setReplyFiles(prev => ({ ...prev, [listingId]: files.slice(0, 5) })); // cap at 5
-  }
+  // Upload media to Supabase Storage (if provided)
+  const uploadIntroMedia = async (userId) => {
+    if (!formData.video) return { url: null, type: null };
 
-  // stays client-side (no /api/send-message)
-  async function sendReply(listingId, sellerId) {
     try {
-      const text = (replyText[listingId] || '').trim();
-      const files = replyFiles[listingId] || [];
-      if (!text && files.length === 0) return;
-      if (!buyerProfile) return;
+      setIsUploading(true);
+      const file = formData.video;
+      const kind = file.type?.startsWith('image') ? 'image' : 'video';
+      const extFromName = file.name?.split('.').pop()?.toLowerCase();
+      const fallbackExt = kind === 'image' ? 'jpg' : 'mp4';
+      const ext = extFromName || fallbackExt;
+      const path = `buyers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
-      // 1) Upload attachments (if any)
-      let attachments = [];
-      if (files.length > 0) {
-        for (const file of files) {
-          const isImage = file.type?.startsWith('image/');
-          const isVideo = file.type?.startsWith('video/');
-          if (!isImage && !isVideo) continue;
+      const { error: upErr } = await supabase.storage
+        .from('buyers-videos')
+        .upload(path, file, {
+          cacheControl: '3600',
+          upsert: false,
+          contentType: file.type || (kind === 'image' ? 'image/jpeg' : 'video/mp4')
+        });
 
-          const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-          const path = `listing-${listingId}/buyer-${buyerProfile.email}/${Date.now()}-${safeName}`;
-          const { error: upErr } = await supabase.storage
-            .from(ATTACH_BUCKET)
-            .upload(path, file, { cacheControl: '3600', upsert: false });
-
-          if (upErr) {
-            console.error('❌ Upload failed:', upErr);
-            alert('Attachment upload failed. Please try again or remove the file(s).');
-            return;
-          }
-          attachments.push({
-            path,
-            name: file.name,
-            size: file.size,
-            mime: file.type,
-            kind: isImage ? 'image' : 'video',
-          });
-        }
+      if (upErr) {
+        console.error('Upload error:', upErr);
+        setErrorMessage('Upload failed. Please try a smaller file or a different format.');
+        return { url: null, type: null };
       }
 
-      // 2) Insert message with text + attachments
-      const { error: insertErr } = await supabase.from('messages').insert([{
-        buyer_name: buyerProfile.name,
-        buyer_email: buyerProfile.email,
-        message: text,
-        seller_id: sellerId || null,
-        listing_id: listingId,
-        topic: 'business-inquiry',
-        is_deal_proposal: false,
-        attachments,
-        from_seller: false, // 👈 label this as buyer-sent
-      }]);
+      const { data: pub } = supabase.storage.from('buyers-videos').getPublicUrl(path);
+      return { url: pub?.publicUrl || null, type: kind };
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
-      if (insertErr) {
-        console.error('❌ Insert message failed:', insertErr);
-        alert('Sending message failed. Please try again.');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!validateForm()) return;
+
+    // Require login to submit (but do NOT crash the page)
+    const { data } = await supabase.auth.getUser();
+    const currUser = data?.user || null;
+    if (!currUser) {
+      setErrorMessage('Please sign in to submit your profile.');
+      return;
+    }
+
+    const { url: introUrl } = await uploadIntroMedia(currUser.id);
+
+    // Build payload (strings stay strings; server can cast as needed)
+    const payload = {
+      auth_id: currUser.id,
+      name: formData.name,
+      email: formData.email || currUser.email,
+      financing_type: formData.financingType,
+      experience: formData.experience === '' ? null : Number(formData.experience),
+      industry_preference: formData.industryPreference,
+      capital_investment: formData.capitalInvestment === '' ? null : Number(formData.capitalInvestment),
+      short_introduction: formData.shortIntroduction,
+      prior_industry_experience: formData.priorIndustryExperience,
+      willing_to_relocate: formData.willingToRelocate,
+      city: formData.city,
+      state_or_province: formData.stateOrProvince,
+      budget_for_purchase: formData.budgetForPurchase === '' ? null : Number(formData.budgetForPurchase),
+      priority_one: formData.priority_one,
+      priority_two: formData.priority_two,
+      priority_three: formData.priority_three,
+      intro_video_url: introUrl || null,
+    };
+
+    if (existingId) {
+      const { error } = await supabase.from('buyers').update(payload).eq('id', existingId);
+      if (error) {
+        console.error(error);
+        setErrorMessage('Could not update your profile right now.');
         return;
       }
-
-      // 3) Reset UI + reload
-      setReplyText(prev => ({ ...prev, [listingId]: '' }));
-      setReplyFiles(prev => ({ ...prev, [listingId]: [] }));
-      await fetchBuyerMessages(buyerProfile.email);
-    } catch (err) {
-      console.error('❌ sendReply crashed:', err);
-      alert('Something went wrong while sending. Please try again.');
+      toast.success('Your buyer profile was updated.');
+    } else {
+      const { error } = await supabase.from('buyers').insert([payload]);
+      if (error) {
+        console.error(error);
+        setErrorMessage('Could not create your profile right now.');
+        return;
+      }
+      toast.success('Your buyer profile was created.');
     }
+
+    // Route back to dashboard after a short tick (so toast can flash)
+    setTimeout(() => router.replace('/buyer-dashboard'), 200);
+  };
+
+  // Simple unauth state: allow reading but indicate sign-in needed on submit
+  const emailDisabled = !!user; // lock to auth email when logged in
+
+  if (loadingUser) {
+    return (
+      <main className="min-h-screen bg-blue-50 p-8">
+        <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
+          <p className="text-gray-600">Loading your profile…</p>
+        </div>
+      </main>
+    );
   }
-
-  async function handleUnsave(listingId) {
-    await supabase
-      .from('saved_listings')
-      .delete()
-      .eq('listing_id', listingId)
-      .eq('buyer_email', buyerProfile.email);
-
-    setSavedListings(prev => prev.filter(entry => entry.listing_id !== listingId));
-  }
-
-  if (loading) {
-    return <div className="p-8 text-center text-gray-600">Loading dashboard...</div>;
-  }
-
-  // Group messages into threads by listing_id
-  const threadsByListing = (buyerMessages || []).reduce((acc, msg) => {
-    const lid = msg.listing_id;
-    if (!lid) return acc;
-    (acc[lid] = acc[lid] || []).push(msg);
-    return acc;
-  }, {});
-  const listingIds = Object.keys(threadsByListing);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* 🔹 Top CTA Bar */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-blue-900">Buyer Dashboard</h1>
-        <button
-          onClick={() => router.push('/listings')}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold shadow"
-        >
-          🔍 Browse Listings
-        </button>
-      </div>
+    <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
+      <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center">
+          {existingId ? 'Edit Buyer Profile' : 'Buyer Onboarding'}
+        </h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 🔹 Left Column: Matches, Saved Listings, Conversations */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* ✅ Matches */}
-          <div className="bg-white p-6 rounded-xl shadow">
-            <h2 className="text-xl font-semibold text-green-700 mb-4">Matching Businesses</h2>
-            {loadingMatches ? (
-              <p>Finding matches...</p>
-            ) : matches.length === 0 ? (
-              <p className="text-gray-600">No matches yet. Adjust your preferences.</p>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {matches.map(listing => (
-                  <div key={listing.id} className="bg-gray-50 border rounded-xl shadow-sm hover:shadow-md transition">
-                    <img
-                      src={listing.image_urls?.[0] || "/placeholder-listing.jpg"}
-                      alt="Business"
-                      className="w-full h-32 object-cover rounded-t-xl"
-                    />
-                    <div className="p-4">
-                      <h3 className="text-lg font-bold">{listing.business_name || 'Business Listing'}</h3>
-                      <p className="text-gray-700"><strong>Industry:</strong> {listing.industry}</p>
-                      <p className="text-gray-700"><strong>Asking Price:</strong> ${listing.asking_price}</p>
-                      <p className="text-gray-700"><strong>Location:</strong> {listing.city}, {listing.state_or_province}</p>
-                      <button
-                        onClick={() => router.push(`/listings/${listing.id}`)}
-                        className="mt-3 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded w-full"
-                      >
-                        View Listing
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* ✅ Saved Listings */}
-          {savedListings.length > 0 && (
-            <div className="bg-white p-6 rounded-xl shadow">
-              <h2 className="text-xl font-semibold text-blue-800 mb-4">Saved Listings</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {savedListings.map(entry => (
-                  <div key={entry.id} className="bg-gray-50 border rounded-xl shadow-sm hover:shadow-md transition">
-                    <img
-                      src={entry.sellers?.image_urls?.[0] || "/placeholder-listing.jpg"}
-                      alt="Listing"
-                      className="w-full h-32 object-cover rounded-t-xl"
-                    />
-                    <div className="p-4">
-                      <h3 className="text-lg font-bold">{entry.sellers?.industry} in {entry.sellers?.location}</h3>
-                      <p className="text-gray-700">Asking Price: ${entry.sellers?.asking_price?.toLocaleString()}</p>
-                      <div className="mt-3 flex justify-between">
-                        <button
-                          onClick={() => router.push(`/listings/${entry.listing_id}`)}
-                          className="text-blue-600 hover:underline text-sm"
-                        >
-                          View
-                        </button>
-                        <button
-                          onClick={() => handleUnsave(entry.listing_id)}
-                          className="text-red-500 hover:underline text-sm"
-                        >
-                          Unsave
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* ✅ Conversations (threaded, one composer per listing) */}
-          <div className="bg-white p-6 rounded-xl shadow">
-            <h2 className="text-xl font-semibold text-blue-800 mb-4">Your Conversations</h2>
-            {loadingMessages ? (
-              <p>Loading conversations...</p>
-            ) : listingIds.length === 0 ? (
-              <p className="text-gray-600">You haven't sent or received any messages yet.</p>
-            ) : (
-              listingIds.map((lid) => {
-                const thread = (threadsByListing[lid] || [])
-                  .slice()
-                  .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-                const lastMsg = thread[thread.length - 1];
-                const sellerId = lastMsg?.seller_id || thread[0]?.seller_id || null;
-
-                return (
-                  <div key={lid} className="mb-6 border rounded-xl p-3 bg-gray-50">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm text-gray-600">Listing #{lid}</p>
-                      <button
-                        onClick={() => router.push(`/listings/${lid}`)}
-                        className="text-blue-600 hover:underline text-xs"
-                      >
-                        View Listing
-                      </button>
-                    </div>
-
-                    {/* Thread bubbles */}
-                    <div className="space-y-2">
-                      {thread.map((msg) => (
-                        <div key={msg.id}>
-                          {(() => {
-                            const { who, color } = whoAndColorForBuyer(msg, buyerProfile?.email);
-                            return (
-                              <div className={`p-2 rounded-lg ${color}`}>
-                                <strong>{who}:</strong> {msg.message}
-                              </div>
-                            );
-                          })()}
-
-                          {Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
-                            <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
-                              {msg.attachments.map((att, i) => (
-                                <AttachmentPreview key={`${msg.id}-${i}`} att={att} />
-                              ))}
-                            </div>
-                          )}
-
-                          <p className="text-[11px] text-gray-400 mt-1">
-                            {new Date(msg.created_at).toLocaleString()}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Single composer per listing */}
-                    <div className="mt-3 border-t pt-3">
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <input
-                          type="file"
-                          accept="image/*,video/*"
-                          multiple
-                          onChange={(e) => onPickFiles(lid, e)}
-                          className="text-xs"
-                        />
-                        <div className="flex-1 flex gap-2">
-                          <input
-                            type="text"
-                            placeholder="Reply..."
-                            value={replyText[lid] || ""}
-                            onChange={(e) => setReplyText((prev) => ({ ...prev, [lid]: e.target.value }))}
-                            className="border p-1 rounded flex-1"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => sendReply(lid, sellerId)}
-                            className="bg-blue-600 text-white px-3 py-1 rounded"
-                          >
-                            Send
-                          </button>
-                        </div>
-                      </div>
-
-                      {replyFiles[lid]?.length > 0 && (
-                        <div className="mt-1 text-xs text-gray-600">
-                          {replyFiles[lid].map((f, idx) => (
-                            <span key={idx} className="inline-block mr-2 truncate max-w-[12rem] align-middle">
-                              📎 {f.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+        {/* Trust banner */}
+        <div className="mt-3 mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4">
+          <p className="text-sm text-amber-900">
+            <strong>Optional but recommended:</strong> add a short video or photo introduction.
+            This is <em>only shared with sellers you contact</em>. It’s especially important if you’re requesting <strong>seller financing</strong>.
+          </p>
         </div>
 
-        {/* 🔹 Right Column: Buyer Profile */}
-        {buyerProfile && (
-          <div className="bg-white p-6 rounded-xl shadow h-fit">
-            <h2 className="text-xl font-semibold text-blue-800 mb-4">Your Profile</h2>
-            <p><strong>Name:</strong> {buyerProfile.name}</p>
-            <p><strong>Email:</strong> {buyerProfile.email}</p>
-            <p><strong>Financing Type:</strong> {buyerProfile.financing_type}</p>
-            <p><strong>Experience (1-5):</strong> {buyerProfile.experience}</p>
-            <p><strong>Industry Preference:</strong> {buyerProfile.industry_preference}</p>
-            <p><strong>Capital Investment:</strong> ${buyerProfile.capital_investment}</p>
-            <p><strong>Budget for Purchase:</strong> ${buyerProfile.budget_for_purchase}</p>
-            <p><strong>Relocation:</strong> {buyerProfile.willing_to_relocate}</p>
-            <p><strong>City/State:</strong> {buyerProfile.city}, {buyerProfile.state_or_province}</p>
-            <p><strong>Short Intro:</strong> {buyerProfile.short_introduction}</p>
+        {errorMessage && <p className="text-red-600 mb-4">{errorMessage}</p>}
 
-            {buyerProfile.video_introduction && (
-              <div className="mt-4">
-                <p className="font-semibold mb-2">Intro Video / Photo:</p>
-                {buyerProfile.video_introduction.match(/\.(jpg|jpeg|png|gif)$/i) ? (
-                  <img src={buyerProfile.video_introduction} alt="Buyer" className="w-full rounded-lg border" />
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block text-sm font-medium mb-1">Name</label>
+            <input
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              className="w-full border p-3 rounded text-black"
+              placeholder="Your full name"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Email</label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              disabled={emailDisabled}
+              className={`w-full border p-3 rounded text-black ${emailDisabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              placeholder="you@example.com"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              {emailDisabled ? 'Email is set from your account.' : 'No account detected — you can type your email.'}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Financing Type</label>
+            <select
+              name="financingType"
+              value={formData.financingType}
+              onChange={handleChange}
+              className="w-full border p-3 rounded text-black"
+            >
+              <option value="self-financing">Self Financing</option>
+              <option value="seller-financing">Seller Financing</option>
+              <option value="rent-to-own">Rent-to-Own</option>
+              <option value="third-party">3rd-Party Financing</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Experience in Business Ownership (1–5)</label>
+            <input
+              type="number"
+              name="experience"
+              min="1"
+              max="5"
+              value={formData.experience}
+              onChange={handleChange}
+              className="w-full border p-3 rounded text-black"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Industry Preference</label>
+            <input
+              name="industryPreference"
+              value={formData.industryPreference}
+              onChange={handleChange}
+              className="w-full border p-3 rounded text-black"
+              placeholder="e.g., Home services, e-commerce"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Available Capital</label>
+              <input
+                type="number"
+                name="capitalInvestment"
+                value={formData.capitalInvestment}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+                placeholder="e.g., 50000"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Budget for Purchase</label>
+              <input
+                type="number"
+                name="budgetForPurchase"
+                value={formData.budgetForPurchase}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+                placeholder="e.g., 200000"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">City</label>
+              <input
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+                placeholder="Where are you based?"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">State / Province</label>
+              <input
+                name="stateOrProvince"
+                value={formData.stateOrProvince}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+                placeholder="e.g., NY, ON"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-1">Short Introduction</label>
+            <textarea
+              name="shortIntroduction"
+              value={formData.shortIntroduction}
+              onChange={handleChange}
+              rows="3"
+              className="w-full border p-3 rounded text-black"
+              placeholder="2–3 sentences about you and the type of business you want to buy."
+            />
+            <p className="text-xs text-gray-500 mt-1">Sellers see this first. Build trust and show your goals.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Prior Industry Experience</label>
+              <select
+                name="priorIndustryExperience"
+                value={formData.priorIndustryExperience}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+              >
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Willing to Relocate?</label>
+              <select
+                name="willingToRelocate"
+                value={formData.willingToRelocate}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+              >
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Top Priority #1</label>
+              <input
+                name="priority_one"
+                value={formData.priority_one}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+                placeholder="e.g., Cash flow"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Top Priority #2</label>
+              <input
+                name="priority_two"
+                value={formData.priority_two}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+                placeholder="e.g., Location"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Top Priority #3</label>
+              <input
+                name="priority_three"
+                value={formData.priority_three}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+                placeholder="e.g., Hours"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium">Upload Intro Video or Photo</label>
+            <div className="mt-1 space-y-1">
+              <input
+                type="file"
+                accept="video/*,image/*"
+                onChange={handleVideoUpload}
+                className="w-full border p-3 rounded"
+              />
+              <p className="text-[11px] leading-4 text-gray-600 -mt-1">
+                Record a 30–60s video or upload a clear photo. <strong>Only shown to sellers you contact.</strong>
+              </p>
+            </div>
+
+            {videoPreview && (
+              <div className="mt-3">
+                {formData.video?.type?.startsWith('image') ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={videoPreview} alt="Preview" className="w-48 rounded border" />
                 ) : (
-                  <video src={buyerProfile.video_introduction} controls className="w-full rounded-lg border" />
+                  <video width="240" controls className="rounded border">
+                    <source src={videoPreview} />
+                  </video>
                 )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, video: null }));
+                    setVideoPreview(null);
+                  }}
+                  className="mt-2 text-sm text-red-600 hover:underline block"
+                >
+                  Remove file
+                </button>
               </div>
             )}
-
-            <button
-              onClick={() => router.push('/buyer-onboarding?mode=edit')}
-              className="mt-6 bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded w-full"
-            >
-              Edit My Profile
-            </button>
           </div>
-        )}
+
+          <button
+            type="submit"
+            disabled={isUploading}
+            className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold disabled:opacity-60"
+          >
+            {isUploading ? 'Uploading…' : existingId ? 'Update Buyer Profile' : 'Submit Buyer Profile'}
+          </button>
+        </form>
       </div>
-    </div>
-  );
-}
-
-/** Inline preview component for message attachments (public bucket) */
-function AttachmentPreview({ att }) {
-  const { data } = supabase.storage.from('message-attachments').getPublicUrl(att.path);
-  const url = data?.publicUrl;
-  if (!url) return null;
-
-  if (att.kind === 'image') {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={url} alt={att.name || 'attachment'} className="w-full h-32 object-cover rounded border" />;
-  }
-  if (att.kind === 'video') {
-    return <video src={url} controls className="w-full h-32 object-cover rounded border" />;
-  }
-  return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-sm">
-      Download {att.name || 'attachment'}
-    </a>
+    </main>
   );
 }
