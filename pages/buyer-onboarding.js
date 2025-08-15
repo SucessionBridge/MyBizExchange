@@ -1,17 +1,42 @@
 // pages/buyer-onboarding.js
+import React, { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
-import supabase from "../lib/supabaseClient";
-import React, { useState, useEffect } from 'react';
 import { useSession } from '@supabase/auth-helpers-react';
+import supabase from '../lib/supabaseClient';
 
-export default function BuyerOnboarding() {
+// US States + Canadian Provinces/Territories
+const REGIONS = [
+  // US
+  { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' }, { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' }, { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' }, { code: 'DE', name: 'Delaware' }, { code: 'DC', name: 'District of Columbia' },
+  { code: 'FL', name: 'Florida' }, { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' },
+  { code: 'ID', name: 'Idaho' }, { code: 'IL', name: 'Illinois' }, { code: 'IN', name: 'Indiana' },
+  { code: 'IA', name: 'Iowa' }, { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' },
+  { code: 'LA', name: 'Louisiana' }, { code: 'ME', name: 'Maine' }, { code: 'MD', name: 'Maryland' },
+  { code: 'MA', name: 'Massachusetts' }, { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' },
+  { code: 'MS', name: 'Mississippi' }, { code: 'MO', name: 'Missouri' }, { code: 'MT', name: 'Montana' },
+  { code: 'NE', name: 'Nebraska' }, { code: 'NV', name: 'Nevada' }, { code: 'NH', name: 'New Hampshire' },
+  { code: 'NJ', name: 'New Jersey' }, { code: 'NM', name: 'New Mexico' }, { code: 'NY', name: 'New York' },
+  { code: 'NC', name: 'North Carolina' }, { code: 'ND', name: 'North Dakota' }, { code: 'OH', name: 'Ohio' },
+  { code: 'OK', name: 'Oklahoma' }, { code: 'OR', name: 'Oregon' }, { code: 'PA', name: 'Pennsylvania' },
+  { code: 'RI', name: 'Rhode Island' }, { code: 'SC', name: 'South Carolina' }, { code: 'SD', name: 'South Dakota' },
+  { code: 'TN', name: 'Tennessee' }, { code: 'TX', name: 'Texas' }, { code: 'UT', name: 'Utah' },
+  { code: 'VT', name: 'Vermont' }, { code: 'VA', name: 'Virginia' }, { code: 'WA', name: 'Washington' },
+  { code: 'WV', name: 'West Virginia' }, { code: 'WI', name: 'Wisconsin' }, { code: 'WY', name: 'Wyoming' },
+  // Canada
+  { code: 'AB', name: 'Alberta' }, { code: 'BC', name: 'British Columbia' }, { code: 'MB', name: 'Manitoba' },
+  { code: 'NB', name: 'New Brunswick' }, { code: 'NL', name: 'Newfoundland and Labrador' },
+  { code: 'NS', name: 'Nova Scotia' }, { code: 'NT', name: 'Northwest Territories' }, { code: 'NU', name: 'Nunavut' },
+  { code: 'ON', name: 'Ontario' }, { code: 'PE', name: 'Prince Edward Island' }, { code: 'QC', name: 'Quebec' },
+  { code: 'SK', name: 'Saskatchewan' }, { code: 'YT', name: 'Yukon' }
+];
+
+function BuyerOnboardingInner() {
   const router = useRouter();
   const session = useSession();
   const user = session?.user || null;
-
-  // Prevent SSR/client hydration mismatches
-  const [isClient, setIsClient] = useState(false);
-  useEffect(() => { setIsClient(true); }, []);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -25,7 +50,7 @@ export default function BuyerOnboarding() {
     willingToRelocate: 'No',
     city: '',
     stateOrProvince: '',
-    video: null, // can be video OR image file
+    video: null,
     budgetForPurchase: '',
     priority_one: '',
     priority_two: '',
@@ -33,24 +58,25 @@ export default function BuyerOnboarding() {
   });
 
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [existingId, setExistingId] = useState(null);
 
-  // Prefill from session + fetch existing profile when user is present
+  // Hydrate from user (if present) and load existing profile
   useEffect(() => {
     let mounted = true;
-    const hydrateFromUser = async () => {
-      if (!user || !mounted) return;
+    (async () => {
+      const authUser = user || (await supabase.auth.getUser()).data?.user || null;
+      if (!authUser || !mounted) return;
 
-      // seed email from auth (keeps input controlled even while disabled)
-      setFormData(prev => ({ ...prev, email: user.email || prev.email || '' }));
+      setFormData(prev => ({ ...prev, email: authUser.email || prev.email || '' }));
 
       const { data: existingProfile, error } = await supabase
         .from('buyers')
         .select('*')
-        .or(`auth_id.eq.${user.id},email.eq.${user.email}`)
+        .or(`auth_id.eq.${authUser.id},email.eq.${authUser.email}`)
         .maybeSingle();
 
       if (error) {
@@ -64,7 +90,7 @@ export default function BuyerOnboarding() {
         setFormData(prev => ({
           ...prev,
           name: existingProfile.name || '',
-          email: user.email || existingProfile.email || '',
+          email: authUser.email || existingProfile.email || '',
           financingType: existingProfile.financing_type || 'self-financing',
           experience: existingProfile.experience ?? 3,
           industryPreference: existingProfile.industry_preference || '',
@@ -80,14 +106,13 @@ export default function BuyerOnboarding() {
           priority_three: existingProfile.priority_three || ''
         }));
       }
-    };
-    hydrateFromUser();
+    })();
     return () => { mounted = false; };
   }, [user]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    if (name === 'willingToRelocate' && type === 'checkbox') {
+    if (type === 'checkbox' && name === 'willingToRelocate') {
       setFormData(prev => ({ ...prev, willingToRelocate: checked ? 'Yes' : 'No' }));
       return;
     }
@@ -109,7 +134,6 @@ export default function BuyerOnboarding() {
     setVideoPreview(URL.createObjectURL(file));
   };
 
-  // Require fields that are actually rendered: name, email, and State/Province for location matching
   const validateForm = () => {
     const emailValue = String(formData.email || user?.email || '').trim();
     const nameValue = String(formData.name ?? '').trim();
@@ -123,10 +147,8 @@ export default function BuyerOnboarding() {
     return true;
   };
 
-  // Upload media to Supabase Storage (if provided)
   const uploadIntroMedia = async (userId) => {
     if (!formData.video) return { url: null, type: null };
-
     try {
       setIsUploading(true);
       const file = formData.video;
@@ -158,21 +180,25 @@ export default function BuyerOnboarding() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Gate on session user (avoid flaky getUser())
-    if (!user) {
+    // Derive user from session, then fallback to getUser (handles occasional race)
+    let localUser = user;
+    if (!localUser) {
+      const { data } = await supabase.auth.getUser();
+      localUser = data?.user || null;
+    }
+    if (!localUser) {
       setErrorMessage('Please sign in to submit your profile.');
       return;
     }
+
     if (!validateForm()) return;
 
-    const emailValue = (formData.email || user.email || '').trim();
+    const emailValue = (formData.email || localUser.email || '').trim();
 
-    // 1) Upload media if provided
-    const { url: introUrl } = await uploadIntroMedia(user.id);
+    const { url: introUrl } = await uploadIntroMedia(localUser.id);
 
-    // 2) Build payload
     const payload = {
-      auth_id: user.id,
+      auth_id: localUser.id,
       name: formData.name,
       email: emailValue,
       financing_type: formData.financingType,
@@ -191,7 +217,6 @@ export default function BuyerOnboarding() {
       intro_video_url: introUrl || null,
     };
 
-    // 3) Save/update profile
     if (existingId) {
       const { error } = await supabase.from('buyers').update(payload).eq('id', existingId);
       if (error) {
@@ -199,6 +224,7 @@ export default function BuyerOnboarding() {
         setErrorMessage('Could not update your profile right now.');
         return;
       }
+      setSuccessMessage('Your profile has been updated.');
     } else {
       const { error } = await supabase.from('buyers').insert([payload]);
       if (error) {
@@ -206,18 +232,12 @@ export default function BuyerOnboarding() {
         setErrorMessage('Could not create your profile right now.');
         return;
       }
+      setSuccessMessage('Your profile has been created.');
     }
 
-    router.push('/buyer-dashboard');
+    // Small delay to show the success message, then redirect
+    setTimeout(() => router.push('/buyer-dashboard'), 900);
   };
-
-  // Avoid hydration mismatch: render a stable shell until mounted
-  if (!isClient) {
-    return <main className="min-h-screen bg-blue-50 p-6 sm:p-8" />;
-  }
-
-  // If no session, show a friendly prompt (prevents confusing submit attempts)
-  const showLoginNotice = !user;
 
   return (
     <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
@@ -226,21 +246,23 @@ export default function BuyerOnboarding() {
           {existingId ? 'Edit Buyer Profile' : 'Buyer Onboarding'}
         </h1>
 
-        {/* Trust banner – emphasize for seller financing */}
         <div className="mt-3 mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4">
           <p className="text-sm text-amber-900">
             <strong>Optional but recommended:</strong> add a short video or photo introduction.
-            This is <em>only shared with sellers you contact</em>. It’s especially important if you’re requesting <strong>seller financing</strong>—sellers want to know who they’re trusting with their business.
+            This is <em>only shared with sellers you contact</em>. It’s especially important if you’re requesting <strong>seller financing</strong>.
           </p>
         </div>
 
-        {showLoginNotice && (
-          <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-            Please sign in before submitting your buyer profile.
+        {errorMessage && (
+          <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {errorMessage}
           </div>
         )}
-
-        {errorMessage && <p className="text-red-600 mb-4">{errorMessage}</p>}
+        {successMessage && (
+          <div className="mb-4 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+            {successMessage}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
@@ -261,15 +283,11 @@ export default function BuyerOnboarding() {
               value={user?.email || formData.email}
               onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
               disabled={!!user}
-              className={`w-full border p-3 rounded text-black ${
-                user ? 'bg-gray-100 cursor-not-allowed' : ''
-              }`}
+              className={`w-full border p-3 rounded text-black ${user ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               placeholder="you@example.com"
             />
             <p className="text-[11px] text-gray-500 mt-1">
-              {user
-                ? 'Email is set from your account.'
-                : 'No account detected — you can type your email.'}
+              {user ? 'Email is set from your account.' : 'No account detected — you can type your email.'}
             </p>
           </div>
 
@@ -287,17 +305,23 @@ export default function BuyerOnboarding() {
                 />
               </div>
               <div>
-                <input
+                <select
                   name="stateOrProvince"
                   value={formData.stateOrProvince}
                   onChange={handleChange}
                   className="w-full border p-3 rounded text-black"
-                  placeholder="State/Province (required)"
-                />
+                >
+                  <option value="">Select State/Province (required)</option>
+                  {REGIONS.map(r => (
+                    <option key={r.code} value={r.name}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Willing to Relocate checkbox */}
+            {/* Willing to Relocate */}
             <div className="mt-3 flex items-center gap-2">
               <input
                 id="wtr"
@@ -310,7 +334,9 @@ export default function BuyerOnboarding() {
               <label htmlFor="wtr" className="text-sm">I’m willing to relocate</label>
             </div>
 
-            <p className="text-xs text-gray-500 mt-1">We use this to match you with nearby listings (or relocation-friendly opportunities).</p>
+            <p className="text-xs text-gray-500 mt-1">
+              We use your location to match you with nearby listings (or relocation-friendly opportunities).
+            </p>
           </div>
 
           <div>
@@ -329,7 +355,9 @@ export default function BuyerOnboarding() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Experience in Business Ownership (1–5)</label>
+            <label className="block text-sm font-medium mb-1">
+              Experience in Business Ownership (1–5)
+            </label>
             <input
               type="number"
               name="experience"
@@ -398,7 +426,6 @@ export default function BuyerOnboarding() {
               />
               <p className="text-[11px] leading-4 text-gray-600 -mt-1">
                 Record a 30–60s video or upload a clear photo. <strong>Only shown to sellers you contact.</strong>
-                <em className="block">Tip: If you’re pursuing seller financing, this really helps.</em>
               </p>
             </div>
 
@@ -440,5 +467,11 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
+
+// Export as client-only to eliminate hydration mismatches that cause React #418/#423
+export default dynamic(() => Promise.resolve(BuyerOnboardingInner), { ssr: false });
+
+ 
+
 
 
