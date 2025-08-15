@@ -83,6 +83,8 @@ export default function Header() {
                 onMouseLeave={() => closeWithDelay(setBuyOpen, buyTimer)}
               >
                 <Link href="/listings"><a className="block px-3 py-2 rounded hover:bg-gray-50">Browse Listings</a></Link>
+                {/* NEW: direct link to create/edit buyer profile */}
+                <Link href="/buyer-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Your Buyer Profile</a></Link>
                 <Link href="/guides/how-buyers-value"><a className="block px-3 py-2 rounded hover:bg-gray-50">How Buyers Value Businesses</a></Link>
                 <Link href="/guides/financing-options"><a className="block px-3 py-2 rounded hover:bg-gray-50">Financing Options</a></Link>
                 {user ? (
@@ -118,11 +120,10 @@ export default function Header() {
             )}
           </div>
 
-          {/* quick links (no top-level Guides) */}
+          {/* quick links */}
           <Link href="/business-valuation"><span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Valuation</span></Link>
           <Link href="/scorecard"><span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Sellability Scorecard</span></Link>
           <Link href="/pricing"><span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Pricing</span></Link>
-          {/* If you want Blog visible: uncomment below */}
           {/* <Link href="/blog"><span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Blog</span></Link> */}
 
           {/* Dashboard/Login */}
@@ -185,6 +186,8 @@ export default function Header() {
             {buyOpenM && (
               <div className="pl-3 pb-2 space-y-2">
                 <Link href="/listings"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Browse Listings</span></Link>
+                {/* NEW (mobile): direct link to create/edit buyer profile */}
+                <Link href="/buyer-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Create Your Buyer Profile</span></Link>
                 <Link href="/guides/how-buyers-value"><span className="block py-1.5" onClick={() => setIsOpen(false)}>How Buyers Value</span></Link>
                 <Link href="/guides/financing-options"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Financing Options</span></Link>
                 {user ? (
@@ -214,7 +217,6 @@ export default function Header() {
             <Link href="/business-valuation"><span className="py-2" onClick={() => setIsOpen(false)}>Valuation</span></Link>
             <Link href="/scorecard"><span className="py-2" onClick={() => setIsOpen(false)}>Sellability Scorecard</span></Link>
             <Link href="/pricing"><span className="py-2" onClick={() => setIsOpen(false)}>Pricing</span></Link>
-            {/* If you want Blog visible on mobile too, uncomment: */}
             {/* <Link href="/blog"><span className="py-2" onClick={() => setIsOpen(false)}>Blog</span></Link> */}
 
             {user ? (
@@ -252,16 +254,5 @@ export default function Header() {
     </header>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
