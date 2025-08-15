@@ -15,7 +15,6 @@ export default function BuyerDashboard() {
   const [loadingProfile, setLoadingProfile] = useState(true);
 
   // Saved listings
-  const [saved, setSaved] = useState([]);
   const [savedListings, setSavedListings] = useState([]);
   const [loadingSaved, setLoadingSaved] = useState(true);
 
@@ -46,7 +45,6 @@ export default function BuyerDashboard() {
 
     (async () => {
       setLoadingProfile(true);
-      // Be backward-compatible: match by auth_id OR email (legacy rows)
       const { data: buyer, error } = await supabase
         .from('buyers')
         .select('*')
@@ -73,57 +71,125 @@ export default function BuyerDashboard() {
     return () => { cancelled = true; };
   }, [authUser, router]);
 
-  // 3) Load saved listings after profile is ready
+  // 3) Load saved listings (robust across historical schemas)
   useEffect(() => {
     if (!authUser || !profile) return;
     let cancelled = false;
 
-    (async () => {
+    const fetchSavedListings = async () => {
       setLoadingSaved(true);
 
-      // Saved by auth_id or (legacy) email
-      const { data: savedRows, error: savedErr } = await supabase
-        .from('saved_listings')
-        .select('*')
-        .or(`buyer_auth_id.eq.${authUser.id},buyer_email.eq.${profile.email}`)
-        .order('created_at', { ascending: false });
+      // We'll try several selectors because older rows may have different columns populated.
+      // Order of precedence:
+      //   A) buyer_auth_id == authUser.id  OR  buyer_email == profile.email
+      //   B) buyer_id == buyers.id (legacy)
+      //   C) user_id == authUser.id (very old)
+      let rows = [];
+      let lastErr = null;
 
-      if (cancelled) return;
+      // A) auth id or email (preferred)
+      {
+        const { data, error } = await supabase
+          .from('saved_listings')
+          .select('*')
+          .or(`buyer_auth_id.eq.${authUser.id},buyer_email.eq.${profile.email}`)
+          .order('created_at', { ascending: false });
 
-      if (savedErr) {
-        console.warn('Saved listings fetch error:', savedErr.message);
-        setSaved([]);
+        if (!error && Array.isArray(data) && data.length > 0) {
+          rows = data;
+        } else if (error) {
+          lastErr = error;
+          console.warn('Saved listings (auth/email) error:', error.message);
+        }
+      }
+
+      // B) by buyers.id (legacy)
+      if (rows.length === 0) {
+        const { data, error } = await supabase
+          .from('saved_listings')
+          .select('*')
+          .eq('buyer_id', profile.id)
+          .order('created_at', { ascending: false });
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          rows = data;
+        } else if (error && !/column .*buyer_id.* does not exist/i.test(error.message || '')) {
+          // Only log if it's not just a "column doesn't exist" case
+          lastErr = error;
+          console.warn('Saved listings (buyer_id) error:', error.message);
+        }
+      }
+
+      // C) by user_id (very old)
+      if (rows.length === 0) {
+        const { data, error } = await supabase
+          .from('saved_listings')
+          .select('*')
+          .eq('user_id', authUser.id)
+          .order('created_at', { ascending: false });
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          rows = data;
+        } else if (error && !/column .*user_id.* does not exist/i.test(error.message || '')) {
+          lastErr = error;
+          console.warn('Saved listings (user_id) error:', error.message);
+        }
+      }
+
+      if (rows.length === 0) {
+        if (lastErr) console.debug('Saved listings lookup ended with no rows.');
         setSavedListings([]);
         setLoadingSaved(false);
         return;
       }
 
-      const rows = savedRows || [];
-      setSaved(rows);
+      // Collect unique listing IDs (string/number-safe)
+      const ids = Array.from(
+        new Set(
+          rows
+            .map(r => (r?.listing_id != null ? String(r.listing_id) : null))
+            .filter(Boolean)
+        )
+      );
 
-      const ids = Array.from(new Set(rows.map(r => r.listing_id).filter(Boolean)));
       if (ids.length === 0) {
         setSavedListings([]);
         setLoadingSaved(false);
         return;
       }
 
+      // Fetch seller rows for the saved listing ids
+      // Convert ids to numbers when possible, but keep fallbacks as strings
+      const idsAsNumber = ids.map(x => {
+        const n = Number(x);
+        return Number.isFinite(n) ? n : x; // keeps uuid/strings untouched
+      });
+
       const { data: sellers, error: sellersErr } = await supabase
         .from('sellers')
         .select('id,business_name,location,asking_price,image_urls')
-        .in('id', ids);
+        .in('id', idsAsNumber);
 
       if (sellersErr) {
         console.warn('Saved sellers fetch error:', sellersErr.message);
         setSavedListings([]);
-      } else {
-        const byId = new Map((sellers || []).map(s => [String(s.id), s]));
-        const ordered = ids.map(id => byId.get(String(id))).filter(Boolean);
-        setSavedListings(ordered);
+        setLoadingSaved(false);
+        return;
       }
-      setLoadingSaved(false);
-    })();
 
+      // Preserve original saved order while de-duping
+      const byId = new Map((sellers || []).map(s => [String(s.id), s]));
+      const ordered = ids
+        .map(id => byId.get(String(id)))
+        .filter(Boolean);
+
+      if (!cancelled) {
+        setSavedListings(ordered);
+        setLoadingSaved(false);
+      }
+    };
+
+    fetchSavedListings();
     return () => { cancelled = true; };
   }, [authUser, profile]);
 
@@ -264,7 +330,7 @@ export default function BuyerDashboard() {
                           alt={lst.business_name || 'Business listing'}
                           className="w-full h-auto aspect-[4/3] object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
                           loading="lazy"
-                          onError={(e) => { e.currentTarget.src = placeholder; }}
+                          onError={(e) => { e.currentTarget.src = '/images/placeholders/listing-placeholder.jpg'; }}
                         />
                       </div>
                       <div className="p-3">
@@ -289,41 +355,92 @@ export default function BuyerDashboard() {
         </section>
 
         {/* Recent conversations */}
-        <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xl font-semibold text-gray-800">Recent Conversations</h2>
-            <Link href="/listings">
-              <a className="text-blue-600 hover:underline text-sm font-semibold">Find more opportunities →</a>
-            </Link>
-          </div>
-
-          {loadingMessages ? (
-            <p className="text-gray-600">Loading messages…</p>
-          ) : latestByListing.length === 0 ? (
-            <p className="text-gray-600">No conversations yet. Start by contacting a seller on a listing.</p>
-          ) : (
-            <div className="divide-y">
-              {latestByListing.map(([lid, last]) => (
-                <div key={lid} className="py-3 flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm text-gray-500">Listing #{lid}</div>
-                    <div className="text-gray-900">{last.message || '(Attachment sent)'}</div>
-                    <div className="text-[11px] text-gray-400">
-                      {new Date(last.created_at).toLocaleString()}
-                    </div>
-                  </div>
-                  <Link href={`/listings/${lid}`}>
-                    <a className="shrink-0 inline-flex items-center bg-white border border-gray-300 hover:border-gray-400 px-3 py-1.5 rounded-lg text-sm font-medium">
-                      Open
-                    </a>
-                  </Link>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+        <RecentConversations profileEmail={profile?.email} />
       </div>
     </main>
+  );
+}
+
+function RecentConversations({ profileEmail }) {
+  const [messages, setMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(true);
+
+  useEffect(() => {
+    if (!profileEmail) return;
+    let cancelled = false;
+
+    (async () => {
+      setLoadingMessages(true);
+      const { data: msgs, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('buyer_email', profileEmail)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (cancelled) return;
+
+      if (error) {
+        console.warn('Messages fetch error:', error.message);
+        setMessages([]);
+      } else {
+        setMessages(msgs || []);
+      }
+      setLoadingMessages(false);
+    })();
+
+    return () => { cancelled = true; };
+  }, [profileEmail]);
+
+  // Group messages by listing (latest only)
+  const latestByListing = useMemo(() => {
+    const by = new Map();
+    for (const m of messages) {
+      const key = String(m.listing_id || '');
+      if (!key) continue;
+      const prev = by.get(key);
+      if (!prev || new Date(m.created_at) > new Date(prev.created_at)) {
+        by.set(key, m);
+      }
+    }
+    return Array.from(by.entries())
+      .sort((a, b) => new Date(b[1].created_at) - new Date(a[1].created_at));
+  }, [messages]);
+
+  return (
+    <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-xl font-semibold text-gray-800">Recent Conversations</h2>
+        <Link href="/listings">
+          <a className="text-blue-600 hover:underline text-sm font-semibold">Find more opportunities →</a>
+        </Link>
+      </div>
+
+      {loadingMessages ? (
+        <p className="text-gray-600">Loading messages…</p>
+      ) : latestByListing.length === 0 ? (
+        <p className="text-gray-600">No conversations yet. Start by contacting a seller on a listing.</p>
+      ) : (
+        <div className="divide-y">
+          {latestByListing.map(([lid, last]) => (
+            <div key={lid} className="py-3 flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm text-gray-500">Listing #{lid}</div>
+                <div className="text-gray-900">{last.message || '(Attachment sent)'}</div>
+                <div className="text-[11px] text-gray-400">
+                  {new Date(last.created_at).toLocaleString()}
+                </div>
+              </div>
+              <Link href={`/listings/${lid}`}>
+                <a className="shrink-0 inline-flex items-center bg-white border border-gray-300 hover:border-gray-400 px-3 py-1.5 rounded-lg text-sm font-medium">
+                  Open
+                </a>
+              </Link>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -338,10 +455,10 @@ function InfoTile({ label, value }) {
 }
 
 /**
- * Force SSR (so Next doesn't try to pre-render/SSG this page at build time).
- * This avoids "Failed to collect page data" build errors and keeps all Supabase
- * calls on the client via useEffect.
+ * Force SSR so Next doesn't try to pre-render/SSG this page at build time.
+ * All Supabase calls run on the client via useEffect.
  */
 export async function getServerSideProps() {
   return { props: {} };
 }
+
