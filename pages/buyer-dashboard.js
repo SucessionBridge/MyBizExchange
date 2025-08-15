@@ -14,15 +14,15 @@ export default function BuyerOnboarding() {
     name: '',
     email: '',
     financingType: 'self-financing',
-    experience: '3',              // keep as string for controlled <input type="number">
+    experience: '3',
     industryPreference: '',
-    capitalInvestment: '',        // string so empty is allowed
+    capitalInvestment: '',
     shortIntroduction: '',
     priorIndustryExperience: 'No',
     willingToRelocate: 'No',
     city: '',
     stateOrProvince: '',
-    video: null,                  // File or null
+    video: null,
     budgetForPurchase: '',
     priority_one: '',
     priority_two: '',
@@ -34,7 +34,6 @@ export default function BuyerOnboarding() {
   const [isUploading, setIsUploading] = useState(false);
   const [existingId, setExistingId] = useState(null);
 
-  // 1) Load auth user and existing buyer profile (prefill)
   useEffect(() => {
     let mounted = true;
 
@@ -100,7 +99,6 @@ export default function BuyerOnboarding() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // keep everything controlled; allow empty string
     setFormData(prev => ({ ...prev, [name]: value ?? '' }));
   };
 
@@ -120,7 +118,6 @@ export default function BuyerOnboarding() {
   };
 
   const validateForm = () => {
-    // validate required fields as non-empty strings
     const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
     for (let field of requiredFields) {
       if ((formData[field] ?? '') === '') {
@@ -171,7 +168,7 @@ export default function BuyerOnboarding() {
 
     if (!validateForm()) return;
 
-    // Require login to submit (but do NOT crash the page)
+    // Require login to submit
     const { data } = await supabase.auth.getUser();
     const currUser = data?.user || null;
     if (!currUser) {
@@ -181,7 +178,6 @@ export default function BuyerOnboarding() {
 
     const { url: introUrl } = await uploadIntroMedia(currUser.id);
 
-    // Build payload (strings stay strings; server can cast as needed)
     const payload = {
       auth_id: currUser.id,
       name: formData.name,
@@ -220,11 +216,20 @@ export default function BuyerOnboarding() {
       toast.success('Your buyer profile was created.');
     }
 
-    // Route back to dashboard after a short tick (so toast can flash)
-    setTimeout(() => router.replace('/buyer-dashboard'), 200);
+    // ✅ Navigate back to the dashboard reliably (supports ?next=/path)
+    const redirectTo =
+      typeof router.query.next === 'string' && router.query.next.startsWith('/')
+        ? router.query.next
+        : '/buyer-dashboard';
+
+    try {
+      await router.push(redirectTo);
+    } catch (navErr) {
+      console.error('Navigation failed, falling back:', navErr);
+      window.location.href = redirectTo; // hard fallback
+    }
   };
 
-  // Simple unauth state: allow reading but indicate sign-in needed on submit
   const emailDisabled = !!user; // lock to auth email when logged in
 
   if (loadingUser) {
