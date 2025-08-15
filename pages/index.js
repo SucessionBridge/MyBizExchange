@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react"; 
 import { useRouter } from "next/router";
 import supabase from "../lib/supabaseClient";
 import Link from "next/link";
@@ -7,6 +7,9 @@ import WhyWeBuilt from "../components/WhyWeBuilt";
 export default function Home() {
   const router = useRouter();
   const [featuredListings, setFeaturedListings] = useState([]);
+
+  // Prevent duplicate redirects (mount + auth state change)
+  const hasRedirectedRef = useRef(false);
 
   // Mobile carousel helpers
   const [activeSlide, setActiveSlide] = useState(0);
@@ -32,35 +35,49 @@ export default function Home() {
   };
 
   useEffect(() => {
-    const checkUserAndRedirect = async () => {
-      if (router.query.force === "true") {
-        console.log("✅ Force=true detected on index.js. Skipping redirect.");
+    const skipRedirect = router.query.force === "true";
+
+    const redirectAccordingToProfile = async (user) => {
+      if (!user || skipRedirect || hasRedirectedRef.current) return;
+      hasRedirectedRef.current = true;
+
+      const { data: buyerProfile, error } = await supabase
+        .from("buyers")
+        .select("email")
+        .eq("email", user.email)
+        .maybeSingle();
+
+      if (error) {
+        console.warn("Buyer lookup error:", error.message);
         return;
       }
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (user) {
-        const { data: buyerProfile } = await supabase
-          .from("buyers")
-          .select("email")
-          .eq("email", user.email)
-          .maybeSingle();
-
-        if (buyerProfile) {
-          console.log("✅ Buyer profile found. Redirecting to dashboard.");
-          router.push("/buyer-dashboard");
-        } else {
-          console.log("🆕 No buyer profile. Redirecting to onboarding.");
-          router.push("/buyer-onboarding");
-        }
+      if (buyerProfile) {
+        console.log("✅ Buyer profile found. Redirecting to dashboard.");
+        router.replace("/buyer-dashboard");
+      } else {
+        console.log("🆕 No buyer profile. Redirecting to onboarding.");
+        router.replace("/buyer-onboarding");
       }
     };
 
+    // Initial check on mount/refresh
+    const checkUserAndRedirect = async () => {
+      if (skipRedirect) {
+        console.log("✅ force=true detected on index.js. Skipping redirect.");
+        return;
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) await redirectAccordingToProfile(user);
+    };
     checkUserAndRedirect();
 
+    // Also handle post-login (magic link) transitions
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) redirectAccordingToProfile(session.user);
+    });
+
+    // Fetch featured listings (unchanged)
     const fetchFeaturedListings = async () => {
       const { data, error } = await supabase
         .from("sellers")
@@ -75,8 +92,11 @@ export default function Home() {
         console.warn("⚠️ Failed to fetch featured listings:", error?.message);
       }
     };
-
     fetchFeaturedListings();
+
+    return () => {
+      authListener?.subscription?.unsubscribe?.();
+    };
   }, [router]);
 
   const placeholder = "/images/placeholders/listing-placeholder.jpg";
