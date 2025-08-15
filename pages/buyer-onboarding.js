@@ -1,4 +1,3 @@
-
 // pages/buyer-onboarding.js
 import { useRouter } from 'next/router';
 import supabase from "../lib/supabaseClient";
@@ -75,6 +74,13 @@ export default function BuyerOnboarding() {
     return () => { mounted = false; };
   }, []);
 
+  // Keep formData.email in sync with the authenticated session (covers race/refresh cases)
+  useEffect(() => {
+    if (session?.user?.email) {
+      setFormData(prev => (prev.email ? prev : { ...prev, email: session.user.email }));
+    }
+  }, [session]);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value ?? '' }));
@@ -97,9 +103,18 @@ export default function BuyerOnboarding() {
   };
 
   const validateForm = () => {
-    const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
-    for (let field of requiredFields) {
-      if (!formData[field]) {
+    // Prefer the auth email if the field is disabled/empty
+    const emailValue = String(formData.email || session?.user?.email || '').trim();
+
+    const required = {
+      name: String(formData.name ?? '').trim(),
+      email: emailValue,
+      city: String(formData.city ?? '').trim(),
+      stateOrProvince: String(formData.stateOrProvince ?? '').trim(),
+    };
+
+    for (const key of Object.keys(required)) {
+      if (required[key] === '') {
         setErrorMessage('Please fill in all required fields.');
         return false;
       }
@@ -147,6 +162,9 @@ export default function BuyerOnboarding() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return alert('You must be logged in to submit.');
 
+    // Derive the final email one more time for payload safety
+    const emailValue = (formData.email || session?.user?.email || '').trim();
+
     // 1) Upload media if provided
     const { url: introUrl, type: introType } = await uploadIntroMedia(user.id);
 
@@ -154,7 +172,7 @@ export default function BuyerOnboarding() {
     const payload = {
       auth_id: user.id,
       name: formData.name,
-      email: formData.email,
+      email: emailValue,
       financing_type: formData.financingType,
       experience: formData.experience,
       industry_preference: formData.industryPreference,
@@ -217,25 +235,24 @@ export default function BuyerOnboarding() {
           </div>
 
           <div>
-            
-  <label className="block text-sm font-medium mb-1">Email</label>
-  <input
-    type="email"
-    name="email"
-    value={formData.email}
-    onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
-    disabled={!!session}                 // if logged in, lock it to auth email
-    className={`w-full border p-3 rounded text-black ${
-      session ? 'bg-gray-100 cursor-not-allowed' : ''
-    }`}
-    placeholder="you@example.com"
-  />
-  <p className="text-[11px] text-gray-500 mt-1">
-    {session
-      ? 'Email is set from your account.'
-      : 'No account detected — you can type your email.'}
-  </p>
-</div>
+            <label className="block text-sm font-medium mb-1">Email</label>
+            <input
+              type="email"
+              name="email"
+              value={session?.user?.email || formData.email}
+              onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
+              disabled={!!session}
+              className={`w-full border p-3 rounded text-black ${
+                session ? 'bg-gray-100 cursor-not-allowed' : ''
+              }`}
+              placeholder="you@example.com"
+            />
+            <p className="text-[11px] text-gray-500 mt-1">
+              {session
+                ? 'Email is set from your account.'
+                : 'No account detected — you can type your email.'}
+            </p>
+          </div>
 
           <div>
             <label className="block text-sm font-medium mb-1">Financing Type</label>
@@ -336,6 +353,7 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
+
 
 
  
