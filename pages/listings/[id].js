@@ -1,3 +1,4 @@
+// pages/listings/[id].js
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import supabase from '../../lib/supabaseClient'; // ✅ Fixed path
@@ -140,15 +141,26 @@ export default function ListingDetail() {
     }
   }
 
+  // ✅ UPDATED: include buyer_auth_id and dedupe with upsert so it appears in dashboard
   async function handleSaveListing() {
-    if (!buyer) {
+    // ensure user is logged in to get auth UID
+    const { data: authData } = await supabase.auth.getUser();
+    const authUser = authData?.user || null;
+
+    if (!authUser || !buyer) {
       alert('You must be logged in as a buyer to save listings.');
       return;
     }
 
-    const { error } = await supabase.from('saved_listings').insert([
-      { buyer_email: buyer.email, listing_id: id }
-    ]);
+    const payload = {
+      listing_id: Number(id),
+      buyer_email: buyer.email,
+      buyer_auth_id: authUser.id,
+    };
+
+    const { error } = await supabase
+      .from('saved_listings')
+      .upsert([payload], { onConflict: 'buyer_auth_id,listing_id' });
 
     if (error) {
       console.error('Save failed:', error);
@@ -471,3 +483,4 @@ export default function ListingDetail() {
     </main>
   );
 }
+
