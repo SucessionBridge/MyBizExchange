@@ -7,6 +7,7 @@ import { useSession } from '@supabase/auth-helpers-react';
 export default function BuyerOnboarding() {
   const router = useRouter();
   const session = useSession();
+  const user = session?.user || null;
 
   // Prevent SSR/client hydration mismatches
   const [isClient, setIsClient] = useState(false);
@@ -37,20 +38,25 @@ export default function BuyerOnboarding() {
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
   const [existingId, setExistingId] = useState(null);
 
+  // Prefill from session + fetch existing profile when user is present
   useEffect(() => {
     let mounted = true;
-    const checkExistingProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+    const hydrateFromUser = async () => {
       if (!user || !mounted) return;
 
       // seed email from auth (keeps input controlled even while disabled)
-      setFormData(prev => ({ ...prev, email: user.email || '' }));
+      setFormData(prev => ({ ...prev, email: user.email || prev.email || '' }));
 
-      const { data: existingProfile } = await supabase
+      const { data: existingProfile, error } = await supabase
         .from('buyers')
         .select('*')
         .or(`auth_id.eq.${user.id},email.eq.${user.email}`)
         .maybeSingle();
+
+      if (error) {
+        console.error('buyers select error', error);
+        return;
+      }
 
       if (existingProfile && mounted) {
         setAlreadySubmitted(true);
@@ -58,7 +64,7 @@ export default function BuyerOnboarding() {
         setFormData(prev => ({
           ...prev,
           name: existingProfile.name || '',
-          email: user.email || '',
+          email: user.email || existingProfile.email || '',
           financingType: existingProfile.financing_type || 'self-financing',
           experience: existingProfile.experience ?? 3,
           industryPreference: existingProfile.industry_preference || '',
@@ -75,20 +81,16 @@ export default function BuyerOnboarding() {
         }));
       }
     };
-    checkExistingProfile();
+    hydrateFromUser();
     return () => { mounted = false; };
-  }, []);
-
-  // Keep email synced if session appears later (no-op if already set)
-  useEffect(() => {
-    const authEmail = session?.user?.email;
-    if (authEmail) {
-      setFormData(prev => (prev.email ? prev : { ...prev, email: authEmail }));
-    }
-  }, [session]);
+  }, [user]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    if (name === 'willingToRelocate' && type === 'checkbox') {
+      setFormData(prev => ({ ...prev, willingToRelocate: checked ? 'Yes' : 'No' }));
+      return;
+    }
     setFormData(prev => ({ ...prev, [name]: value ?? '' }));
   };
 
@@ -109,7 +111,7 @@ export default function BuyerOnboarding() {
 
   // Require fields that are actually rendered: name, email, and State/Province for location matching
   const validateForm = () => {
-    const emailValue = String(formData.email || session?.user?.email || '').trim();
+    const emailValue = String(formData.email || user?.email || '').trim();
     const nameValue = String(formData.name ?? '').trim();
     const stateValue = String(formData.stateOrProvince ?? '').trim();
 
@@ -155,12 +157,15 @@ export default function BuyerOnboarding() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Gate on session user (avoid flaky getUser())
+    if (!user) {
+      setErrorMessage('Please sign in to submit your profile.');
+      return;
+    }
     if (!validateForm()) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert('You must be logged in to submit.');
-
-    const emailValue = (formData.email || session?.user?.email || '').trim();
+    const emailValue = (formData.email || user.email || '').trim();
 
     // 1) Upload media if provided
     const { url: introUrl } = await uploadIntroMedia(user.id);
@@ -211,6 +216,9 @@ export default function BuyerOnboarding() {
     return <main className="min-h-screen bg-blue-50 p-6 sm:p-8" />;
   }
 
+  // If no session, show a friendly prompt (prevents confusing submit attempts)
+  const showLoginNotice = !user;
+
   return (
     <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
       <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
@@ -225,6 +233,12 @@ export default function BuyerOnboarding() {
             This is <em>only shared with sellers you contact</em>. It’s especially important if you’re requesting <strong>seller financing</strong>—sellers want to know who they’re trusting with their business.
           </p>
         </div>
+
+        {showLoginNotice && (
+          <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+            Please sign in before submitting your buyer profile.
+          </div>
+        )}
 
         {errorMessage && <p className="text-red-600 mb-4">{errorMessage}</p>}
 
@@ -244,16 +258,16 @@ export default function BuyerOnboarding() {
             <input
               type="email"
               name="email"
-              value={session?.user?.email || formData.email}
+              value={user?.email || formData.email}
               onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
-              disabled={!!session}
+              disabled={!!user}
               className={`w-full border p-3 rounded text-black ${
-                session ? 'bg-gray-100 cursor-not-allowed' : ''
+                user ? 'bg-gray-100 cursor-not-allowed' : ''
               }`}
               placeholder="you@example.com"
             />
             <p className="text-[11px] text-gray-500 mt-1">
-              {session
+              {user
                 ? 'Email is set from your account.'
                 : 'No account detected — you can type your email.'}
             </p>
@@ -283,15 +297,14 @@ export default function BuyerOnboarding() {
               </div>
             </div>
 
-            {/* NEW: Willing to Relocate checkbox */}
+            {/* Willing to Relocate checkbox */}
             <div className="mt-3 flex items-center gap-2">
               <input
                 id="wtr"
                 type="checkbox"
+                name="willingToRelocate"
                 checked={formData.willingToRelocate === 'Yes'}
-                onChange={(e) =>
-                  setFormData(prev => ({ ...prev, willingToRelocate: e.target.checked ? 'Yes' : 'No' }))
-                }
+                onChange={handleChange}
                 className="h-4 w-4"
               />
               <label htmlFor="wtr" className="text-sm">I’m willing to relocate</label>
@@ -427,4 +440,5 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
+
 
