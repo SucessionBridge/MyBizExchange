@@ -1,48 +1,20 @@
 // pages/buyer-onboarding.js
-import React, { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
-import { useSession } from '@supabase/auth-helpers-react';
-import supabase from '../lib/supabaseClient';
+import supabase from "../lib/supabaseClient";
+import React, { useState, useEffect } from 'react';
+import { toast } from 'react-hot-toast';
 
-// US States + Canadian Provinces/Territories
-const REGIONS = [
-  // US
-  { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' }, { code: 'AZ', name: 'Arizona' },
-  { code: 'AR', name: 'Arkansas' }, { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
-  { code: 'CT', name: 'Connecticut' }, { code: 'DE', name: 'Delaware' }, { code: 'DC', name: 'District of Columbia' },
-  { code: 'FL', name: 'Florida' }, { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' },
-  { code: 'ID', name: 'Idaho' }, { code: 'IL', name: 'Illinois' }, { code: 'IN', name: 'Indiana' },
-  { code: 'IA', name: 'Iowa' }, { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' },
-  { code: 'LA', name: 'Louisiana' }, { code: 'ME', name: 'Maine' }, { code: 'MD', name: 'Maryland' },
-  { code: 'MA', name: 'Massachusetts' }, { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' },
-  { code: 'MS', name: 'Mississippi' }, { code: 'MO', name: 'Missouri' }, { code: 'MT', name: 'Montana' },
-  { code: 'NE', name: 'Nebraska' }, { code: 'NV', name: 'Nevada' }, { code: 'NH', name: 'New Hampshire' },
-  { code: 'NJ', name: 'New Jersey' }, { code: 'NM', name: 'New Mexico' }, { code: 'NY', name: 'New York' },
-  { code: 'NC', name: 'North Carolina' }, { code: 'ND', name: 'North Dakota' }, { code: 'OH', name: 'Ohio' },
-  { code: 'OK', name: 'Oklahoma' }, { code: 'OR', name: 'Oregon' }, { code: 'PA', name: 'Pennsylvania' },
-  { code: 'RI', name: 'Rhode Island' }, { code: 'SC', name: 'South Carolina' }, { code: 'SD', name: 'South Dakota' },
-  { code: 'TN', name: 'Tennessee' }, { code: 'TX', name: 'Texas' }, { code: 'UT', name: 'Utah' },
-  { code: 'VT', name: 'Vermont' }, { code: 'VA', name: 'Virginia' }, { code: 'WA', name: 'Washington' },
-  { code: 'WV', name: 'West Virginia' }, { code: 'WI', name: 'Wisconsin' }, { code: 'WY', name: 'Wyoming' },
-  // Canada
-  { code: 'AB', name: 'Alberta' }, { code: 'BC', name: 'British Columbia' }, { code: 'MB', name: 'Manitoba' },
-  { code: 'NB', name: 'New Brunswick' }, { code: 'NL', name: 'Newfoundland and Labrador' },
-  { code: 'NS', name: 'Nova Scotia' }, { code: 'NT', name: 'Northwest Territories' }, { code: 'NU', name: 'Nunavut' },
-  { code: 'ON', name: 'Ontario' }, { code: 'PE', name: 'Prince Edward Island' }, { code: 'QC', name: 'Quebec' },
-  { code: 'SK', name: 'Saskatchewan' }, { code: 'YT', name: 'Yukon' }
-];
-
-function BuyerOnboardingInner() {
+export default function BuyerOnboarding() {
   const router = useRouter();
-  const session = useSession(); // may be null during first paint or if user not logged in
-  const user = session?.user || null;
+
+  const [user, setUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(true);
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     financingType: 'self-financing',
-    experience: 3,
+    experience: '3',
     industryPreference: '',
     capitalInvestment: '',
     shortIntroduction: '',
@@ -58,23 +30,75 @@ function BuyerOnboardingInner() {
   });
 
   const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [existingId, setExistingId] = useState(null);
 
-  // Prefill email if session appears
   useEffect(() => {
-    if (user?.email) {
-      setFormData(prev => (prev.email ? prev : { ...prev, email: user.email }));
-    }
-  }, [user]);
+    let mounted = true;
+
+    const load = async () => {
+      setLoadingUser(true);
+      const { data, error } = await supabase.auth.getUser();
+      const currUser = data?.user || null;
+
+      if (!mounted) return;
+
+      if (!currUser) {
+        setUser(null);
+        setLoadingUser(false);
+        return;
+      }
+
+      setUser(currUser);
+
+      // lock email to auth email
+      setFormData(prev => ({ ...prev, email: currUser.email || '' }));
+
+      // fetch existing buyer profile by auth_id OR email (legacy)
+      const { data: existingProfile, error: selErr } = await supabase
+        .from('buyers')
+        .select('*')
+        .or(`auth_id.eq.${currUser.id},email.eq.${currUser.email}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (selErr) {
+        console.warn('Buyer profile lookup error:', selErr.message);
+      }
+
+      if (mounted && existingProfile) {
+        setExistingId(existingProfile.id);
+        setFormData(prev => ({
+          ...prev,
+          name: existingProfile.name ?? '',
+          email: currUser.email ?? '',
+          financingType: existingProfile.financing_type ?? 'self-financing',
+          experience: existingProfile.experience != null ? String(existingProfile.experience) : '3',
+          industryPreference: existingProfile.industry_preference ?? '',
+          capitalInvestment: existingProfile.capital_investment != null ? String(existingProfile.capital_investment) : '',
+          shortIntroduction: existingProfile.short_introduction ?? '',
+          priorIndustryExperience: existingProfile.prior_industry_experience ?? 'No',
+          willingToRelocate: existingProfile.willing_to_relocate ?? 'No',
+          city: existingProfile.city ?? '',
+          stateOrProvince: existingProfile.state_or_province ?? '',
+          budgetForPurchase: existingProfile.budget_for_purchase != null ? String(existingProfile.budget_for_purchase) : '',
+          priority_one: existingProfile.priority_one ?? '',
+          priority_two: existingProfile.priority_two ?? '',
+          priority_three: existingProfile.priority_three ?? ''
+        }));
+      }
+
+      setLoadingUser(false);
+    };
+
+    load();
+    return () => { mounted = false; };
+  }, []);
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    if (type === 'checkbox' && name === 'willingToRelocate') {
-      setFormData(prev => ({ ...prev, willingToRelocate: checked ? 'Yes' : 'No' }));
-      return;
-    }
+    const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value ?? '' }));
   };
 
@@ -94,28 +118,29 @@ function BuyerOnboardingInner() {
   };
 
   const validateForm = () => {
-    const emailValue = String(formData.email || user?.email || '').trim();
-    const nameValue = String(formData.name ?? '').trim();
-    const stateValue = String(formData.stateOrProvince ?? '').trim();
-
-    if (!nameValue || !emailValue || !stateValue) {
-      setErrorMessage('Please fill in all required fields.');
-      return false;
+    const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
+    for (let field of requiredFields) {
+      if ((formData[field] ?? '') === '') {
+        setErrorMessage('Please fill in all required fields.');
+        return false;
+      }
     }
     setErrorMessage('');
     return true;
   };
 
   // Upload media to Supabase Storage (if provided)
-  const uploadIntroMedia = async (userIdOrAnon) => {
+  const uploadIntroMedia = async (userId) => {
     if (!formData.video) return { url: null, type: null };
 
     try {
       setIsUploading(true);
       const file = formData.video;
-      const ext = file.name?.split('.').pop()?.toLowerCase() || (file.type.startsWith('image') ? 'jpg' : 'mp4');
-      const kind = file.type.startsWith('image') ? 'image' : 'video';
-      const path = `buyers/${userIdOrAnon}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const kind = file.type?.startsWith('image') ? 'image' : 'video';
+      const extFromName = file.name?.split('.').pop()?.toLowerCase();
+      const fallbackExt = kind === 'image' ? 'jpg' : 'mp4';
+      const ext = extFromName || fallbackExt;
+      const path = `buyers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
       const { error: upErr } = await supabase.storage
         .from('buyers-videos')
@@ -132,7 +157,7 @@ function BuyerOnboardingInner() {
       }
 
       const { data: pub } = supabase.storage.from('buyers-videos').getPublicUrl(path);
-      return { url: pub.publicUrl || null, type: kind };
+      return { url: pub?.publicUrl || null, type: kind };
     } finally {
       setIsUploading(false);
     }
@@ -140,84 +165,91 @@ function BuyerOnboardingInner() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
     if (!validateForm()) return;
 
-    // Resolve user lazily; proceed even if not logged in
-    let localUser = user;
-    if (!localUser) {
-      const { data } = await supabase.auth.getUser();
-      localUser = data?.user || null;
+    // Require login to submit
+    const { data } = await supabase.auth.getUser();
+    const currUser = data?.user || null;
+    if (!currUser) {
+      setErrorMessage('Please sign in to submit your profile.');
+      return;
     }
 
-    const emailValue = (formData.email || localUser?.email || '').trim();
+    const { url: introUrl } = await uploadIntroMedia(currUser.id);
 
-    // 1) Upload media if provided (use 'anon' folder if no auth)
-    const { url: introUrl } = await uploadIntroMedia(localUser?.id || 'anon');
-
-    // 2) Manual upsert by email (works with/without auth)
     const payload = {
-      auth_id: localUser?.id || null,
+      auth_id: currUser.id,
       name: formData.name,
-      email: emailValue,
+      email: formData.email || currUser.email,
       financing_type: formData.financingType,
-      experience: formData.experience,
+      experience: formData.experience === '' ? null : Number(formData.experience),
       industry_preference: formData.industryPreference,
-      capital_investment: formData.capitalInvestment,
+      capital_investment: formData.capitalInvestment === '' ? null : Number(formData.capitalInvestment),
       short_introduction: formData.shortIntroduction,
       prior_industry_experience: formData.priorIndustryExperience,
       willing_to_relocate: formData.willingToRelocate,
       city: formData.city,
       state_or_province: formData.stateOrProvince,
-      budget_for_purchase: formData.budgetForPurchase,
+      budget_for_purchase: formData.budgetForPurchase === '' ? null : Number(formData.budgetForPurchase),
       priority_one: formData.priority_one,
       priority_two: formData.priority_two,
       priority_three: formData.priority_three,
       intro_video_url: introUrl || null,
     };
 
-    // Try update by email; if none, insert
-    const { data: existing, error: findErr } = await supabase
-      .from('buyers')
-      .select('id')
-      .eq('email', emailValue)
-      .maybeSingle();
-
-    if (findErr) {
-      console.error('Find buyer error', findErr);
-      setErrorMessage('Could not save your profile right now.');
-      return;
-    }
-
-    if (existing?.id) {
-      const { error } = await supabase.from('buyers').update(payload).eq('id', existing.id);
+    if (existingId) {
+      const { error } = await supabase.from('buyers').update(payload).eq('id', existingId);
       if (error) {
-        console.error('Update buyer error', error);
+        console.error(error);
         setErrorMessage('Could not update your profile right now.');
         return;
       }
-      setSuccessMessage('Your profile has been updated.');
+      toast.success('Your buyer profile was updated.');
     } else {
       const { error } = await supabase.from('buyers').insert([payload]);
       if (error) {
-        console.error('Insert buyer error', error);
+        console.error(error);
         setErrorMessage('Could not create your profile right now.');
         return;
       }
-      setSuccessMessage('Your profile has been created.');
+      toast.success('Your buyer profile was created.');
     }
 
-    // Let user see success, then redirect
-    setTimeout(() => router.push('/buyer-dashboard'), 900);
+    // ✅ Navigate back to the dashboard reliably (supports ?next=/path)
+    const redirectTo =
+      typeof router.query.next === 'string' && router.query.next.startsWith('/')
+        ? router.query.next
+        : '/buyer-dashboard';
+
+    try {
+      await router.push(redirectTo);
+    } catch (navErr) {
+      console.error('Navigation failed, falling back:', navErr);
+      window.location.href = redirectTo; // hard fallback
+    }
   };
+
+  const emailDisabled = !!user; // lock to auth email when logged in
+
+  if (loadingUser) {
+    return (
+      <main className="min-h-screen bg-blue-50 p-8">
+        <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
+          <p className="text-gray-600">Loading your profile…</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
       <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
         <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center">
-          Buyer Onboarding
+          {existingId ? 'Edit Buyer Profile' : 'Buyer Onboarding'}
         </h1>
 
-        {/* Trust banner – emphasize for seller financing */}
+        {/* Trust banner */}
         <div className="mt-3 mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4">
           <p className="text-sm text-amber-900">
             <strong>Optional but recommended:</strong> add a short video or photo introduction.
@@ -225,16 +257,7 @@ function BuyerOnboardingInner() {
           </p>
         </div>
 
-        {errorMessage && (
-          <div className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {errorMessage}
-          </div>
-        )}
-        {successMessage && (
-          <div className="mb-4 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-700">
-            {successMessage}
-          </div>
-        )}
+        {errorMessage && <p className="text-red-600 mb-4">{errorMessage}</p>}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
@@ -244,6 +267,7 @@ function BuyerOnboardingInner() {
               value={formData.name}
               onChange={handleChange}
               className="w-full border p-3 rounded text-black"
+              placeholder="Your full name"
             />
           </div>
 
@@ -252,62 +276,14 @@ function BuyerOnboardingInner() {
             <input
               type="email"
               name="email"
-              value={user?.email || formData.email}
-              onChange={(e) => setFormData(p => ({ ...p, email: e.target.value }))}
-              disabled={!!user}
-              className={`w-full border p-3 rounded text-black ${user ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+              value={formData.email}
+              onChange={handleChange}
+              disabled={emailDisabled}
+              className={`w-full border p-3 rounded text-black ${emailDisabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
               placeholder="you@example.com"
             />
             <p className="text-[11px] text-gray-500 mt-1">
-              {user ? 'Email is set from your account.' : 'No account detected — you can type your email.'}
-            </p>
-          </div>
-
-          {/* Preferred Location */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Preferred Location</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <input
-                  name="city"
-                  value={formData.city}
-                  onChange={handleChange}
-                  className="w-full border p-3 rounded text-black"
-                  placeholder="City (optional)"
-                />
-              </div>
-              <div>
-                <select
-                  name="stateOrProvince"
-                  value={formData.stateOrProvince}
-                  onChange={handleChange}
-                  className="w-full border p-3 rounded text-black"
-                >
-                  <option value="">Select State/Province (required)</option>
-                  {REGIONS.map(r => (
-                    <option key={r.code} value={r.name}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Willing to Relocate */}
-            <div className="mt-3 flex items-center gap-2">
-              <input
-                id="wtr"
-                type="checkbox"
-                name="willingToRelocate"
-                checked={formData.willingToRelocate === 'Yes'}
-                onChange={handleChange}
-                className="h-4 w-4"
-              />
-              <label htmlFor="wtr" className="text-sm">I’m willing to relocate</label>
-            </div>
-
-            <p className="text-xs text-gray-500 mt-1">
-              We use your location to match you with nearby listings (or relocation-friendly opportunities).
+              {emailDisabled ? 'Email is set from your account.' : 'No account detected — you can type your email.'}
             </p>
           </div>
 
@@ -327,9 +303,7 @@ function BuyerOnboardingInner() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
-              Experience in Business Ownership (1–5)
-            </label>
+            <label className="block text-sm font-medium mb-1">Experience in Business Ownership (1–5)</label>
             <input
               type="number"
               name="experience"
@@ -348,6 +322,7 @@ function BuyerOnboardingInner() {
               value={formData.industryPreference}
               onChange={handleChange}
               className="w-full border p-3 rounded text-black"
+              placeholder="e.g., Home services, e-commerce"
             />
           </div>
 
@@ -360,6 +335,7 @@ function BuyerOnboardingInner() {
                 value={formData.capitalInvestment}
                 onChange={handleChange}
                 className="w-full border p-3 rounded text-black"
+                placeholder="e.g., 50000"
               />
             </div>
             <div>
@@ -370,6 +346,30 @@ function BuyerOnboardingInner() {
                 value={formData.budgetForPurchase}
                 onChange={handleChange}
                 className="w-full border p-3 rounded text-black"
+                placeholder="e.g., 200000"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">City</label>
+              <input
+                name="city"
+                value={formData.city}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+                placeholder="Where are you based?"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">State / Province</label>
+              <input
+                name="stateOrProvince"
+                value={formData.stateOrProvince}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+                placeholder="e.g., NY, ON"
               />
             </div>
           </div>
@@ -382,9 +382,69 @@ function BuyerOnboardingInner() {
               onChange={handleChange}
               rows="3"
               className="w-full border p-3 rounded text-black"
-              placeholder="Write 2–3 sentences about yourself and the type of business you want to buy."
+              placeholder="2–3 sentences about you and the type of business you want to buy."
             />
             <p className="text-xs text-gray-500 mt-1">Sellers see this first. Build trust and show your goals.</p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Prior Industry Experience</label>
+              <select
+                name="priorIndustryExperience"
+                value={formData.priorIndustryExperience}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+              >
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Willing to Relocate?</label>
+              <select
+                name="willingToRelocate"
+                value={formData.willingToRelocate}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+              >
+                <option value="No">No</option>
+                <option value="Yes">Yes</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">Top Priority #1</label>
+              <input
+                name="priority_one"
+                value={formData.priority_one}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+                placeholder="e.g., Cash flow"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Top Priority #2</label>
+              <input
+                name="priority_two"
+                value={formData.priority_two}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+                placeholder="e.g., Location"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Top Priority #3</label>
+              <input
+                name="priority_three"
+                value={formData.priority_three}
+                onChange={handleChange}
+                className="w-full border p-3 rounded text-black"
+                placeholder="e.g., Hours"
+              />
+            </div>
           </div>
 
           <div>
@@ -404,6 +464,7 @@ function BuyerOnboardingInner() {
             {videoPreview && (
               <div className="mt-3">
                 {formData.video?.type?.startsWith('image') ? (
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={videoPreview} alt="Preview" className="w-48 rounded border" />
                 ) : (
                   <video width="240" controls className="rounded border">
@@ -430,7 +491,7 @@ function BuyerOnboardingInner() {
             disabled={isUploading}
             className="w-full bg-blue-600 text-white py-3 rounded hover:bg-blue-700 text-lg font-semibold disabled:opacity-60"
           >
-            {isUploading ? 'Uploading...' : 'Submit Buyer Profile'}
+            {isUploading ? 'Uploading…' : existingId ? 'Update Buyer Profile' : 'Submit Buyer Profile'}
           </button>
         </form>
       </div>
@@ -438,7 +499,5 @@ function BuyerOnboardingInner() {
   );
 }
 
-// Client-only export eliminates hydration mismatches (React #418/#423)
-export default dynamic(() => Promise.resolve(BuyerOnboardingInner), { ssr: false });
 
 
