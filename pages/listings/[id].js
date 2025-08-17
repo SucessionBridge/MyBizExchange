@@ -15,6 +15,10 @@ export default function ListingDetail() {
   const [success, setSuccess] = useState(false);
   const [attachment, setAttachment] = useState(null); // Add attachment state
 
+  // ✅ NEW: saved state + guard against double-clicks
+  const [isSaved, setIsSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   const toTitleCase = (str) =>
     str
       ? str
@@ -73,6 +77,31 @@ export default function ListingDetail() {
     if (buyerData) setBuyer(buyerData);
     setLoading(false);
   }
+
+  // ✅ NEW: once we know buyer + id, check if already saved
+  useEffect(() => {
+    if (!id || !buyer) return;
+
+    const listingId = Number(id);
+    const listingFilter = Number.isFinite(listingId) ? listingId : id;
+
+    (async () => {
+      const { data, error } = await supabase
+        .from('saved_listings')
+        .select('id')
+        .eq('listing_id', listingFilter)
+        .or(`buyer_auth_id.eq.${buyer.auth_id},buyer_email.eq.${buyer.email}`)
+        .maybeSingle();
+
+      if (error) {
+        // Not fatal; just means we can’t pre-mark it
+        console.debug('Check saved failed:', error.message);
+        setIsSaved(false);
+      } else {
+        setIsSaved(!!data);
+      }
+    })();
+  }, [id, buyer]);
 
   // Parse AI description into titled sections
   function parseDescriptionSections(description) {
@@ -141,32 +170,57 @@ export default function ListingDetail() {
     }
   }
 
-  // ✅ UPDATED: include buyer_auth_id and dedupe with upsert so it appears in dashboard
-  async function handleSaveListing() {
-    // ensure user is logged in to get auth UID
+  // ✅ REPLACED: toggle save/unsave with upsert + delete (legacy-safe)
+  async function toggleSave() {
+    if (saving) return;
+    setSaving(true);
+
+    // Need current auth to set buyer_auth_id or allow delete via RLS
     const { data: authData } = await supabase.auth.getUser();
     const authUser = authData?.user || null;
 
     if (!authUser || !buyer) {
       alert('You must be logged in as a buyer to save listings.');
+      setSaving(false);
       return;
     }
 
-    const payload = {
-      listing_id: Number(id),
-      buyer_email: buyer.email,
-      buyer_auth_id: authUser.id,
-    };
+    const listingId = Number(id);
+    const listingValue = Number.isFinite(listingId) ? listingId : id;
 
-    const { error } = await supabase
-      .from('saved_listings')
-      .upsert([payload], { onConflict: 'buyer_auth_id,listing_id' });
+    try {
+      if (isSaved) {
+        // Unsave: allow delete by auth_id OR (legacy) email
+        const { error } = await supabase
+          .from('saved_listings')
+          .delete()
+          .eq('listing_id', listingValue)
+          .or(`buyer_auth_id.eq.${authUser.id},buyer_email.eq.${buyer.email}`);
 
-    if (error) {
-      console.error('Save failed:', error);
-      alert("Couldn't save this listing.");
-    } else {
-      alert('✅ Listing saved to your profile.');
+        if (error) throw error;
+        setIsSaved(false);
+        alert('✅ Listing removed from your saved items.');
+      } else {
+        // Save: upsert + onConflict to dedupe
+        const payload = {
+          listing_id: listingValue,
+          buyer_email: buyer.email,
+          buyer_auth_id: authUser.id,
+        };
+
+        const { error } = await supabase
+          .from('saved_listings')
+          .upsert([payload], { onConflict: 'buyer_auth_id,listing_id' });
+
+        if (error) throw error;
+        setIsSaved(true);
+        alert('✅ Listing saved to your profile.');
+      }
+    } catch (error) {
+      console.error(isSaved ? 'Unsave failed:' : 'Save failed:', error);
+      alert(isSaved ? "Couldn't remove this listing." : "Couldn't save this listing.");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -231,6 +285,21 @@ export default function ListingDetail() {
               Ad ID: {listing.ad_id}
             </p>
             <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
+
+            {/* ✅ Save toggle in hero (optional, keeps your old button too) */}
+            {buyer && (
+              <div className="mt-3">
+                <button
+                  onClick={toggleSave}
+                  disabled={saving}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium ${
+                    isSaved ? 'bg-white text-blue-700' : 'bg-blue-600 text-white'
+                  }`}
+                >
+                  {isSaved ? '★ Saved — Click to Unsave' : '☆ Save Listing'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -448,11 +517,12 @@ export default function ListingDetail() {
                     Send Message
                   </button>
                   <button
-                    onClick={handleSaveListing}
+                    onClick={toggleSave}
                     type="button"
+                    disabled={saving}
                     className="bg-gray-100 hover:bg-gray-200 px-5 py-2 rounded-lg border"
                   >
-                    Save Listing
+                    {isSaved ? 'Unsave' : 'Save Listing'}
                   </button>
                   <button
                     onClick={handleEmailMe}
@@ -483,4 +553,3 @@ export default function ListingDetail() {
     </main>
   );
 }
-
