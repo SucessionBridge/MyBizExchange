@@ -1,4 +1,4 @@
-// pages/buyer-dashboard.js 
+// pages/buyer-dashboard.js
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -22,9 +22,22 @@ export default function BuyerDashboard() {
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
 
-  // Matches (NEW)
+  // Matches
   const [matches, setMatches] = useState([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
+
+  // Helpers
+  const toNum = (v) => {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === 'number' && isFinite(v)) return v;
+    if (typeof v === 'string') {
+      const n = Number(v.replace(/[^0-9.-]/g, ''));
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  };
+  const normStr = (s) => (s || '').toString().trim().toLowerCase();
+  const includesI = (a, b) => normStr(a).includes(normStr(b));
 
   // 1) Auth check
   useEffect(() => {
@@ -83,15 +96,11 @@ export default function BuyerDashboard() {
     const fetchSavedListings = async () => {
       setLoadingSaved(true);
 
-      // We'll try several selectors because older rows may have different columns populated.
-      // Order of precedence:
-      //   A) buyer_auth_id == authUser.id  OR  buyer_email == profile.email
-      //   B) buyer_id == buyers.id (legacy)
-      //   C) user_id == authUser.id (very old)
+      // Try several selectors due to schema history
       let rows = [];
       let lastErr = null;
 
-      // A) auth id or email (preferred)
+      // A) by auth id or email (preferred)
       {
         const { data, error } = await supabase
           .from('saved_listings')
@@ -118,7 +127,6 @@ export default function BuyerDashboard() {
         if (!error && Array.isArray(data) && data.length > 0) {
           rows = data;
         } else if (error && !/column .*buyer_id.* does not exist/i.test(error.message || '')) {
-          // Only log if it's not just a "column doesn't exist" case
           lastErr = error;
           console.warn('Saved listings (buyer_id) error:', error.message);
         }
@@ -147,7 +155,7 @@ export default function BuyerDashboard() {
         return;
       }
 
-      // Collect unique listing IDs (string/number-safe)
+      // Collect unique listing IDs
       const ids = Array.from(
         new Set(
           rows
@@ -163,10 +171,9 @@ export default function BuyerDashboard() {
       }
 
       // Fetch seller rows for the saved listing ids
-      // Convert ids to numbers when possible, but keep fallbacks as strings
       const idsAsNumber = ids.map(x => {
         const n = Number(x);
-        return Number.isFinite(n) ? n : x; // keeps uuid/strings untouched
+        return Number.isFinite(n) ? n : x;
       });
 
       const { data: sellers, error: sellersErr } = await supabase
@@ -181,7 +188,6 @@ export default function BuyerDashboard() {
         return;
       }
 
-      // Preserve original saved order while de-duping
       const byId = new Map((sellers || []).map(s => [String(s.id), s]));
       const ordered = ids
         .map(id => byId.get(String(id)))
@@ -225,35 +231,117 @@ export default function BuyerDashboard() {
     return () => { cancelled = true; };
   }, [profile?.email]);
 
-  // 5) Matches for You via API (NEW)
+  // 5) Fetch active listings and compute matches (client-only scoring)
   useEffect(() => {
-    if (!authUser) return;
+    if (!profile) return;
     let cancelled = false;
 
-    (async () => {
-      try {
-        setLoadingMatches(true);
-        const resp = await fetch(`/api/get-matches?userId=${encodeURIComponent(authUser.id)}&limit=16`);
-        if (!resp.ok) {
-          setMatches([]);
-          setLoadingMatches(false);
-          return;
-        }
-        const json = await resp.json();
-        if (!cancelled) {
-          setMatches(Array.isArray(json.matches) ? json.matches : []);
-          setLoadingMatches(false);
-        }
-      } catch {
-        if (!cancelled) {
-          setMatches([]);
-          setLoadingMatches(false);
-        }
-      }
-    })();
+    const scoreListing = (lst, buyer) => {
+      const p1 = normStr(buyer.priority_one);
+      const p2 = normStr(buyer.priority_two);
+      const p3 = normStr(buyer.priority_three);
+      const weights = {};
+      if (p1) weights[p1] = (weights[p1] || 0) + 3;
+      if (p2) weights[p2] = (weights[p2] || 0) + 2;
+      if (p3) weights[p3] = (weights[p3] || 0) + 1;
 
+      const asking = toNum(lst.asking_price);
+      const budget = toNum(buyer.budget_for_purchase);
+      const lstCity = normStr(lst.city || (lst.location || '').split(',')[0]);
+      const lstState = normStr(lst.state_or_province || (lst.location || '').split(',').slice(-1)[0]);
+      const buyerCity = normStr(buyer.city);
+      const buyerState = normStr(buyer.state_or_province);
+      const lstIndustry = normStr(lst.industry);
+      const prefIndustry = normStr(buyer.industry_preference);
+      const lstFinType = normStr(lst.financing_type);
+      const sellerFinFlag = normStr(lst.seller_financing_considered); // 'yes'/'maybe'
+      const buyerFin = normStr(buyer.financing_type);
+
+      let score = 0;
+
+      // LOCATION
+      if (weights.location) {
+        let add = 0;
+        if (buyerState && lstState && buyerState === lstState) add += 0.7;
+        if (buyerCity && lstCity && buyerCity === lstCity) add += 0.5; // city match bonus
+        score += weights.location * add;
+      }
+
+      // PRICE (budget vs asking)
+      if (weights.price && budget > 0 && asking > 0) {
+        if (asking <= budget) score += weights.price * 1.0;
+        else if (asking <= budget * 1.10) score += weights.price * 0.6;
+        else if (asking <= budget * 1.25) score += weights.price * 0.3;
+      }
+
+      // INDUSTRY
+      if (weights.industry && prefIndustry) {
+        if (includesI(lstIndustry, prefIndustry)) score += weights.industry * 1.0;
+      }
+
+      // FINANCING
+      if (weights.financing && buyerFin) {
+        let good = false;
+        if (buyerFin === 'seller-financing') {
+          good = lstFinType === 'seller-financing' || sellerFinFlag === 'yes' || sellerFinFlag === 'maybe';
+        } else if (buyerFin === 'rent-to-own') {
+          good = lstFinType === 'rent-to-own' || sellerFinFlag === 'yes' || sellerFinFlag === 'maybe';
+        } else if (buyerFin === 'third-party') {
+          good = lstFinType === 'third-party' || lstFinType === 'buyer-financed';
+        } else if (buyerFin === 'self-financing') {
+          good = true; // self-financing works everywhere
+        }
+        if (good) score += weights.financing * 1.0;
+      }
+
+      // Light fallback if no explicit priorities set: give some sensible score
+      if (!p1 && !p2 && !p3) {
+        if (budget && asking && asking <= budget) score += 1.5;
+        if (prefIndustry && includesI(lstIndustry, prefIndustry)) score += 1.0;
+        if (buyerState && lstState && buyerState === lstState) score += 0.8;
+      }
+
+      return score;
+    };
+
+    const fetchAndScore = async () => {
+      setLoadingMatches(true);
+
+      // Pull active listings with fields we score on
+      const { data: sellers, error } = await supabase
+        .from('sellers')
+        .select('id,business_name,location,asking_price,image_urls,industry,city,state_or_province,financing_type,seller_financing_considered,status,created_at')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(300);
+
+      if (error) {
+        console.warn('Match listings fetch error:', error.message);
+        setMatches([]);
+        setLoadingMatches(false);
+        return;
+      }
+
+      const scored = (sellers || []).map(s => ({
+        ...s,
+        __score: scoreListing(s, profile),
+      }));
+
+      // Only keep meaningful matches
+      const meaningful = scored
+        .filter(s => (s.__score || 0) > 0)
+        .sort((a, b) => (b.__score || 0) - (a.__score || 0))
+        .slice(0, 12);
+
+      if (!cancelled) {
+        setMatches(meaningful);
+        setLoadingMatches(false);
+      }
+    };
+
+    fetchAndScore();
     return () => { cancelled = true; };
-  }, [authUser]);
+  }, [profile]);
 
   // Group messages by listing (latest only)
   const latestByListing = useMemo(() => {
@@ -285,7 +373,7 @@ export default function BuyerDashboard() {
       <main className="min-h-screen bg-blue-50 p-8">
         <div className="max-w-6xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
           <p className="text-gray-700">
-            We couldn’t find your buyer profile.{` `}
+            We couldn’t find your buyer profile{' '}
             <Link href="/buyer-onboarding?next=/buyer-dashboard">
               <a className="text-blue-600 underline">Create it now</a>
             </Link>.
@@ -331,10 +419,17 @@ export default function BuyerDashboard() {
             <InfoTile label="Industry" value={profile.industry_preference || '—'} />
             <InfoTile label="Relocate?" value={profile.willing_to_relocate || '—'} />
           </div>
-          <p className="text-xs text-gray-500 mt-3">Update your profile anytime to improve matching with sellers.</p>
+
+          {/* Show selected priorities */}
+          <div className="mt-3 text-xs text-gray-600">
+            <span className="mr-3"><strong>Priority 1:</strong> {profile.priority_one || '—'}</span>
+            <span className="mr-3"><strong>Priority 2:</strong> {profile.priority_two || '—'}</span>
+            <span><strong>Priority 3:</strong> {profile.priority_three || '—'}</span>
+          </div>
+          <p className="text-[11px] text-gray-500 mt-2">Update your profile anytime to improve matching with sellers.</p>
         </section>
 
-        {/* Matches for You (NEW) */}
+        {/* Matches for You */}
         <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xl font-semibold text-gray-800">Matches for You</h2>
@@ -344,11 +439,11 @@ export default function BuyerDashboard() {
           </div>
 
           {loadingMatches ? (
-            <p className="text-gray-600">Finding matches…</p>
+            <p className="text-gray-600">Calculating your matches…</p>
           ) : matches.length === 0 ? (
             <p className="text-gray-600">
-              No strong matches yet. Try broadening your industry/price/location in{' '}
-              <Link href="/buyer-onboarding?next=/buyer-dashboard"><a className="text-blue-600 underline">Edit Profile</a></Link>.
+              No strong matches yet. Try updating your priorities or browsing{' '}
+              <Link href="/listings"><a className="text-blue-600 underline">all listings</a></Link>.
             </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5">
@@ -373,10 +468,10 @@ export default function BuyerDashboard() {
                         </h3>
                         <div className="mt-1.5 flex items-center justify-between">
                           <p className="text-[14px] font-semibold text-gray-900">
-                            {lst.asking_price ? `$${Number(lst.asking_price).toLocaleString()}` : 'Inquire'}
+                            {lst.asking_price ? `$${toNum(lst.asking_price).toLocaleString()}` : 'Inquire'}
                           </p>
                           <p className="text-[13px] text-gray-600 truncate max-w-[60%] text-right">
-                            {lst.location || lst.state_or_province || 'Location undisclosed'}
+                            {lst.location || [lst.city, lst.state_or_province].filter(Boolean).join(', ') || 'Location undisclosed'}
                           </p>
                         </div>
                       </div>
@@ -401,7 +496,7 @@ export default function BuyerDashboard() {
             <p className="text-gray-600">Loading saved listings…</p>
           ) : savedListings.length === 0 ? (
             <p className="text-gray-600">
-              You haven’t saved any listings yet.{` `}
+              You haven’t saved any listings yet.{' '}
               <Link href="/listings"><a className="text-blue-600 underline">Browse available businesses</a></Link>.
             </p>
           ) : (
