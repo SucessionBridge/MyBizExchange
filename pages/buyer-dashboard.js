@@ -1,4 +1,4 @@
-// pages/buyer-dashboard.js
+// pages/buyer-dashboard.js 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
@@ -21,6 +21,10 @@ export default function BuyerDashboard() {
   // Recent messages
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
+
+  // Matches (NEW)
+  const [matches, setMatches] = useState([]);
+  const [loadingMatches, setLoadingMatches] = useState(true);
 
   // 1) Auth check
   useEffect(() => {
@@ -221,6 +225,36 @@ export default function BuyerDashboard() {
     return () => { cancelled = true; };
   }, [profile?.email]);
 
+  // 5) Matches for You via API (NEW)
+  useEffect(() => {
+    if (!authUser) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setLoadingMatches(true);
+        const resp = await fetch(`/api/get-matches?userId=${encodeURIComponent(authUser.id)}&limit=16`);
+        if (!resp.ok) {
+          setMatches([]);
+          setLoadingMatches(false);
+          return;
+        }
+        const json = await resp.json();
+        if (!cancelled) {
+          setMatches(Array.isArray(json.matches) ? json.matches : []);
+          setLoadingMatches(false);
+        }
+      } catch {
+        if (!cancelled) {
+          setMatches([]);
+          setLoadingMatches(false);
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [authUser]);
+
   // Group messages by listing (latest only)
   const latestByListing = useMemo(() => {
     const by = new Map();
@@ -251,7 +285,7 @@ export default function BuyerDashboard() {
       <main className="min-h-screen bg-blue-50 p-8">
         <div className="max-w-6xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
           <p className="text-gray-700">
-            We couldn’t find your buyer profile.{' '}
+            We couldn’t find your buyer profile.{` `}
             <Link href="/buyer-onboarding?next=/buyer-dashboard">
               <a className="text-blue-600 underline">Create it now</a>
             </Link>.
@@ -300,6 +334,60 @@ export default function BuyerDashboard() {
           <p className="text-xs text-gray-500 mt-3">Update your profile anytime to improve matching with sellers.</p>
         </section>
 
+        {/* Matches for You (NEW) */}
+        <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xl font-semibold text-gray-800">Matches for You</h2>
+            <Link href="/listings">
+              <a className="text-blue-600 hover:underline text-sm font-semibold">See all →</a>
+            </Link>
+          </div>
+
+          {loadingMatches ? (
+            <p className="text-gray-600">Finding matches…</p>
+          ) : matches.length === 0 ? (
+            <p className="text-gray-600">
+              No strong matches yet. Try broadening your industry/price/location in{' '}
+              <Link href="/buyer-onboarding?next=/buyer-dashboard"><a className="text-blue-600 underline">Edit Profile</a></Link>.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5">
+              {matches.map((lst) => {
+                const cover = Array.isArray(lst.image_urls) && lst.image_urls.length > 0 ? lst.image_urls[0] : placeholder;
+                return (
+                  <Link key={lst.id} href={`/listings/${lst.id}`}>
+                    <a className="group block rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-lg">
+                      <div className="bg-gray-100 overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={cover}
+                          alt={lst.business_name || 'Business listing'}
+                          className="w-full h-auto aspect-[4/3] object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
+                          loading="lazy"
+                          onError={(e) => { e.currentTarget.src = '/images/placeholders/listing-placeholder.jpg'; }}
+                        />
+                      </div>
+                      <div className="p-3">
+                        <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
+                          {lst.business_name || 'Unnamed Business'}
+                        </h3>
+                        <div className="mt-1.5 flex items-center justify-between">
+                          <p className="text-[14px] font-semibold text-gray-900">
+                            {lst.asking_price ? `$${Number(lst.asking_price).toLocaleString()}` : 'Inquire'}
+                          </p>
+                          <p className="text-[13px] text-gray-600 truncate max-w-[60%] text-right">
+                            {lst.location || lst.state_or_province || 'Location undisclosed'}
+                          </p>
+                        </div>
+                      </div>
+                    </a>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </section>
+
         {/* Saved listings */}
         <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-3">
@@ -313,7 +401,7 @@ export default function BuyerDashboard() {
             <p className="text-gray-600">Loading saved listings…</p>
           ) : savedListings.length === 0 ? (
             <p className="text-gray-600">
-              You haven’t saved any listings yet.{' '}
+              You haven’t saved any listings yet.{` `}
               <Link href="/listings"><a className="text-blue-600 underline">Browse available businesses</a></Link>.
             </p>
           ) : (
@@ -461,4 +549,3 @@ function InfoTile({ label, value }) {
 export async function getServerSideProps() {
   return { props: {} };
 }
-
