@@ -5,19 +5,9 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 
 const INDUSTRY_OPTIONS = [
-  'Home Services',
-  'Retail',
-  'E-Commerce',
-  'Professional Services',
-  'Food & Beverage',
-  'Manufacturing',
-  'Automotive',
-  'Health & Beauty',
-  'Construction',
-  'Software & SaaS',
-  'Logistics',
-  'Education',
-  'Hospitality',
+  'Home Services','Retail','E-Commerce','Professional Services','Food & Beverage',
+  'Manufacturing','Automotive','Health & Beauty','Construction','Software & SaaS',
+  'Logistics','Education','Hospitality',
 ];
 
 const PRIORITY_OPTIONS = [
@@ -40,13 +30,13 @@ export default function BuyerOnboarding() {
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
-  // base form data (DB-compatible)
+  // DB-compatible
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     financingType: 'self-financing',
     experience: '3',
-    industryPreference: '',        // stored as CSV in DB
+    industryPreference: '',        // CSV
     capitalInvestment: '',
     shortIntroduction: '',
     priorIndustryExperience: 'No',
@@ -61,22 +51,20 @@ export default function BuyerOnboarding() {
   });
 
   // UI helpers
-  const [industriesSelected, setIndustriesSelected] = useState([]); // array for chip UI
-  const [otherIndustry, setOtherIndustry] = useState('');           // free-text
+  const [industriesSelected, setIndustriesSelected] = useState([]);
+  const [otherIndustry, setOtherIndustry] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [existingId, setExistingId] = useState(null);
 
-  // 1) Load auth + profile (prefill)
+  // 1) Load auth + profile (prefill if logged in)
   useEffect(() => {
     let mounted = true;
-
-    const load = async () => {
+    (async () => {
       setLoadingUser(true);
       const { data } = await supabase.auth.getUser();
       const currUser = data?.user || null;
-
       if (!mounted) return;
 
       if (!currUser) {
@@ -96,16 +84,14 @@ export default function BuyerOnboarding() {
         .limit(1)
         .maybeSingle();
 
-      if (selErr) {
-        console.warn('Buyer profile lookup error:', selErr.message);
-      }
+      if (selErr) console.warn('Buyer profile lookup error:', selErr.message);
 
       if (mounted && existingProfile) {
         setExistingId(existingProfile.id);
 
-        // hydrate industries (chips + other text)
         const tokens = parseCSV(existingProfile.industry_preference);
-        const core = tokens.filter(t => INDUSTRY_OPTIONS.map(s => s.toLowerCase()).includes(t.toLowerCase()));
+        const lower = INDUSTRY_OPTIONS.map(s => s.toLowerCase());
+        const core = tokens.filter(t => lower.includes(t.toLowerCase()));
         const extras = tokens.filter(t => !core.map(c => c.toLowerCase()).includes(t.toLowerCase()));
         setIndustriesSelected(core);
         setOtherIndustry(extras.join(', '));
@@ -131,9 +117,7 @@ export default function BuyerOnboarding() {
       }
 
       setLoadingUser(false);
-    };
-
-    load();
+    })();
     return () => { mounted = false; };
   }, []);
 
@@ -143,10 +127,7 @@ export default function BuyerOnboarding() {
   };
 
   const toggleIndustry = (label) => {
-    setIndustriesSelected(prev => {
-      if (prev.includes(label)) return prev.filter(l => l !== label);
-      return [...prev, label];
-    });
+    setIndustriesSelected(prev => prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]);
   };
 
   const handleVideoUpload = (e) => {
@@ -165,31 +146,22 @@ export default function BuyerOnboarding() {
   };
 
   const validateForm = () => {
-    const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
-    for (let field of requiredFields) {
-      if ((formData[field] ?? '') === '') {
+    const required = ['name','email','city','stateOrProvince'];
+    for (let f of required) {
+      if ((formData[f] ?? '') === '') {
         setErrorMessage('Please fill in all required fields.');
         return false;
       }
     }
-    // priorities: require three distinct choices
     const picks = [formData.priority_one, formData.priority_two, formData.priority_three].filter(Boolean);
-    if (picks.length < 3) {
-      setErrorMessage('Please pick all three priorities to help us match businesses.');
-      return false;
-    }
-    const dup = picks.find((v, i) => picks.indexOf(v) !== i);
-    if (dup) {
-      setErrorMessage('Please choose three different priorities (no duplicates).');
-      return false;
-    }
-
+    if (picks.length < 3) { setErrorMessage('Please pick all three priorities.'); return false; }
+    if (new Set(picks).size !== 3) { setErrorMessage('Please choose three different priorities.'); return false; }
     setErrorMessage('');
     return true;
   };
 
-  // Upload media to Supabase Storage (if provided)
-  const uploadIntroMedia = async (userId) => {
+  // Upload media; works when logged-out by using email in the path
+  const uploadIntroMedia = async (authIdOrNull, email) => {
     if (!formData.video) return { url: null, type: null };
 
     try {
@@ -199,7 +171,10 @@ export default function BuyerOnboarding() {
       const extFromName = file.name?.split('.').pop()?.toLowerCase();
       const fallbackExt = kind === 'image' ? 'jpg' : 'mp4';
       const ext = extFromName || fallbackExt;
-      const path = `buyers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+      const safeEmail = String(email || 'unknown').toLowerCase().replace(/[^a-z0-9._-]/g, '_');
+      const folder = authIdOrNull ? `buyers/${authIdOrNull}` : `pending/${safeEmail}`;
+      const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
       const { error: upErr } = await supabase.storage
         .from('buyers-videos')
@@ -211,7 +186,8 @@ export default function BuyerOnboarding() {
 
       if (upErr) {
         console.error('Upload error:', upErr);
-        setErrorMessage('Upload failed. Please try a smaller file or a different format.');
+        // Don’t block the profile—just continue without media
+        toast.error('Intro upload failed. You can add it later after login.');
         return { url: null, type: null };
       }
 
@@ -226,23 +202,18 @@ export default function BuyerOnboarding() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    // ✅ Use the auth we already loaded (fixes the "Please sign in" false negative)
-    const currUser = user;
-    if (!currUser) {
-      toast.error('Please sign in to submit your profile.');
-      router.push('/login?next=/buyer-onboarding');
-      return;
-    }
+    // We allow submission whether logged in or not
+    const currUser = user; // may be null
+    const { url: introUrl } = await uploadIntroMedia(currUser?.id ?? null, formData.email);
 
     // Build industry CSV from chips + "other"
     const otherTokens = parseCSV(otherIndustry);
     const industryCSV = [...industriesSelected, ...otherTokens].join(', ');
-    const { url: introUrl } = await uploadIntroMedia(currUser.id);
 
     const payload = {
-      auth_id: currUser.id,
+      auth_id: currUser?.id ?? null,
       name: formData.name,
-      email: formData.email || currUser.email,
+      email: formData.email,
       financing_type: formData.financingType,
       experience: formData.experience === '' ? null : Number(formData.experience),
       industry_preference: industryCSV,
@@ -259,28 +230,33 @@ export default function BuyerOnboarding() {
       intro_video_url: introUrl || null,
     };
 
-    if (existingId) {
-      const { error } = await supabase.from('buyers').update(payload).eq('id', existingId);
-      if (error) {
-        console.error(error);
-        setErrorMessage('Could not update your profile right now.');
-        return;
+    // Upsert by email when logged out; by id when logged in & we found a row
+    try {
+      if (existingId) {
+        const { error } = await supabase.from('buyers').update(payload).eq('id', existingId);
+        if (error) throw error;
+      } else {
+        // Try update-by-email first to avoid duplicates, else insert
+        const { data: existingByEmail, error: findErr } = await supabase
+          .from('buyers').select('id').eq('email', formData.email).maybeSingle();
+        if (!findErr && existingByEmail?.id) {
+          const { error } = await supabase.from('buyers').update(payload).eq('id', existingByEmail.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('buyers').insert([payload]);
+          if (error) throw error;
+        }
       }
-      toast.success('Your buyer profile was updated.');
-    } else {
-      const { error } = await supabase.from('buyers').insert([payload]);
-      if (error) {
-        console.error(error);
-        setErrorMessage('Could not create your profile right now.');
-        return;
-      }
-      toast.success('Your buyer profile was created.');
+    } catch (err) {
+      console.error('Buyer upsert failed:', err);
+      setErrorMessage('Could not save your profile right now.');
+      return;
     }
 
-    setTimeout(() => {
-      const next = router.query.next ? String(router.query.next) : '/buyer-dashboard';
-      router.replace(next);
-    }, 200);
+    // Hard OK prompt, then send to login
+    alert('✅ Your buyer profile has been submitted.\n\nPlease log in with your email to access your dashboard and messages.');
+    const next = router.query.next ? String(router.query.next) : '/buyer-dashboard';
+    router.replace(`/login?next=${encodeURIComponent(next)}`);
   };
 
   const emailDisabled = !!user;
@@ -340,7 +316,7 @@ export default function BuyerOnboarding() {
                 placeholder="you@example.com"
               />
               <p className="text-[11px] text-gray-500 mt-1">
-                {emailDisabled ? 'Email is set from your account.' : 'No account detected — you can type your email.'}
+                {emailDisabled ? 'Email is set from your account.' : 'We’ll save your profile to this email.'}
               </p>
             </div>
           </div>
@@ -523,21 +499,9 @@ export default function BuyerOnboarding() {
               For example, if you choose <strong>Industry</strong> and <strong>Price</strong>, we’ll prefer businesses in your target industries that are within your budget.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <PrioritySelect
-                label="Priority #1"
-                value={formData.priority_one}
-                onChange={(v) => setFormData(prev => ({ ...prev, priority_one: v }))}
-              />
-              <PrioritySelect
-                label="Priority #2"
-                value={formData.priority_two}
-                onChange={(v) => setFormData(prev => ({ ...prev, priority_two: v }))}
-              />
-              <PrioritySelect
-                label="Priority #3"
-                value={formData.priority_three}
-                onChange={(v) => setFormData(prev => ({ ...prev, priority_three: v }))}
-              />
+              <PrioritySelect label="Priority #1" value={formData.priority_one}   onChange={(v) => setFormData(p => ({ ...p, priority_one: v }))} />
+              <PrioritySelect label="Priority #2" value={formData.priority_two}   onChange={(v) => setFormData(p => ({ ...p, priority_two: v }))} />
+              <PrioritySelect label="Priority #3" value={formData.priority_three} onChange={(v) => setFormData(p => ({ ...p, priority_three: v }))} />
             </div>
           </div>
 
@@ -569,10 +533,7 @@ export default function BuyerOnboarding() {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setFormData(prev => ({ ...prev, video: null }));
-                    setVideoPreview(null);
-                  }}
+                  onClick={() => { setFormData(p => ({ ...p, video: null })); setVideoPreview(null); }}
                   className="mt-2 text-sm text-red-600 hover:underline block"
                 >
                   Remove file
@@ -613,4 +574,5 @@ function PrioritySelect({ label, value, onChange }) {
     </div>
   );
 }
+
 
