@@ -27,13 +27,76 @@ const INDUSTRY_OPTIONS = [
   'Hospitality',
 ];
 
+// Canonical mapping: add common synonyms/phrases here (all lowercase)
+const INDUSTRY_CANON = {
+  'retail': [
+    'retail','shop','store','boutique',
+    'wine store','wine shop','liquor store','bottle shop',
+    'convenience store','c-store'
+  ],
+  'food & beverage': [
+    'food & beverage','restaurant','bar','pub','cafe','coffee','coffee shop',
+    'bakery','brewery','distillery','food truck','catering'
+  ],
+  'home services': [
+    'home services','hvac','heating','air','plumbing','plumber','electrical',
+    'electrician','landscaping','lawn care','painting','roofing',
+    'cleaning','maid service','garage door','pest control'
+  ],
+  'automotive': [
+    'automotive','auto','car wash','detailing','mechanic','auto repair',
+    'tire','oil change','body shop'
+  ],
+  'professional services': [
+    'professional services','accounting','bookkeeping','legal','consulting','marketing agency'
+  ],
+  'construction': ['construction','contractor','general contractor','gc','remodeling'],
+  'e-commerce': ['ecommerce','e-commerce','amazon fba','shopify','online store'],
+  'manufacturing': ['manufacturing','fabrication','machining','factory','plant'],
+  'healthcare': ['healthcare','clinic','dental','dentist','optometry','chiropractic','home health'],
+  'logistics': ['logistics','trucking','last mile','delivery','3pl','freight','courier'],
+  'saas / software': ['saas','software','it services','managed services','msp','dev shop'],
+  'cleaning & maintenance': ['cleaning & maintenance','janitorial','commercial cleaning','window cleaning'],
+  'hospitality': ['hospitality','hotel','motel','bnb','vacation rental'],
+};
+
 const PRIORITY_OPTIONS = [
-  { value: '', label: '— Select —' },
+  { value: '',          label: '— Select —' },
   { value: 'location',  label: 'Location' },
   { value: 'price',     label: 'Price/Budget' },
   { value: 'industry',  label: 'Industry' },
   { value: 'financing', label: 'Financing' },
 ];
+
+function normalizeIndustries(list) {
+  // Returns a deduped list including canonical buckets + the user's exact phrase (when different)
+  const out = new Set();
+  for (const raw of list) {
+    const term = String(raw || '').trim();
+    if (!term) continue;
+    const lc = term.toLowerCase();
+
+    let canonical = null;
+    for (const [canon, aliases] of Object.entries(INDUSTRY_CANON)) {
+      if (aliases.includes(lc)) { canonical = canon; break; }
+      // also match exact canonical name (case-insensitive)
+      if (canon.toLowerCase() === lc) { canonical = canon; break; }
+    }
+    if (canonical) out.add(canonical);
+    if (!canonical || canonical.toLowerCase() !== lc) out.add(term); // keep user's wording too
+  }
+  return Array.from(out);
+}
+
+function suggestCanonicals(term) {
+  const t = String(term || '').trim().toLowerCase();
+  if (!t) return [];
+  const suggestions = [];
+  for (const [canon, aliases] of Object.entries(INDUSTRY_CANON)) {
+    if (aliases.includes(t) || canon.toLowerCase() === t) suggestions.push(canon);
+  }
+  return suggestions;
+}
 
 export default function BuyerOnboarding() {
   const router = useRouter();
@@ -47,7 +110,7 @@ export default function BuyerOnboarding() {
     email: '',
     financingType: 'self-financing',
     experience: '3',
-    industryPreference: '',     // will be a comma-separated list from the multi-select
+    industryPreference: '',     // comma-separated
     capitalInvestment: '',
     shortIntroduction: '',
     priorIndustryExperience: 'No',
@@ -61,15 +124,16 @@ export default function BuyerOnboarding() {
     priority_three: ''
   });
 
-  // Local UI state for multi-select
+  // Multi-select + custom input
   const [selectedIndustries, setSelectedIndustries] = useState([]);
+  const [customIndustry, setCustomIndustry] = useState('');
 
   const [errorMessage, setErrorMessage] = useState('');
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [existingId, setExistingId] = useState(null);
 
-  // 1) Load auth user and existing buyer profile (prefill)
+  // 1) Load auth user + existing profile
   useEffect(() => {
     let mounted = true;
 
@@ -89,7 +153,6 @@ export default function BuyerOnboarding() {
       setUser(currUser);
       setFormData(prev => ({ ...prev, email: currUser.email || '' }));
 
-      // fetch existing buyer profile by auth_id OR email (legacy)
       const { data: existingProfile, error: selErr } = await supabase
         .from('buyers')
         .select('*')
@@ -98,20 +161,32 @@ export default function BuyerOnboarding() {
         .limit(1)
         .maybeSingle();
 
-      if (selErr) {
-        console.warn('Buyer profile lookup error:', selErr.message);
-      }
+      if (selErr) console.warn('Buyer profile lookup error:', selErr.message);
 
       if (mounted && existingProfile) {
         setExistingId(existingProfile.id);
 
-        // Parse industry list if comma-separated
-        const industries = (existingProfile.industry_preference || '')
+        // Split any stored comma list into known options + first custom fallback
+        const tokens = String(existingProfile.industry_preference || '')
           .split(',')
           .map(s => s.trim())
           .filter(Boolean);
 
-        setSelectedIndustries(industries);
+        const optionIndex = new Map(INDUSTRY_OPTIONS.map((o, i) => [o.toLowerCase(), i]));
+        const chosen = [];
+        let custom = '';
+
+        for (const t of tokens) {
+          const idx = optionIndex.get(t.toLowerCase());
+          if (typeof idx === 'number') {
+            chosen.push(INDUSTRY_OPTIONS[idx]);
+          } else if (!custom) {
+            custom = t; // keep the first unknown as custom text
+          }
+        }
+
+        setSelectedIndustries(chosen);
+        setCustomIndustry(custom);
 
         setFormData(prev => ({
           ...prev,
@@ -119,7 +194,7 @@ export default function BuyerOnboarding() {
           email: currUser.email ?? '',
           financingType: existingProfile.financing_type ?? 'self-financing',
           experience: existingProfile.experience != null ? String(existingProfile.experience) : '3',
-          industryPreference: industries.join(', '),
+          industryPreference: (existingProfile.industry_preference || ''),
           capitalInvestment: existingProfile.capital_investment != null ? String(existingProfile.capital_investment) : '',
           shortIntroduction: existingProfile.short_introduction ?? '',
           priorIndustryExperience: existingProfile.prior_industry_experience ?? 'No',
@@ -140,7 +215,7 @@ export default function BuyerOnboarding() {
     return () => { mounted = false; };
   }, []);
 
-  // Basic handlers
+  // Handlers
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value ?? '' }));
@@ -149,26 +224,22 @@ export default function BuyerOnboarding() {
   const handleIndustryMulti = (e) => {
     const opts = Array.from(e.target.selectedOptions).map(o => o.value);
     setSelectedIndustries(opts);
-    setFormData(prev => ({ ...prev, industryPreference: opts.join(', ') }));
   };
 
   const handleVideoUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const maxMB = 50;
     if (file.size > maxMB * 1024 * 1024) {
       setErrorMessage(`File too large. Max ${maxMB}MB.`);
       return;
     }
-
     setErrorMessage('');
     setFormData(prev => ({ ...prev, video: file }));
     setVideoPreview(URL.createObjectURL(file));
   };
 
   const validateForm = () => {
-    // Only require basic fields
     const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
     for (let field of requiredFields) {
       if ((formData[field] ?? '') === '') {
@@ -180,10 +251,9 @@ export default function BuyerOnboarding() {
     return true;
   };
 
-  // Upload media to Supabase Storage (if provided)
+  // Upload to storage (optional)
   const uploadIntroMedia = async (userId) => {
     if (!formData.video) return { url: null, type: null };
-
     try {
       setIsUploading(true);
       const file = formData.video;
@@ -216,10 +286,8 @@ export default function BuyerOnboarding() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validateForm()) return;
 
-    // Require login to submit
     const { data } = await supabase.auth.getUser();
     const currUser = data?.user || null;
     if (!currUser) {
@@ -229,15 +297,18 @@ export default function BuyerOnboarding() {
 
     const { url: introUrl } = await uploadIntroMedia(currUser.id);
 
-    // Build payload
+    // Build the industry list: selected + (optional) custom, then normalize
+    const rawIndustries = [...selectedIndustries];
+    if (customIndustry && customIndustry.trim()) rawIndustries.push(customIndustry.trim());
+    const normalized = normalizeIndustries(rawIndustries);
+
     const payload = {
       auth_id: currUser.id,
       name: formData.name,
       email: formData.email || currUser.email,
       financing_type: formData.financingType,
       experience: formData.experience === '' ? null : Number(formData.experience),
-      // store as comma-separated list for now (dashboard matcher can handle commas)
-      industry_preference: formData.industryPreference,
+      industry_preference: normalized.join(', '), // store CSV (canonical + user term if different)
       capital_investment: formData.capitalInvestment === '' ? null : Number(formData.capitalInvestment),
       short_introduction: formData.shortIntroduction,
       prior_industry_experience: formData.priorIndustryExperience,
@@ -269,7 +340,6 @@ export default function BuyerOnboarding() {
       toast.success('Your buyer profile was created.');
     }
 
-    // Route back (dashboard by default, or ?next=…)
     setTimeout(() => router.replace(nextPath), 150);
   };
 
@@ -285,6 +355,8 @@ export default function BuyerOnboarding() {
     );
   }
 
+  const customSuggestions = suggestCanonicals(customIndustry);
+
   return (
     <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
       <div className="max-w-2xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
@@ -292,7 +364,6 @@ export default function BuyerOnboarding() {
           {existingId ? 'Edit Buyer Profile' : 'Buyer Onboarding'}
         </h1>
 
-        {/* Trust banner */}
         <div className="mt-3 mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4">
           <p className="text-sm text-amber-900">
             <strong>Optional but recommended:</strong> add a short video or photo introduction.
@@ -373,8 +444,23 @@ export default function BuyerOnboarding() {
               ))}
             </select>
             <p className="text-[11px] text-gray-500 mt-1">
-              We’ll use your first choice most strongly for matching.
+              Can’t find yours? Add a custom one below — we’ll still match it to the closest category.
             </p>
+
+            <div className="mt-3">
+              <label className="block text-sm font-medium mb-1">Custom industry (optional)</label>
+              <input
+                value={customIndustry}
+                onChange={(e) => setCustomIndustry(e.target.value)}
+                className="w-full border p-3 rounded text-black"
+                placeholder="e.g., Wine store, Pilates studio, Microbrewery"
+              />
+              {!!customIndustry && customSuggestions.length > 0 && (
+                <p className="text-xs text-emerald-700 mt-1">
+                  We’ll also match this as: <strong>{customSuggestions.join(', ')}</strong>
+                </p>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -559,4 +645,3 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
-
