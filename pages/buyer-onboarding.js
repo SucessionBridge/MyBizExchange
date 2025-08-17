@@ -5,9 +5,19 @@ import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 
 const INDUSTRY_OPTIONS = [
-  'Home Services','Retail','E-Commerce','Professional Services','Food & Beverage',
-  'Manufacturing','Automotive','Health & Beauty','Construction','Software & SaaS',
-  'Logistics','Education','Hospitality',
+  'Home Services',
+  'Retail',
+  'E-Commerce',
+  'Professional Services',
+  'Food & Beverage',
+  'Manufacturing',
+  'Automotive',
+  'Health & Beauty',
+  'Construction',
+  'Software & SaaS',
+  'Logistics',
+  'Education',
+  'Hospitality',
 ];
 
 const PRIORITY_OPTIONS = [
@@ -17,11 +27,75 @@ const PRIORITY_OPTIONS = [
   { value: 'financing', label: 'Financing' },
 ];
 
+// 👇 descriptors for the Experience scale
+const EXPERIENCE_SCALE = {
+  1: 'Brand new to ownership',
+  2: 'Some management experience',
+  3: 'Led teams/budgets',
+  4: 'Owned/operated a business',
+  5: 'Serial owner / seasoned exec',
+};
+
 function parseCSV(str) {
   return String(str || '')
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
+}
+
+// --- currency helpers ---
+function digitsOnly(v) {
+  return String(v ?? '').replace(/[^\d]/g, '');
+}
+function formatCurrency(v) {
+  const d = digitsOnly(v);
+  if (d === '') return '';
+  return '$' + Number(d).toLocaleString();
+}
+
+/** Minimal currency input that:
+ * - lets users type digits
+ * - formats to $X,XXX on blur
+ * - returns raw digits to parent via onValue
+ */
+function CurrencyField({ label, value, onValue, placeholder }) {
+  const [local, setLocal] = useState(formatCurrency(value));
+
+  useEffect(() => {
+    // keep in sync if parent changes (e.g., prefill)
+    setLocal(formatCurrency(value));
+  }, [value]);
+
+  const handleFocus = (e) => {
+    // show raw digits while editing
+    setLocal(digitsOnly(local));
+  };
+
+  const handleChange = (e) => {
+    const raw = digitsOnly(e.target.value);
+    setLocal(raw);
+  };
+
+  const handleBlur = () => {
+    // commit raw digits up to parent, then show formatted
+    onValue(digitsOnly(local));
+    setLocal(formatCurrency(local));
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1">{label}</label>
+      <input
+        inputMode="numeric"
+        value={local}
+        onFocus={handleFocus}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        className="w-full border p-3 rounded text-black"
+        placeholder={placeholder}
+      />
+    </div>
+  );
 }
 
 export default function BuyerOnboarding() {
@@ -30,13 +104,13 @@ export default function BuyerOnboarding() {
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
-  // DB-compatible
+  // base form data (DB-compatible)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     financingType: 'self-financing',
     experience: '3',
-    industryPreference: '',        // CSV
+    industryPreference: '',        // stored as CSV in DB
     capitalInvestment: '',
     shortIntroduction: '',
     priorIndustryExperience: 'No',
@@ -51,20 +125,22 @@ export default function BuyerOnboarding() {
   });
 
   // UI helpers
-  const [industriesSelected, setIndustriesSelected] = useState([]);
-  const [otherIndustry, setOtherIndustry] = useState('');
+  const [industriesSelected, setIndustriesSelected] = useState([]); // chips
+  const [otherIndustry, setOtherIndustry] = useState('');           // free-text
   const [errorMessage, setErrorMessage] = useState('');
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [existingId, setExistingId] = useState(null);
 
-  // 1) Load auth + profile (prefill if logged in)
+  // 1) Load auth + profile (prefill)
   useEffect(() => {
     let mounted = true;
-    (async () => {
+
+    const load = async () => {
       setLoadingUser(true);
       const { data } = await supabase.auth.getUser();
       const currUser = data?.user || null;
+
       if (!mounted) return;
 
       if (!currUser) {
@@ -84,14 +160,16 @@ export default function BuyerOnboarding() {
         .limit(1)
         .maybeSingle();
 
-      if (selErr) console.warn('Buyer profile lookup error:', selErr.message);
+      if (selErr) {
+        console.warn('Buyer profile lookup error:', selErr.message);
+      }
 
       if (mounted && existingProfile) {
         setExistingId(existingProfile.id);
 
+        // hydrate industries (chips + other text)
         const tokens = parseCSV(existingProfile.industry_preference);
-        const lower = INDUSTRY_OPTIONS.map(s => s.toLowerCase());
-        const core = tokens.filter(t => lower.includes(t.toLowerCase()));
+        const core = tokens.filter(t => INDUSTRY_OPTIONS.map(s => s.toLowerCase()).includes(t.toLowerCase()));
         const extras = tokens.filter(t => !core.map(c => c.toLowerCase()).includes(t.toLowerCase()));
         setIndustriesSelected(core);
         setOtherIndustry(extras.join(', '));
@@ -117,7 +195,9 @@ export default function BuyerOnboarding() {
       }
 
       setLoadingUser(false);
-    })();
+    };
+
+    load();
     return () => { mounted = false; };
   }, []);
 
@@ -127,7 +207,10 @@ export default function BuyerOnboarding() {
   };
 
   const toggleIndustry = (label) => {
-    setIndustriesSelected(prev => prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]);
+    setIndustriesSelected(prev => {
+      if (prev.includes(label)) return prev.filter(l => l !== label);
+      return [...prev, label];
+    });
   };
 
   const handleVideoUpload = (e) => {
@@ -146,22 +229,31 @@ export default function BuyerOnboarding() {
   };
 
   const validateForm = () => {
-    const required = ['name','email','city','stateOrProvince'];
-    for (let f of required) {
-      if ((formData[f] ?? '') === '') {
+    const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
+    for (let field of requiredFields) {
+      if ((formData[field] ?? '') === '') {
         setErrorMessage('Please fill in all required fields.');
         return false;
       }
     }
+    // priorities: require three distinct choices
     const picks = [formData.priority_one, formData.priority_two, formData.priority_three].filter(Boolean);
-    if (picks.length < 3) { setErrorMessage('Please pick all three priorities.'); return false; }
-    if (new Set(picks).size !== 3) { setErrorMessage('Please choose three different priorities.'); return false; }
+    if (picks.length < 3) {
+      setErrorMessage('Please pick all three priorities to help us match businesses.');
+      return false;
+    }
+    const dup = picks.find((v, i) => picks.indexOf(v) !== i);
+    if (dup) {
+      setErrorMessage('Please choose three different priorities (no duplicates).');
+      return false;
+    }
+
     setErrorMessage('');
     return true;
   };
 
-  // Upload media; works when logged-out by using email in the path
-  const uploadIntroMedia = async (authIdOrNull, email) => {
+  // Upload media to Supabase Storage (if provided)
+  const uploadIntroMedia = async (userId) => {
     if (!formData.video) return { url: null, type: null };
 
     try {
@@ -171,10 +263,7 @@ export default function BuyerOnboarding() {
       const extFromName = file.name?.split('.').pop()?.toLowerCase();
       const fallbackExt = kind === 'image' ? 'jpg' : 'mp4';
       const ext = extFromName || fallbackExt;
-
-      const safeEmail = String(email || 'unknown').toLowerCase().replace(/[^a-z0-9._-]/g, '_');
-      const folder = authIdOrNull ? `buyers/${authIdOrNull}` : `pending/${safeEmail}`;
-      const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const path = `buyers/${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
 
       const { error: upErr } = await supabase.storage
         .from('buyers-videos')
@@ -186,8 +275,7 @@ export default function BuyerOnboarding() {
 
       if (upErr) {
         console.error('Upload error:', upErr);
-        // Don’t block the profile—just continue without media
-        toast.error('Intro upload failed. You can add it later after login.');
+        setErrorMessage('Upload failed. Please try a smaller file or a different format.');
         return { url: null, type: null };
       }
 
@@ -202,18 +290,23 @@ export default function BuyerOnboarding() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    // We allow submission whether logged in or not
-    const currUser = user; // may be null
-    const { url: introUrl } = await uploadIntroMedia(currUser?.id ?? null, formData.email);
+    // Keep your existing sign-in requirement here
+    const currUser = user;
+    if (!currUser) {
+      toast.error('Please sign in to submit your profile.');
+      router.push('/login?next=/buyer-onboarding');
+      return;
+    }
 
     // Build industry CSV from chips + "other"
     const otherTokens = parseCSV(otherIndustry);
     const industryCSV = [...industriesSelected, ...otherTokens].join(', ');
+    const { url: introUrl } = await uploadIntroMedia(currUser.id);
 
     const payload = {
-      auth_id: currUser?.id ?? null,
+      auth_id: currUser.id,
       name: formData.name,
-      email: formData.email,
+      email: formData.email || currUser.email,
       financing_type: formData.financingType,
       experience: formData.experience === '' ? null : Number(formData.experience),
       industry_preference: industryCSV,
@@ -230,33 +323,28 @@ export default function BuyerOnboarding() {
       intro_video_url: introUrl || null,
     };
 
-    // Upsert by email when logged out; by id when logged in & we found a row
-    try {
-      if (existingId) {
-        const { error } = await supabase.from('buyers').update(payload).eq('id', existingId);
-        if (error) throw error;
-      } else {
-        // Try update-by-email first to avoid duplicates, else insert
-        const { data: existingByEmail, error: findErr } = await supabase
-          .from('buyers').select('id').eq('email', formData.email).maybeSingle();
-        if (!findErr && existingByEmail?.id) {
-          const { error } = await supabase.from('buyers').update(payload).eq('id', existingByEmail.id);
-          if (error) throw error;
-        } else {
-          const { error } = await supabase.from('buyers').insert([payload]);
-          if (error) throw error;
-        }
+    if (existingId) {
+      const { error } = await supabase.from('buyers').update(payload).eq('id', existingId);
+      if (error) {
+        console.error(error);
+        setErrorMessage('Could not update your profile right now.');
+        return;
       }
-    } catch (err) {
-      console.error('Buyer upsert failed:', err);
-      setErrorMessage('Could not save your profile right now.');
-      return;
+      toast.success('Your buyer profile was updated.');
+    } else {
+      const { error } = await supabase.from('buyers').insert([payload]);
+      if (error) {
+        console.error(error);
+        setErrorMessage('Could not create your profile right now.');
+        return;
+      }
+      toast.success('Your buyer profile was created.');
     }
 
-    // Hard OK prompt, then send to login
-    alert('✅ Your buyer profile has been submitted.\n\nPlease log in with your email to access your dashboard and messages.');
-    const next = router.query.next ? String(router.query.next) : '/buyer-dashboard';
-    router.replace(`/login?next=${encodeURIComponent(next)}`);
+    setTimeout(() => {
+      const next = router.query.next ? String(router.query.next) : '/buyer-dashboard';
+      router.replace(next);
+    }, 200);
   };
 
   const emailDisabled = !!user;
@@ -316,7 +404,7 @@ export default function BuyerOnboarding() {
                 placeholder="you@example.com"
               />
               <p className="text-[11px] text-gray-500 mt-1">
-                {emailDisabled ? 'Email is set from your account.' : 'We’ll save your profile to this email.'}
+                {emailDisabled ? 'Email is set from your account.' : 'No account detected — you can type your email.'}
               </p>
             </div>
           </div>
@@ -336,13 +424,20 @@ export default function BuyerOnboarding() {
                       'w-10 h-10 rounded-full border transition',
                       active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 hover:bg-blue-50'
                     ].join(' ')}
-                    aria-label={`Set experience to ${n}`}
+                    title={EXPERIENCE_SCALE[n]}
+                    aria-label={`Set experience to ${n} - ${EXPERIENCE_SCALE[n]}`}
                   >
                     {n}
                   </button>
                 );
               })}
             </div>
+            <div className="mt-1 text-xs text-gray-600">
+              Selected: <strong>{EXPERIENCE_SCALE[Number(formData.experience)] || 'Choose 1–5'}</strong>
+            </div>
+            <p className="text-[11px] text-gray-500 mt-1">
+              1 = brand new • 5 = seasoned owner. This helps sellers gauge fit.
+            </p>
           </div>
 
           {/* Financing */}
@@ -361,30 +456,20 @@ export default function BuyerOnboarding() {
             </select>
           </div>
 
-          {/* Budget + Capital */}
+          {/* Budget + Capital (currency) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Available Capital</label>
-              <input
-                type="number"
-                name="capitalInvestment"
-                value={formData.capitalInvestment}
-                onChange={handleChange}
-                className="w-full border p-3 rounded text-black"
-                placeholder="e.g., 50000"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Budget for Purchase</label>
-              <input
-                type="number"
-                name="budgetForPurchase"
-                value={formData.budgetForPurchase}
-                onChange={handleChange}
-                className="w-full border p-3 rounded text-black"
-                placeholder="e.g., 200000"
-              />
-            </div>
+            <CurrencyField
+              label="Available Capital"
+              value={formData.capitalInvestment}
+              onValue={(raw) => setFormData(prev => ({ ...prev, capitalInvestment: raw }))}
+              placeholder="$50,000"
+            />
+            <CurrencyField
+              label="Budget for Purchase"
+              value={formData.budgetForPurchase}
+              onValue={(raw) => setFormData(prev => ({ ...prev, budgetForPurchase: raw }))}
+              placeholder="$200,000"
+            />
           </div>
 
           {/* Location */}
@@ -499,9 +584,21 @@ export default function BuyerOnboarding() {
               For example, if you choose <strong>Industry</strong> and <strong>Price</strong>, we’ll prefer businesses in your target industries that are within your budget.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <PrioritySelect label="Priority #1" value={formData.priority_one}   onChange={(v) => setFormData(p => ({ ...p, priority_one: v }))} />
-              <PrioritySelect label="Priority #2" value={formData.priority_two}   onChange={(v) => setFormData(p => ({ ...p, priority_two: v }))} />
-              <PrioritySelect label="Priority #3" value={formData.priority_three} onChange={(v) => setFormData(p => ({ ...p, priority_three: v }))} />
+              <PrioritySelect
+                label="Priority #1"
+                value={formData.priority_one}
+                onChange={(v) => setFormData(prev => ({ ...prev, priority_one: v }))}
+              />
+              <PrioritySelect
+                label="Priority #2"
+                value={formData.priority_two}
+                onChange={(v) => setFormData(prev => ({ ...prev, priority_two: v }))}
+              />
+              <PrioritySelect
+                label="Priority #3"
+                value={formData.priority_three}
+                onChange={(v) => setFormData(prev => ({ ...prev, priority_three: v }))}
+              />
             </div>
           </div>
 
@@ -533,7 +630,10 @@ export default function BuyerOnboarding() {
 
                 <button
                   type="button"
-                  onClick={() => { setFormData(p => ({ ...p, video: null })); setVideoPreview(null); }}
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, video: null }));
+                    setVideoPreview(null);
+                  }}
                   className="mt-2 text-sm text-red-600 hover:underline block"
                 >
                   Remove file
