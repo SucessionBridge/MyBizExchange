@@ -14,16 +14,17 @@ export default function BuyerOnboarding() {
     name: '',
     email: '',
     financingType: 'self-financing',
-    experience: '3',
+    experience: '3',              // keep as string for controlled <input type="number">
     industryPreference: '',
-    capitalInvestment: '',
+    capitalInvestment: '',        // string so empty is allowed
     shortIntroduction: '',
     priorIndustryExperience: 'No',
     willingToRelocate: 'No',
     city: '',
     stateOrProvince: '',
-    video: null,
+    video: null,                  // File or null
     budgetForPurchase: '',
+    // 🔽 priorities as controlled strings (dropdowns)
     priority_one: '',
     priority_two: '',
     priority_three: ''
@@ -34,12 +35,22 @@ export default function BuyerOnboarding() {
   const [isUploading, setIsUploading] = useState(false);
   const [existingId, setExistingId] = useState(null);
 
+  // Normalize legacy priority values from DB to our canonical set
+  const normPriority = (v) => {
+    const s = String(v || '').trim().toLowerCase();
+    if (['location', 'price', 'industry', 'financing'].includes(s)) return s;
+    if (s === 'budget') return 'price';
+    if (s === 'financing options' || s === 'financing option') return 'financing';
+    return '';
+  };
+
+  // 1) Load auth user and existing buyer profile (prefill)
   useEffect(() => {
     let mounted = true;
 
     const load = async () => {
       setLoadingUser(true);
-      const { data, error } = await supabase.auth.getUser();
+      const { data } = await supabase.auth.getUser();
       const currUser = data?.user || null;
 
       if (!mounted) return;
@@ -84,9 +95,10 @@ export default function BuyerOnboarding() {
           city: existingProfile.city ?? '',
           stateOrProvince: existingProfile.state_or_province ?? '',
           budgetForPurchase: existingProfile.budget_for_purchase != null ? String(existingProfile.budget_for_purchase) : '',
-          priority_one: existingProfile.priority_one ?? '',
-          priority_two: existingProfile.priority_two ?? '',
-          priority_three: existingProfile.priority_three ?? ''
+          // 🔽 prefill priorities (normalized)
+          priority_one: normPriority(existingProfile.priority_one),
+          priority_two: normPriority(existingProfile.priority_two),
+          priority_three: normPriority(existingProfile.priority_three),
         }));
       }
 
@@ -99,6 +111,7 @@ export default function BuyerOnboarding() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    // keep everything controlled; allow empty string
     setFormData(prev => ({ ...prev, [name]: value ?? '' }));
   };
 
@@ -118,6 +131,7 @@ export default function BuyerOnboarding() {
   };
 
   const validateForm = () => {
+    // validate required fields as non-empty strings
     const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
     for (let field of requiredFields) {
       if ((formData[field] ?? '') === '') {
@@ -168,7 +182,7 @@ export default function BuyerOnboarding() {
 
     if (!validateForm()) return;
 
-    // Require login to submit
+    // Require login to submit (but do NOT crash the page)
     const { data } = await supabase.auth.getUser();
     const currUser = data?.user || null;
     if (!currUser) {
@@ -178,6 +192,7 @@ export default function BuyerOnboarding() {
 
     const { url: introUrl } = await uploadIntroMedia(currUser.id);
 
+    // Build payload (strings stay strings; server can cast as needed)
     const payload = {
       auth_id: currUser.id,
       name: formData.name,
@@ -192,9 +207,10 @@ export default function BuyerOnboarding() {
       city: formData.city,
       state_or_province: formData.stateOrProvince,
       budget_for_purchase: formData.budgetForPurchase === '' ? null : Number(formData.budgetForPurchase),
-      priority_one: formData.priority_one,
-      priority_two: formData.priority_two,
-      priority_three: formData.priority_three,
+      // 🔽 store selected priorities (canonical lowercase)
+      priority_one: normPriority(formData.priority_one),
+      priority_two: normPriority(formData.priority_two),
+      priority_three: normPriority(formData.priority_three),
       intro_video_url: introUrl || null,
     };
 
@@ -216,20 +232,11 @@ export default function BuyerOnboarding() {
       toast.success('Your buyer profile was created.');
     }
 
-    // ✅ Navigate back to the dashboard reliably (supports ?next=/path)
-    const redirectTo =
-      typeof router.query.next === 'string' && router.query.next.startsWith('/')
-        ? router.query.next
-        : '/buyer-dashboard';
-
-    try {
-      await router.push(redirectTo);
-    } catch (navErr) {
-      console.error('Navigation failed, falling back:', navErr);
-      window.location.href = redirectTo; // hard fallback
-    }
+    // Route back to dashboard after a short tick (so toast can flash)
+    setTimeout(() => router.replace('/buyer-dashboard'), 200);
   };
 
+  // Simple unauth state: allow reading but indicate sign-in needed on submit
   const emailDisabled = !!user; // lock to auth email when logged in
 
   if (loadingUser) {
@@ -414,36 +421,52 @@ export default function BuyerOnboarding() {
             </div>
           </div>
 
+          {/* 🔽 PRIORITY SELECTS (replaces the 3 text inputs) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Top Priority #1</label>
-              <input
+              <label className="block text-sm font-medium mb-1">Top Priority #1 (most important)</label>
+              <select
                 name="priority_one"
                 value={formData.priority_one}
                 onChange={handleChange}
                 className="w-full border p-3 rounded text-black"
-                placeholder="e.g., Cash flow"
-              />
+              >
+                <option value="">-- Select priority --</option>
+                <option value="location">Location</option>
+                <option value="price">Price</option>
+                <option value="industry">Industry</option>
+                <option value="financing">Financing</option>
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Top Priority #2</label>
-              <input
+              <select
                 name="priority_two"
                 value={formData.priority_two}
                 onChange={handleChange}
                 className="w-full border p-3 rounded text-black"
-                placeholder="e.g., Location"
-              />
+              >
+                <option value="">-- Select priority --</option>
+                <option value="location">Location</option>
+                <option value="price">Price</option>
+                <option value="industry">Industry</option>
+                <option value="financing">Financing</option>
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Top Priority #3</label>
-              <input
+              <select
                 name="priority_three"
                 value={formData.priority_three}
                 onChange={handleChange}
                 className="w-full border p-3 rounded text-black"
-                placeholder="e.g., Hours"
-              />
+              >
+                <option value="">-- Select priority --</option>
+                <option value="location">Location</option>
+                <option value="price">Price</option>
+                <option value="industry">Industry</option>
+                <option value="financing">Financing</option>
+              </select>
             </div>
           </div>
 
@@ -498,6 +521,5 @@ export default function BuyerOnboarding() {
     </main>
   );
 }
-
 
 
