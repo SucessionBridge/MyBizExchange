@@ -365,6 +365,29 @@ export default function BuyerDashboard() {
           </div>
         </div>
 
+        {/* ⚠️ Deactivated banner */}
+        {profile?.is_deleted && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-4">
+            Your buyer profile is <strong>deactivated</strong>. Matching and emails are paused.
+            <button
+              className="ml-3 px-3 py-1.5 border rounded bg-white hover:bg-gray-50"
+              onClick={async () => {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) return alert('Please sign in first.');
+                const { error } = await supabase
+                  .from('buyers')
+                  .update({ is_deleted: false, deleted_at: null })
+                  .eq('auth_id', user.id);
+                if (error) return alert('Could not reactivate.');
+                alert('Reactivated! Refreshing…');
+                window.location.reload();
+              }}
+            >
+              Reactivate
+            </button>
+          </div>
+        )}
+
         {/* Profile summary */}
         <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
           <h2 className="text-xl font-semibold text-blue-700 mb-3">Your Buying Preferences</h2>
@@ -515,6 +538,9 @@ export default function BuyerDashboard() {
 
         {/* Recent conversations */}
         <RecentConversations profileEmail={profile?.email} />
+
+        {/* Danger Zone: deactivate or delete */}
+        <BuyerDangerZone />
       </div>
     </main>
   );
@@ -752,6 +778,215 @@ function InfoTile({ label, value }) {
   );
 }
 
+/* ---------- Danger Zone (deactivate/delete) ---------- */
+
+function BuyerDangerZone() {
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState(1);
+  const [action, setAction] = useState('deactivate'); // 'deactivate' | 'delete'
+  const [reason, setReason] = useState('bought');
+  const [notes, setNotes] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const REASONS = [
+    { value: 'bought', label: 'I bought a business' },
+    { value: 'not-looking', label: 'No longer looking' },
+    { value: 'inventory', label: 'Didn’t see enough inventory' },
+    { value: 'emails', label: 'Too many emails/notifications' },
+    { value: 'privacy', label: 'Privacy concerns' },
+    { value: 'other', label: 'Other (describe below)' },
+  ];
+
+  const next = () => setStep(s => Math.min(3, s + 1));
+  const back = () => setStep(s => Math.max(1, s - 1));
+
+  const doDeactivate = async () => {
+    setBusy(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('Please sign in first.');
+        return;
+      }
+      const { error } = await supabase
+        .from('buyers')
+        .update({
+          is_deleted: true,
+          deleted_at: new Date().toISOString(),
+          deletion_reason: reason,
+          deletion_notes: notes || null
+        })
+        .eq('auth_id', user.id);
+
+      if (error) throw error;
+      alert('Your profile has been deactivated. You can reactivate anytime.');
+    } catch (e) {
+      console.error(e);
+      alert('Could not deactivate your profile right now.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const doDelete = async () => {
+    setBusy(true);
+    try {
+      // Get a session token to authenticate the API call
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert('Please sign in first.');
+        return;
+      }
+      const r = await fetch('/api/buyer/delete-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ reason, notes })
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j?.error || 'Delete failed');
+      alert('Your account has been deleted.');
+      window.location.href = '/';
+    } catch (e) {
+      console.error(e);
+      alert(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
+      <div className="flex items-center justify-between mb-2">
+        <h2 className="text-xl font-semibold text-red-700">Close Account</h2>
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="text-sm px-3 py-1.5 border rounded-lg"
+        >
+          {open ? 'Hide' : 'Start'}
+        </button>
+      </div>
+      <p className="text-sm text-gray-600 mb-4">
+        You can <strong>deactivate</strong> (pause matching & emails) or <strong>delete</strong> your account (irreversible).
+      </p>
+
+      {open && (
+        <div className="space-y-5">
+          {/* Step 1 */}
+          {step === 1 && (
+            <div>
+              <h3 className="font-medium mb-2">Step 1: Choose an option</h3>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="action"
+                    value="deactivate"
+                    checked={action === 'deactivate'}
+                    onChange={() => setAction('deactivate')}
+                  />
+                  <span>Deactivate my buyer profile (can be reactivated later)</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="action"
+                    value="delete"
+                    checked={action === 'delete'}
+                    onChange={() => setAction('delete')}
+                  />
+                  <span>Delete my account permanently (irreversible)</span>
+                </label>
+              </div>
+
+              <div className="mt-4 flex gap-2">
+                <button onClick={next} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
+                  Continue
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2 */}
+          {step === 2 && (
+            <div>
+              <h3 className="font-medium mb-2">Step 2: Tell us why</h3>
+              <div className="grid gap-3">
+                <div>
+                  <label className="block text-sm mb-1">Reason</label>
+                  <select
+                    value={reason}
+                    onChange={e => setReason(e.target.value)}
+                    className="w-full border p-3 rounded"
+                  >
+                    {REASONS.map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Anything else? (optional)</label>
+                  <textarea
+                    value={notes}
+                    onChange={e => setNotes(e.target.value)}
+                    rows={3}
+                    className="w-full border p-3 rounded"
+                    placeholder="This helps us improve."
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 flex gap-2">
+                <button onClick={back} className="px-4 py-2 border rounded-lg">Back</button>
+                <button onClick={next} className="px-4 py-2 bg-blue-600 text-white rounded-lg">
+                  Continue
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3 */}
+          {step === 3 && (
+            <div>
+              <h3 className="font-medium mb-2">Step 3: Confirm</h3>
+              <p className="text-sm text-gray-700 mb-3">
+                Action: <strong>{action === 'deactivate' ? 'Deactivate profile' : 'Delete account permanently'}</strong><br/>
+                Reason: <strong>{reason}</strong>{notes ? <> — {notes}</> : null}
+              </p>
+              <div className="flex gap-2">
+                <button onClick={back} className="px-4 py-2 border rounded-lg">Back</button>
+                {action === 'deactivate' ? (
+                  <button
+                    disabled={busy}
+                    onClick={doDeactivate}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-lg disabled:opacity-60"
+                  >
+                    {busy ? 'Working…' : 'Deactivate'}
+                  </button>
+                ) : (
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      if (confirm('Delete your account permanently? This cannot be undone.')) {
+                        doDelete();
+                      }
+                    }}
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg disabled:opacity-60"
+                  >
+                    {busy ? 'Working…' : 'Delete permanently'}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
+  );
+}
+
 /**
  * Force SSR so Next doesn't try to pre-render/SSG this page at build time.
  * All Supabase calls run on the client via useEffect.
@@ -759,7 +994,5 @@ function InfoTile({ label, value }) {
 export async function getServerSideProps() {
   return { props: {} };
 }
-
-
 
 
