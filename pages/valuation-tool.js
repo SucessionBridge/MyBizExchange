@@ -42,8 +42,8 @@ function ValuationTool() {
   const [sellerCarryAllowed, setSellerCarryAllowed] = useState(false);
 
   const [showEbitdaRevenue, setShowEbitdaRevenue] = useState(false);
-  const [ebitdaOverride, setEbitdaOverride] = useState('');
-  const [revenueInput, setRevenueInput] = useState('');
+  const [ebitdaOverride, setEbitdaOverride] = useState(null);   // number | null
+  const [revenueInput, setRevenueInput] = useState(null);       // number | null
   const [ebitdaMultiples, setEbitdaMultiples] = useState([...DEFAULT_EBITDA_MULTIPLES]);
   const [revenueMultiples, setRevenueMultiples] = useState([...DEFAULT_REVENUE_MULTIPLES]);
 
@@ -100,7 +100,7 @@ function ValuationTool() {
 
           const initialSde = Number(data.annual_profit || 0);
           setSdeInput(initialSde);
-          setRevenueInput(String(data.annual_revenue || ''));
+          setRevenueInput(Number(data.annual_revenue || 0));
         }
       } catch (e) {
         console.error('Unexpected error loading listing:', e);
@@ -132,7 +132,7 @@ function ValuationTool() {
 
   const ebitdaValues = useMemo(() => {
     if (!showEbitdaRevenue) return null;
-    const eVal = Number(ebitdaOverride || sdeInput || 0);
+    const eVal = Number(ebitdaOverride ?? sdeInput ?? 0);
     return calculateEBITDAValues({
       ebitda: eVal,
       multiples: ebitdaMultiples.map(Number),
@@ -142,7 +142,7 @@ function ValuationTool() {
 
   const revenueValues = useMemo(() => {
     if (!showEbitdaRevenue) return null;
-    const rVal = Number(revenueInput || listing?.annual_revenue || 0);
+    const rVal = Number(revenueInput ?? listing?.annual_revenue ?? 0);
     return calculateRevenueValues({
       revenue: rVal,
       multiples: revenueMultiples.map(Number),
@@ -232,9 +232,9 @@ function ValuationTool() {
       working_capital_adjustment: Number(workingCapital || 0),
       seller_carry_allowed: Boolean(sellerCarryAllowed),
       show_ebitda_revenue_methods: Boolean(showEbitdaRevenue),
-      ebitda_value_override: ebitdaOverride ? Number(ebitdaOverride) : null,
+      ebitda_value_override: ebitdaOverride != null ? Number(ebitdaOverride) : null,
       ebitda_multiples: { low: Number(ebitdaMultiples[0]), base: Number(ebitdaMultiples[1]), high: Number(ebitdaMultiples[2]) },
-      revenue_input: revenueInput ? Number(revenueInput) : Number(listing?.annual_revenue || 0),
+      revenue_input: revenueInput != null ? Number(revenueInput) : Number(listing?.annual_revenue || 0),
       revenue_multiples: { low: Number(revenueMultiples[0]), base: Number(revenueMultiples[1]), high: Number(revenueMultiples[2]) },
       adjustments: {
         risk: adjustments.risk,
@@ -318,12 +318,12 @@ function ValuationTool() {
       setWorkingCapital(Number(i.working_capital_adjustment || 0));
       setSellerCarryAllowed(Boolean(i.seller_carry_allowed));
       setShowEbitdaRevenue(Boolean(i.show_ebitda_revenue_methods));
-      setEbitdaOverride(i.ebitda_value_override ?? '');
+      setEbitdaOverride(i.ebitda_value_override == null ? null : Number(i.ebitda_value_override));
       const em = i.ebitda_multiples || {};
       setEbitdaMultiples([Number(em.low || 3), Number(em.base || 4), Number(em.high || 5)]);
       const rm = i.revenue_multiples || {};
       setRevenueMultiples([Number(rm.low || 0.6), Number(rm.base || 1.0), Number(rm.high || 1.4)]);
-      setRevenueInput(String(i.revenue_input ?? listing?.annual_revenue ?? ''));
+      setRevenueInput(Number(i.revenue_input ?? listing?.annual_revenue ?? 0));
       alert('Loaded last valuation.');
     } catch (e) {
       console.error('Load valuation failed:', e);
@@ -414,15 +414,11 @@ function ValuationTool() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium">SDE (Profit)</label>
-              <input
-                type="number"
-                className="w-full border rounded p-2"
-                value={sdeInput}
-                onChange={(e) => setSdeInput(Number(e.target.value || 0))}
-              />
-            </div>
+            <CurrencyField
+              label="SDE (Profit)"
+              value={sdeInput}
+              onChange={setSdeInput}
+            />
 
             <div>
               <label className="block text-sm font-medium">Industry</label>
@@ -441,15 +437,11 @@ function ValuationTool() {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium">Working Capital Need (+)</label>
-              <input
-                type="number"
-                className="w-full border rounded p-2"
-                value={workingCapital}
-                onChange={(e) => setWorkingCapital(Number(e.target.value || 0))}
-              />
-            </div>
+            <CurrencyField
+              label="Working Capital Need (+)"
+              value={workingCapital}
+              onChange={setWorkingCapital}
+            />
           </div>
 
           {/* Multiples editor */}
@@ -511,14 +503,18 @@ function ValuationTool() {
             {showEbitdaRevenue && (
               <div className="mt-3 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium">EBITDA Override ($)</label>
-                    <input type="number" className="w-full border rounded p-2" value={ebitdaOverride} onChange={(e) => setEbitdaOverride(e.target.value)} placeholder="Leave blank to use SDE" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">Revenue ($)</label>
-                    <input type="number" className="w-full border rounded p-2" value={revenueInput} onChange={(e) => setRevenueInput(e.target.value)} placeholder="Defaults to listing revenue" />
-                  </div>
+                  <CurrencyField
+                    label="EBITDA Override ($)"
+                    value={ebitdaOverride}
+                    onChange={setEbitdaOverride}
+                    placeholder="Leave blank to use SDE"
+                  />
+                  <CurrencyField
+                    label="Revenue ($)"
+                    value={revenueInput}
+                    onChange={setRevenueInput}
+                    placeholder="Defaults to listing revenue"
+                  />
                 </div>
 
                 <div className="grid grid-cols-3 gap-3">
@@ -630,6 +626,53 @@ function ValuationTool() {
         </section>
       </div>
     </main>
+  );
+}
+
+function parseUSD(input) {
+  const n = Number(String(input || '').replace(/[^0-9.-]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function CurrencyField({ label, value, onChange, placeholder }) {
+  const [focused, setFocused] = useState(false);
+  const [text, setText] = useState(value == null || value === 0 ? '' : formatMoney(Number(value)));
+
+  // keep display synced with external changes when not focused
+  useEffect(() => {
+    if (!focused) {
+      if (value == null || value === 0) setText('');
+      else setText(formatMoney(Number(value)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, focused]);
+
+  return (
+    <div>
+      {label && <label className="block text-sm font-medium mb-1">{label}</label>}
+      <input
+        type="text"
+        inputMode="decimal"
+        className="w-full border rounded p-2"
+        placeholder={placeholder}
+        value={text}
+        onFocus={() => {
+          setFocused(true);
+          setText(value == null ? '' : String(value)); // show raw number while editing
+        }}
+        onChange={(e) => {
+          const t = e.target.value;
+          setText(t);
+          onChange(parseUSD(t));
+        }}
+        onBlur={() => {
+          setFocused(false);
+          const n = parseUSD(text);
+          setText(n ? formatMoney(n) : '');
+          onChange(n);
+        }}
+      />
+    </div>
   );
 }
 
