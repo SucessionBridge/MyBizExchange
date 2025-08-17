@@ -4,8 +4,40 @@ import supabase from "../lib/supabaseClient";
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 
+const STATE_OPTIONS = [
+  // US
+  'AL','AK','AZ','AR','CA','CO','CT','DC','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+  // Canada
+  'AB','BC','MB','NB','NL','NS','NT','NU','ON','PE','QC','SK','YT'
+];
+
+const INDUSTRY_OPTIONS = [
+  'Home services',
+  'E-commerce',
+  'Manufacturing',
+  'Logistics',
+  'Professional services',
+  'Automotive',
+  'Food & beverage',
+  'Retail',
+  'Healthcare',
+  'Construction',
+  'SaaS / Software',
+  'Cleaning & maintenance',
+  'Hospitality',
+];
+
+const PRIORITY_OPTIONS = [
+  { value: '', label: '— Select —' },
+  { value: 'location',  label: 'Location' },
+  { value: 'price',     label: 'Price/Budget' },
+  { value: 'industry',  label: 'Industry' },
+  { value: 'financing', label: 'Financing' },
+];
+
 export default function BuyerOnboarding() {
   const router = useRouter();
+  const nextPath = typeof router.query.next === 'string' ? router.query.next : '/buyer-dashboard';
 
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
@@ -14,35 +46,28 @@ export default function BuyerOnboarding() {
     name: '',
     email: '',
     financingType: 'self-financing',
-    experience: '3',              // keep as string for controlled <input type="number">
-    industryPreference: '',
-    capitalInvestment: '',        // string so empty is allowed
+    experience: '3',
+    industryPreference: '',     // will be a comma-separated list from the multi-select
+    capitalInvestment: '',
     shortIntroduction: '',
     priorIndustryExperience: 'No',
     willingToRelocate: 'No',
     city: '',
     stateOrProvince: '',
-    video: null,                  // File or null
+    video: null,
     budgetForPurchase: '',
-    // 🔽 priorities as controlled strings (dropdowns)
     priority_one: '',
     priority_two: '',
     priority_three: ''
   });
 
+  // Local UI state for multi-select
+  const [selectedIndustries, setSelectedIndustries] = useState([]);
+
   const [errorMessage, setErrorMessage] = useState('');
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [existingId, setExistingId] = useState(null);
-
-  // Normalize legacy priority values from DB to our canonical set
-  const normPriority = (v) => {
-    const s = String(v || '').trim().toLowerCase();
-    if (['location', 'price', 'industry', 'financing'].includes(s)) return s;
-    if (s === 'budget') return 'price';
-    if (s === 'financing options' || s === 'financing option') return 'financing';
-    return '';
-  };
 
   // 1) Load auth user and existing buyer profile (prefill)
   useEffect(() => {
@@ -62,8 +87,6 @@ export default function BuyerOnboarding() {
       }
 
       setUser(currUser);
-
-      // lock email to auth email
       setFormData(prev => ({ ...prev, email: currUser.email || '' }));
 
       // fetch existing buyer profile by auth_id OR email (legacy)
@@ -81,13 +104,22 @@ export default function BuyerOnboarding() {
 
       if (mounted && existingProfile) {
         setExistingId(existingProfile.id);
+
+        // Parse industry list if comma-separated
+        const industries = (existingProfile.industry_preference || '')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+
+        setSelectedIndustries(industries);
+
         setFormData(prev => ({
           ...prev,
           name: existingProfile.name ?? '',
           email: currUser.email ?? '',
           financingType: existingProfile.financing_type ?? 'self-financing',
           experience: existingProfile.experience != null ? String(existingProfile.experience) : '3',
-          industryPreference: existingProfile.industry_preference ?? '',
+          industryPreference: industries.join(', '),
           capitalInvestment: existingProfile.capital_investment != null ? String(existingProfile.capital_investment) : '',
           shortIntroduction: existingProfile.short_introduction ?? '',
           priorIndustryExperience: existingProfile.prior_industry_experience ?? 'No',
@@ -95,10 +127,9 @@ export default function BuyerOnboarding() {
           city: existingProfile.city ?? '',
           stateOrProvince: existingProfile.state_or_province ?? '',
           budgetForPurchase: existingProfile.budget_for_purchase != null ? String(existingProfile.budget_for_purchase) : '',
-          // 🔽 prefill priorities (normalized)
-          priority_one: normPriority(existingProfile.priority_one),
-          priority_two: normPriority(existingProfile.priority_two),
-          priority_three: normPriority(existingProfile.priority_three),
+          priority_one: existingProfile.priority_one ?? '',
+          priority_two: existingProfile.priority_two ?? '',
+          priority_three: existingProfile.priority_three ?? ''
         }));
       }
 
@@ -109,10 +140,16 @@ export default function BuyerOnboarding() {
     return () => { mounted = false; };
   }, []);
 
+  // Basic handlers
   const handleChange = (e) => {
     const { name, value } = e.target;
-    // keep everything controlled; allow empty string
     setFormData(prev => ({ ...prev, [name]: value ?? '' }));
+  };
+
+  const handleIndustryMulti = (e) => {
+    const opts = Array.from(e.target.selectedOptions).map(o => o.value);
+    setSelectedIndustries(opts);
+    setFormData(prev => ({ ...prev, industryPreference: opts.join(', ') }));
   };
 
   const handleVideoUpload = (e) => {
@@ -131,7 +168,7 @@ export default function BuyerOnboarding() {
   };
 
   const validateForm = () => {
-    // validate required fields as non-empty strings
+    // Only require basic fields
     const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
     for (let field of requiredFields) {
       if ((formData[field] ?? '') === '') {
@@ -182,7 +219,7 @@ export default function BuyerOnboarding() {
 
     if (!validateForm()) return;
 
-    // Require login to submit (but do NOT crash the page)
+    // Require login to submit
     const { data } = await supabase.auth.getUser();
     const currUser = data?.user || null;
     if (!currUser) {
@@ -192,13 +229,14 @@ export default function BuyerOnboarding() {
 
     const { url: introUrl } = await uploadIntroMedia(currUser.id);
 
-    // Build payload (strings stay strings; server can cast as needed)
+    // Build payload
     const payload = {
       auth_id: currUser.id,
       name: formData.name,
       email: formData.email || currUser.email,
       financing_type: formData.financingType,
       experience: formData.experience === '' ? null : Number(formData.experience),
+      // store as comma-separated list for now (dashboard matcher can handle commas)
       industry_preference: formData.industryPreference,
       capital_investment: formData.capitalInvestment === '' ? null : Number(formData.capitalInvestment),
       short_introduction: formData.shortIntroduction,
@@ -207,10 +245,9 @@ export default function BuyerOnboarding() {
       city: formData.city,
       state_or_province: formData.stateOrProvince,
       budget_for_purchase: formData.budgetForPurchase === '' ? null : Number(formData.budgetForPurchase),
-      // 🔽 store selected priorities (canonical lowercase)
-      priority_one: normPriority(formData.priority_one),
-      priority_two: normPriority(formData.priority_two),
-      priority_three: normPriority(formData.priority_three),
+      priority_one: formData.priority_one,
+      priority_two: formData.priority_two,
+      priority_three: formData.priority_three,
       intro_video_url: introUrl || null,
     };
 
@@ -232,12 +269,11 @@ export default function BuyerOnboarding() {
       toast.success('Your buyer profile was created.');
     }
 
-    // Route back to dashboard after a short tick (so toast can flash)
-    setTimeout(() => router.replace('/buyer-dashboard'), 200);
+    // Route back (dashboard by default, or ?next=…)
+    setTimeout(() => router.replace(nextPath), 150);
   };
 
-  // Simple unauth state: allow reading but indicate sign-in needed on submit
-  const emailDisabled = !!user; // lock to auth email when logged in
+  const emailDisabled = !!user;
 
   if (loadingUser) {
     return (
@@ -322,15 +358,23 @@ export default function BuyerOnboarding() {
             />
           </div>
 
+          {/* Industry multi-select */}
           <div>
-            <label className="block text-sm font-medium mb-1">Industry Preference</label>
-            <input
-              name="industryPreference"
-              value={formData.industryPreference}
-              onChange={handleChange}
+            <label className="block text-sm font-medium mb-1">Industry Preferences (choose 1–5)</label>
+            <select
+              multiple
+              size={Math.min(INDUSTRY_OPTIONS.length, 8)}
+              value={selectedIndustries}
+              onChange={handleIndustryMulti}
               className="w-full border p-3 rounded text-black"
-              placeholder="e.g., Home services, e-commerce"
-            />
+            >
+              {INDUSTRY_OPTIONS.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+            <p className="text-[11px] text-gray-500 mt-1">
+              We’ll use your first choice most strongly for matching.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -358,6 +402,7 @@ export default function BuyerOnboarding() {
             </div>
           </div>
 
+          {/* Location */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">City</label>
@@ -371,13 +416,17 @@ export default function BuyerOnboarding() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">State / Province</label>
-              <input
+              <select
                 name="stateOrProvince"
                 value={formData.stateOrProvince}
                 onChange={handleChange}
                 className="w-full border p-3 rounded text-black"
-                placeholder="e.g., NY, ON"
-              />
+              >
+                <option value="">— Select —</option>
+                {STATE_OPTIONS.map(code => (
+                  <option key={code} value={code}>{code}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -421,21 +470,17 @@ export default function BuyerOnboarding() {
             </div>
           </div>
 
-          {/* 🔽 PRIORITY SELECTS (replaces the 3 text inputs) */}
+          {/* Priorities */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Top Priority #1 (most important)</label>
+              <label className="block text-sm font-medium mb-1">Top Priority #1</label>
               <select
                 name="priority_one"
                 value={formData.priority_one}
                 onChange={handleChange}
                 className="w-full border p-3 rounded text-black"
               >
-                <option value="">-- Select priority --</option>
-                <option value="location">Location</option>
-                <option value="price">Price</option>
-                <option value="industry">Industry</option>
-                <option value="financing">Financing</option>
+                {PRIORITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div>
@@ -446,11 +491,7 @@ export default function BuyerOnboarding() {
                 onChange={handleChange}
                 className="w-full border p-3 rounded text-black"
               >
-                <option value="">-- Select priority --</option>
-                <option value="location">Location</option>
-                <option value="price">Price</option>
-                <option value="industry">Industry</option>
-                <option value="financing">Financing</option>
+                {PRIORITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
             <div>
@@ -461,15 +502,12 @@ export default function BuyerOnboarding() {
                 onChange={handleChange}
                 className="w-full border p-3 rounded text-black"
               >
-                <option value="">-- Select priority --</option>
-                <option value="location">Location</option>
-                <option value="price">Price</option>
-                <option value="industry">Industry</option>
-                <option value="financing">Financing</option>
+                {PRIORITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
           </div>
 
+          {/* Intro media */}
           <div>
             <label className="block text-sm font-medium">Upload Intro Video or Photo</label>
             <div className="mt-1 space-y-1">
