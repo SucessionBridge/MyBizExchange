@@ -17,6 +17,7 @@ export default function BuyerDashboard() {
   // Saved listings
   const [savedListings, setSavedListings] = useState([]);
   const [loadingSaved, setLoadingSaved] = useState(true);
+  const [unsaving, setUnsaving] = useState({}); // map of listingId -> boolean
 
   // Recent messages
   const [messages, setMessages] = useState([]);
@@ -189,6 +190,43 @@ export default function BuyerDashboard() {
     return () => { cancelled = true; };
   }, [authUser, profile]);
 
+  // 🔘 Unsave from dashboard
+  const handleUnsave = async (listingId) => {
+    if (!authUser || !profile) {
+      alert('Please sign in first.');
+      return;
+    }
+
+    const idStr = String(listingId);
+    setUnsaving(prev => ({ ...prev, [idStr]: true }));
+
+    // normalize id shape to match your saved_listings.listing_id type
+    const n = Number(listingId);
+    const listingValue = Number.isFinite(n) ? n : listingId;
+
+    try {
+      const { error } = await supabase
+        .from('saved_listings')
+        .delete()
+        .eq('listing_id', listingValue)
+        .or(`buyer_auth_id.eq.${authUser.id},buyer_email.eq.${profile.email}`);
+
+      if (error) throw error;
+
+      // update UI
+      setSavedListings(prev => prev.filter(x => String(x.id) !== idStr));
+    } catch (err) {
+      console.error('Unsave failed:', err);
+      alert("Couldn't remove this listing.");
+    } finally {
+      setUnsaving(prev => {
+        const p = { ...prev };
+        delete p[idStr];
+        return p;
+      });
+    }
+  };
+
   // 4) Load recent messages (by buyer email)
   useEffect(() => {
     if (!profile?.email) return;
@@ -225,8 +263,6 @@ export default function BuyerDashboard() {
     const fetchAndScore = async () => {
       setLoadingMatches(true);
 
-      // Pull a reasonable slice of active sellers.
-      // If you have status flags, add .eq('is_active', true) / .neq('status', 'sold'), etc.
       const { data: sellers, error } = await supabase
         .from('sellers')
         .select('id,business_name,location,city,state_or_province,asking_price,industry,financing_type,seller_financing_considered,image_urls,created_at')
@@ -245,10 +281,9 @@ export default function BuyerDashboard() {
           listing: l,
           ...scoreListingAgainstProfile(l, profile)
         }))
-        .filter(x => x.score > 0) // keep only relevant
+        .filter(x => x.score > 0)
         .sort((a, b) => {
           if (b.score !== a.score) return b.score - a.score;
-          // tie-breaker: closer to budget, then newest first
           const ba = budgetDistance(profile, b.listing);
           const aa = budgetDistance(profile, a.listing);
           if (aa !== ba) return aa - ba;
@@ -256,7 +291,7 @@ export default function BuyerDashboard() {
         });
 
       if (!cancelled) {
-        setMatches(scored.slice(0, 8)); // show top 8
+        setMatches(scored.slice(0, 8));
         setLoadingMatches(false);
       }
     };
@@ -424,9 +459,29 @@ export default function BuyerDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5">
               {savedListings.map((lst) => {
                 const cover = Array.isArray(lst.image_urls) && lst.image_urls.length > 0 ? lst.image_urls[0] : placeholder;
+                const idStr = String(lst.id);
+                const isWorking = !!unsaving[idStr];
+
                 return (
                   <Link key={lst.id} href={`/listings/${lst.id}`}>
-                    <a className="group block rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-lg">
+                    <a className="group block relative rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-lg">
+                      {/* UNSAVE button */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleUnsave(lst.id);
+                        }}
+                        disabled={isWorking}
+                        className={`absolute top-2 right-2 z-10 text-xs px-2 py-1 rounded-md border shadow-sm ${
+                          isWorking
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-white/90 hover:bg-white text-gray-700'
+                        }`}
+                      >
+                        {isWorking ? 'Removing…' : 'Unsave'}
+                      </button>
+
                       <div className="bg-gray-100 overflow-hidden">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -502,7 +557,6 @@ function prioritiesWeights(profile) {
   const base = { location: 0, price: 0, industry: 0, financing: 0 };
 
   if (!p1 && !p2 && !p3) {
-    // sensible defaults if user hasn't chosen
     return { location: 1, price: 2, industry: 2, financing: 1 };
   }
   if (p1) base[p1] = 3;
@@ -516,7 +570,7 @@ function financingCompatible(profileFinancing, listing) {
   const lf = lc(listing?.financing_type);
   const sellerConsidered = lc(listing?.seller_financing_considered);
 
-  if (!pf) return true; // buyer didn't specify – don't penalize
+  if (!pf) return true;
   if (pf === 'seller-financing') {
     return sellerConsidered === 'yes' || sellerConsidered === 'maybe' || lf === 'seller-financing';
   }
@@ -524,10 +578,10 @@ function financingCompatible(profileFinancing, listing) {
     return lf === 'rent-to-own' || sellerConsidered === 'yes' || sellerConsidered === 'maybe';
   }
   if (pf === 'third-party') {
-    return lf === 'third-party' || lf === 'buyer-financed' || !lf; // neutral/fallback
+    return lf === 'third-party' || lf === 'buyer-financed' || !lf;
   }
   if (pf === 'self-financing') {
-    return true; // always OK
+    return true;
   }
   return true;
 }
@@ -559,7 +613,6 @@ function budgetOK(profile, listing) {
 }
 
 function budgetDistance(profile, listing) {
-  // smaller is better; used for tie-break sorting
   const budget = Number(profile?.budget_for_purchase || 0);
   const ask = toNum(listing?.asking_price);
   if (!ask || !budget) return Number.POSITIVE_INFINITY;
@@ -571,19 +624,16 @@ function scoreListingAgainstProfile(listing, profile) {
   let score = 0;
   const reasons = [];
 
-  // Industry
   if (industryMatchTokens(profile?.industry_preference, listing?.industry)) {
     score += w.industry || 0;
     reasons.push('✅ Industry match');
   }
 
-  // Price
   if (budgetOK(profile, listing)) {
     score += w.price || 0;
     reasons.push('💸 Within budget');
   }
 
-  // Location (downweight if buyer is willing to relocate)
   const willing = lc(profile?.willing_to_relocate) === 'yes';
   if (locationMatch(profile, listing)) {
     const locWeight = willing ? Math.max(1, (w.location || 0) - 1) : (w.location || 0);
@@ -593,13 +643,11 @@ function scoreListingAgainstProfile(listing, profile) {
     }
   }
 
-  // Financing
   if (financingCompatible(profile?.financing_type, listing)) {
     if (w.financing > 0) {
       score += w.financing;
       reasons.push('🤝 Financing compatible');
     } else {
-      // Neutral compatibility still helpful if no priority chosen
       if (!profile?.priority_one && !profile?.priority_two && !profile?.priority_three) {
         score += 1;
         reasons.push('🤝 Financing compatible');
@@ -643,7 +691,6 @@ function RecentConversations({ profileEmail }) {
     return () => { cancelled = true; };
   }, [profileEmail]);
 
-  // Group messages by listing (latest only)
   const latestByListing = useMemo(() => {
     const by = new Map();
     for (const m of messages) {
@@ -712,5 +759,7 @@ function InfoTile({ label, value }) {
 export async function getServerSideProps() {
   return { props: {} };
 }
+
+
 
 
