@@ -22,22 +22,9 @@ export default function BuyerDashboard() {
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
 
-  // Matches
+  // Suggested matches
   const [matches, setMatches] = useState([]);
   const [loadingMatches, setLoadingMatches] = useState(true);
-
-  // Helpers
-  const toNum = (v) => {
-    if (v === null || v === undefined) return 0;
-    if (typeof v === 'number' && isFinite(v)) return v;
-    if (typeof v === 'string') {
-      const n = Number(v.replace(/[^0-9.-]/g, ''));
-      return Number.isFinite(n) ? n : 0;
-    }
-    return 0;
-  };
-  const normStr = (s) => (s || '').toString().trim().toLowerCase();
-  const includesI = (a, b) => normStr(a).includes(normStr(b));
 
   // 1) Auth check
   useEffect(() => {
@@ -96,11 +83,10 @@ export default function BuyerDashboard() {
     const fetchSavedListings = async () => {
       setLoadingSaved(true);
 
-      // Try several selectors due to schema history
       let rows = [];
       let lastErr = null;
 
-      // A) by auth id or email (preferred)
+      // A) auth id or email (preferred)
       {
         const { data, error } = await supabase
           .from('saved_listings')
@@ -155,7 +141,7 @@ export default function BuyerDashboard() {
         return;
       }
 
-      // Collect unique listing IDs
+      // Collect unique listing IDs (string/number-safe)
       const ids = Array.from(
         new Set(
           rows
@@ -170,7 +156,7 @@ export default function BuyerDashboard() {
         return;
       }
 
-      // Fetch seller rows for the saved listing ids
+      // Fetch sellers for those ids
       const idsAsNumber = ids.map(x => {
         const n = Number(x);
         return Number.isFinite(n) ? n : x;
@@ -231,110 +217,46 @@ export default function BuyerDashboard() {
     return () => { cancelled = true; };
   }, [profile?.email]);
 
-  // 5) Fetch active listings and compute matches (client-only scoring)
+  // 5) Suggested matches (client-side scoring, priority-aware)
   useEffect(() => {
     if (!profile) return;
     let cancelled = false;
 
-    const scoreListing = (lst, buyer) => {
-      const p1 = normStr(buyer.priority_one);
-      const p2 = normStr(buyer.priority_two);
-      const p3 = normStr(buyer.priority_three);
-      const weights = {};
-      if (p1) weights[p1] = (weights[p1] || 0) + 3;
-      if (p2) weights[p2] = (weights[p2] || 0) + 2;
-      if (p3) weights[p3] = (weights[p3] || 0) + 1;
-
-      const asking = toNum(lst.asking_price);
-      const budget = toNum(buyer.budget_for_purchase);
-      const lstCity = normStr(lst.city || (lst.location || '').split(',')[0]);
-      const lstState = normStr(lst.state_or_province || (lst.location || '').split(',').slice(-1)[0]);
-      const buyerCity = normStr(buyer.city);
-      const buyerState = normStr(buyer.state_or_province);
-      const lstIndustry = normStr(lst.industry);
-      const prefIndustry = normStr(buyer.industry_preference);
-      const lstFinType = normStr(lst.financing_type);
-      const sellerFinFlag = normStr(lst.seller_financing_considered); // 'yes'/'maybe'
-      const buyerFin = normStr(buyer.financing_type);
-
-      let score = 0;
-
-      // LOCATION
-      if (weights.location) {
-        let add = 0;
-        if (buyerState && lstState && buyerState === lstState) add += 0.7;
-        if (buyerCity && lstCity && buyerCity === lstCity) add += 0.5; // city match bonus
-        score += weights.location * add;
-      }
-
-      // PRICE (budget vs asking)
-      if (weights.price && budget > 0 && asking > 0) {
-        if (asking <= budget) score += weights.price * 1.0;
-        else if (asking <= budget * 1.10) score += weights.price * 0.6;
-        else if (asking <= budget * 1.25) score += weights.price * 0.3;
-      }
-
-      // INDUSTRY
-      if (weights.industry && prefIndustry) {
-        if (includesI(lstIndustry, prefIndustry)) score += weights.industry * 1.0;
-      }
-
-      // FINANCING
-      if (weights.financing && buyerFin) {
-        let good = false;
-        if (buyerFin === 'seller-financing') {
-          good = lstFinType === 'seller-financing' || sellerFinFlag === 'yes' || sellerFinFlag === 'maybe';
-        } else if (buyerFin === 'rent-to-own') {
-          good = lstFinType === 'rent-to-own' || sellerFinFlag === 'yes' || sellerFinFlag === 'maybe';
-        } else if (buyerFin === 'third-party') {
-          good = lstFinType === 'third-party' || lstFinType === 'buyer-financed';
-        } else if (buyerFin === 'self-financing') {
-          good = true; // self-financing works everywhere
-        }
-        if (good) score += weights.financing * 1.0;
-      }
-
-      // Light fallback if no explicit priorities set: give some sensible score
-      if (!p1 && !p2 && !p3) {
-        if (budget && asking && asking <= budget) score += 1.5;
-        if (prefIndustry && includesI(lstIndustry, prefIndustry)) score += 1.0;
-        if (buyerState && lstState && buyerState === lstState) score += 0.8;
-      }
-
-      return score;
-    };
-
     const fetchAndScore = async () => {
       setLoadingMatches(true);
 
-      // Pull active listings with fields we score on
+      // Pull a reasonable slice of active sellers.
+      // If you have status flags, add .eq('is_active', true) / .neq('status', 'sold'), etc.
       const { data: sellers, error } = await supabase
         .from('sellers')
-        .select('id,business_name,location,asking_price,image_urls,industry,city,state_or_province,financing_type,seller_financing_considered,status,created_at')
-        .eq('status', 'active')
+        .select('id,business_name,location,city,state_or_province,asking_price,industry,financing_type,seller_financing_considered,image_urls,created_at')
         .order('created_at', { ascending: false })
-        .limit(300);
+        .limit(250);
 
       if (error) {
-        console.warn('Match listings fetch error:', error.message);
+        console.warn('Sellers fetch for matches error:', error.message);
         setMatches([]);
         setLoadingMatches(false);
         return;
       }
 
-      const scored = (sellers || []).map(s => ({
-        ...s,
-        __score: scoreListing(s, profile),
-      }));
-
-      // Only keep meaningful matches
-      const meaningful = scored
-        .filter(s => (s.__score || 0) > 0)
-        .sort((a, b) => (b.__score || 0) - (a.__score || 0))
-        .slice(0, 12);
+      const scored = (sellers || [])
+        .map(l => ({
+          listing: l,
+          ...scoreListingAgainstProfile(l, profile)
+        }))
+        .filter(x => x.score > 0) // keep only relevant
+        .sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          // tie-breaker: closer to budget, then newest first
+          const ba = budgetDistance(profile, b.listing);
+          const aa = budgetDistance(profile, a.listing);
+          if (aa !== ba) return aa - ba;
+          return new Date(b.listing.created_at) - new Date(a.listing.created_at);
+        });
 
       if (!cancelled) {
-        setMatches(meaningful);
+        setMatches(scored.slice(0, 8)); // show top 8
         setLoadingMatches(false);
       }
     };
@@ -373,7 +295,7 @@ export default function BuyerDashboard() {
       <main className="min-h-screen bg-blue-50 p-8">
         <div className="max-w-6xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
           <p className="text-gray-700">
-            We couldn’t find your buyer profile{' '}
+            We couldn’t find your buyer profile.{` `}
             <Link href="/buyer-onboarding?next=/buyer-dashboard">
               <a className="text-blue-600 underline">Create it now</a>
             </Link>.
@@ -419,44 +341,36 @@ export default function BuyerDashboard() {
             <InfoTile label="Industry" value={profile.industry_preference || '—'} />
             <InfoTile label="Relocate?" value={profile.willing_to_relocate || '—'} />
           </div>
-
-          {/* Show selected priorities */}
-          <div className="mt-3 text-xs text-gray-600">
-            <span className="mr-3"><strong>Priority 1:</strong> {profile.priority_one || '—'}</span>
-            <span className="mr-3"><strong>Priority 2:</strong> {profile.priority_two || '—'}</span>
-            <span><strong>Priority 3:</strong> {profile.priority_three || '—'}</span>
-          </div>
-          <p className="text-[11px] text-gray-500 mt-2">Update your profile anytime to improve matching with sellers.</p>
+          <p className="text-xs text-gray-500 mt-3">Update your profile anytime to improve matching with sellers.</p>
         </section>
 
-        {/* Matches for You */}
+        {/* Suggested Matches */}
         <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xl font-semibold text-gray-800">Matches for You</h2>
+            <h2 className="text-xl font-semibold text-gray-800">Suggested Matches</h2>
             <Link href="/listings">
-              <a className="text-blue-600 hover:underline text-sm font-semibold">See all →</a>
+              <a className="text-blue-600 hover:underline text-sm font-semibold">See marketplace →</a>
             </Link>
           </div>
 
           {loadingMatches ? (
-            <p className="text-gray-600">Calculating your matches…</p>
+            <p className="text-gray-600">Finding matches…</p>
           ) : matches.length === 0 ? (
             <p className="text-gray-600">
-              No strong matches yet. Try updating your priorities or browsing{' '}
-              <Link href="/listings"><a className="text-blue-600 underline">all listings</a></Link>.
+              No strong matches yet. Try broadening your priorities or browse the marketplace.
             </p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5">
-              {matches.map((lst) => {
-                const cover = Array.isArray(lst.image_urls) && lst.image_urls.length > 0 ? lst.image_urls[0] : placeholder;
+              {matches.map(({ listing, score, reasons }) => {
+                const cover = Array.isArray(listing.image_urls) && listing.image_urls.length > 0 ? listing.image_urls[0] : placeholder;
                 return (
-                  <Link key={lst.id} href={`/listings/${lst.id}`}>
+                  <Link key={listing.id} href={`/listings/${listing.id}`}>
                     <a className="group block rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-lg">
                       <div className="bg-gray-100 overflow-hidden">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={cover}
-                          alt={lst.business_name || 'Business listing'}
+                          alt={listing.business_name || 'Business listing'}
                           className="w-full h-auto aspect-[4/3] object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
                           loading="lazy"
                           onError={(e) => { e.currentTarget.src = '/images/placeholders/listing-placeholder.jpg'; }}
@@ -464,15 +378,22 @@ export default function BuyerDashboard() {
                       </div>
                       <div className="p-3">
                         <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
-                          {lst.business_name || 'Unnamed Business'}
+                          {listing.business_name || 'Unnamed Business'}
                         </h3>
                         <div className="mt-1.5 flex items-center justify-between">
                           <p className="text-[14px] font-semibold text-gray-900">
-                            {lst.asking_price ? `$${toNum(lst.asking_price).toLocaleString()}` : 'Inquire'}
+                            {listing.asking_price ? `$${toNum(listing.asking_price).toLocaleString()}` : 'Inquire'}
                           </p>
                           <p className="text-[13px] text-gray-600 truncate max-w-[60%] text-right">
-                            {lst.location || [lst.city, lst.state_or_province].filter(Boolean).join(', ') || 'Location undisclosed'}
+                            {listing.location || composeLocation(listing)}
                           </p>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {reasons.map((r, i) => (
+                            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full border bg-gray-50 text-gray-700">
+                              {r}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     </a>
@@ -496,7 +417,7 @@ export default function BuyerDashboard() {
             <p className="text-gray-600">Loading saved listings…</p>
           ) : savedListings.length === 0 ? (
             <p className="text-gray-600">
-              You haven’t saved any listings yet.{' '}
+              You haven’t saved any listings yet.{` `}
               <Link href="/listings"><a className="text-blue-600 underline">Browse available businesses</a></Link>.
             </p>
           ) : (
@@ -543,6 +464,153 @@ export default function BuyerDashboard() {
     </main>
   );
 }
+
+/* ---------- Matching helpers ---------- */
+
+function toNum(v) {
+  if (v === null || v === undefined) return 0;
+  if (typeof v === 'number' && isFinite(v)) return v;
+  if (typeof v === 'string') {
+    const n = Number(v.replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function lc(x) {
+  return String(x || '').toLowerCase().trim();
+}
+
+function parseCSV(str) {
+  return String(str || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function composeLocation(l) {
+  const city = l?.city || '';
+  const st = l?.state_or_province || '';
+  if (city && st) return `${city}, ${st}`;
+  return city || st || 'Location undisclosed';
+}
+
+function prioritiesWeights(profile) {
+  const p1 = lc(profile?.priority_one);
+  const p2 = lc(profile?.priority_two);
+  const p3 = lc(profile?.priority_three);
+  const base = { location: 0, price: 0, industry: 0, financing: 0 };
+
+  if (!p1 && !p2 && !p3) {
+    // sensible defaults if user hasn't chosen
+    return { location: 1, price: 2, industry: 2, financing: 1 };
+  }
+  if (p1) base[p1] = 3;
+  if (p2 && base[p2] === 0) base[p2] = 2;
+  if (p3 && base[p3] === 0) base[p3] = 1;
+  return base;
+}
+
+function financingCompatible(profileFinancing, listing) {
+  const pf = lc(profileFinancing);
+  const lf = lc(listing?.financing_type);
+  const sellerConsidered = lc(listing?.seller_financing_considered);
+
+  if (!pf) return true; // buyer didn't specify – don't penalize
+  if (pf === 'seller-financing') {
+    return sellerConsidered === 'yes' || sellerConsidered === 'maybe' || lf === 'seller-financing';
+  }
+  if (pf === 'rent-to-own') {
+    return lf === 'rent-to-own' || sellerConsidered === 'yes' || sellerConsidered === 'maybe';
+  }
+  if (pf === 'third-party') {
+    return lf === 'third-party' || lf === 'buyer-financed' || !lf; // neutral/fallback
+  }
+  if (pf === 'self-financing') {
+    return true; // always OK
+  }
+  return true;
+}
+
+function industryMatchTokens(profileIndustryCSV, listingIndustry) {
+  const tokens = parseCSV(profileIndustryCSV).map(lc);
+  const li = lc(listingIndustry);
+  if (!tokens.length || !li) return false;
+  return tokens.some(tok => li.includes(tok));
+}
+
+function locationMatch(profile, listing) {
+  const pc = lc(profile?.city);
+  const ps = lc(profile?.state_or_province);
+  const lcCity = lc(listing?.city);
+  const lcState = lc(listing?.state_or_province);
+  if (!pc && !ps) return false;
+  if (pc && lcCity && lcCity.includes(pc)) return true;
+  if (ps && lcState && lcState.includes(ps)) return true;
+  return false;
+}
+
+function budgetOK(profile, listing) {
+  const budget = Number(profile?.budget_for_purchase || 0);
+  if (!Number.isFinite(budget) || budget <= 0) return false;
+  const ask = toNum(listing?.asking_price);
+  if (!ask) return false;
+  return ask <= budget;
+}
+
+function budgetDistance(profile, listing) {
+  // smaller is better; used for tie-break sorting
+  const budget = Number(profile?.budget_for_purchase || 0);
+  const ask = toNum(listing?.asking_price);
+  if (!ask || !budget) return Number.POSITIVE_INFINITY;
+  return Math.max(0, ask - budget);
+}
+
+function scoreListingAgainstProfile(listing, profile) {
+  const w = prioritiesWeights(profile);
+  let score = 0;
+  const reasons = [];
+
+  // Industry
+  if (industryMatchTokens(profile?.industry_preference, listing?.industry)) {
+    score += w.industry || 0;
+    reasons.push('✅ Industry match');
+  }
+
+  // Price
+  if (budgetOK(profile, listing)) {
+    score += w.price || 0;
+    reasons.push('💸 Within budget');
+  }
+
+  // Location (downweight if buyer is willing to relocate)
+  const willing = lc(profile?.willing_to_relocate) === 'yes';
+  if (locationMatch(profile, listing)) {
+    const locWeight = willing ? Math.max(1, (w.location || 0) - 1) : (w.location || 0);
+    if (locWeight > 0) {
+      score += locWeight;
+      reasons.push('📍 Location match');
+    }
+  }
+
+  // Financing
+  if (financingCompatible(profile?.financing_type, listing)) {
+    if (w.financing > 0) {
+      score += w.financing;
+      reasons.push('🤝 Financing compatible');
+    } else {
+      // Neutral compatibility still helpful if no priority chosen
+      if (!profile?.priority_one && !profile?.priority_two && !profile?.priority_three) {
+        score += 1;
+        reasons.push('🤝 Financing compatible');
+      }
+    }
+  }
+
+  return { score, reasons };
+}
+
+/* ---------- Recent conversations ---------- */
 
 function RecentConversations({ profileEmail }) {
   const [messages, setMessages] = useState([]);
@@ -644,3 +712,5 @@ function InfoTile({ label, value }) {
 export async function getServerSideProps() {
   return { props: {} };
 }
+
+
