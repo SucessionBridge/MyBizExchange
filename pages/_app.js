@@ -28,7 +28,7 @@ export default function App({ Component, pageProps }) {
         } catch (_) {
           // no-op
         } finally {
-          const next = localStorage.getItem('pendingNext') || '/seller';
+          const next = localStorage.getItem('pendingNext') || '/sellers';
           localStorage.removeItem('pendingNext');
           router.replace(next);
         }
