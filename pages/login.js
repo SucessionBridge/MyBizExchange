@@ -38,6 +38,9 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
 
+    // Persist intended destination for hash-based magic-link landings
+    localStorage.setItem('pendingNext', nextPath || '/seller');
+
     // Build callback URL; include ?next= for broker flow (or any explicit next)
     const callbackUrl = `${window.location.origin}/auth/callback${
       nextPath ? `?next=${encodeURIComponent(nextPath)}` : ''
@@ -85,4 +88,3 @@ export default function Login() {
     </main>
   );
 }
-
