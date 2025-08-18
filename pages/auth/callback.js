@@ -7,32 +7,19 @@ export default function AuthCallback() {
   const router = useRouter();
 
   useEffect(() => {
-    const handleRedirect = async () => {
-      console.log('📍 Entered /auth/callback');
+    const go = async () => {
       const { error } = await supabase.auth.exchangeCodeForSession();
-      if (error) {
-        console.error('❌ Session error:', error.message);
-        router.replace('/login');
-        return;
-      }
+      if (error) return router.replace('/login');
 
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('✅ Logged in user:', user);
-
-      if (user) {
-        router.replace('/buyer-onboarding');
-      } else {
-        router.replace('/login');
-      }
+      const url = new URL(window.location.href);
+      const next = url.searchParams.get('next') || '/seller'; // default to seller onboarding
+      router.replace(next);
     };
-
-    handleRedirect();
+    go();
   }, [router]);
 
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      Logging you in...
-    </div>
-  );
+  return <div className="min-h-screen flex items-center justify-center">Logging you in...</div>;
 }
+
+
 
