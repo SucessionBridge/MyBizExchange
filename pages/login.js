@@ -39,7 +39,7 @@ export default function Login() {
     setLoading(true);
 
     // Persist intended destination for hash-based magic-link landings
-    localStorage.setItem('pendingNext', nextPath || '/seller');
+    localStorage.setItem('pendingNext', nextPath || '/sellers');
 
     // Build callback URL; include ?next= for broker flow (or any explicit next)
     const callbackUrl = `${window.location.origin}/auth/callback${
