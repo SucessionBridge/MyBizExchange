@@ -75,13 +75,13 @@ function EmailVerifyGate() {
 
     setSending(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: e1,
-        options: {
-          // Redirect back to this page after clicking the link
-          emailRedirectTo: `${window.location.origin}/sellers`,
-        },
-      });
+     await supabase.auth.signInWithOtp({
+  email: e1,
+  options: {
+    emailRedirectTo: `${window.location.origin}/auth/callback?next=/seller`,
+  },
+});
+ 
       if (error) throw error;
       setSentTo(e1);
     } catch (e) {
