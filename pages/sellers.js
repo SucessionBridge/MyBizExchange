@@ -84,6 +84,7 @@ function EmailVerifyGate() {
     try {
       // 👇 preserve broker context so the flow returns to /seller?as=broker
       const nextDest = asBroker ? '/seller?as=broker' : '/seller';
+      localStorage.setItem('pendingNext', nextDest);
       const { error } = await supabase.auth.signInWithOtp({
         email: e1,
         options: {
