@@ -5,9 +5,152 @@ import supabase from '../lib/supabaseClient'; // ✅ correct
 import FloatingInput from '../components/FloatingInput';
 import EditDescriptionModal from '../components/EditDescriptionModal'; // ✅ NEW
 
-export default function SellerWizard() {
+/* ---------------- Email verification gate (magic link) ---------------- */
 
+function EmailVerifyGate() {
+  const [email, setEmail] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [sentTo, setSentTo] = useState('');
+  const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
+  const [suggestion, setSuggestion] = useState('');
+
+  const COMMON_DOMAINS = ['gmail.com','yahoo.com','outlook.com','hotmail.com','icloud.com','aol.com','comcast.net','live.com','proton.me'];
+  const suggestDomain = (addr) => {
+    const [local, domainRaw = ''] = String(addr).split('@');
+    const domain = domainRaw.toLowerCase();
+    if (!domain) return '';
+    const fixes = { gmai: 'gmail.com', gmial: 'gmail.com', gmal: 'gmail.com', hotmai: 'hotmail.com', yaho: 'yahoo.com', icloud.co: 'icloud.com' };
+    for (const bad in fixes) if (domain.startsWith(bad)) return `${local}@${fixes[bad]}`;
+    if (domain.endsWith('.con')) return `${local}@${domain.replace(/\.con$/, '.com')}`;
+    if (domain.endsWith('.cmo')) return `${local}@${domain.replace(/\.cmo$/, '.com')}`;
+    const dist = (a,b) => {
+      if (Math.abs(a.length - b.length) > 2) return 99;
+      let d = 0;
+      for (let i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) d++;
+      return d;
+    };
+    let best = ''; let bestD = 99;
+    for (const d of COMMON_DOMAINS) {
+      const dd = dist(domain, d);
+      if (dd < bestD) { bestD = dd; best = d; }
+    }
+    if (best && bestD <= 2) return `${local}@${best}`;
+    return '';
+  };
+
+  useEffect(() => { setSuggestion(suggestDomain(email)); }, [email]);
+
+  const sendMagicLink = async () => {
+    setError('');
+    const e1 = email.trim();
+    const e2 = confirm.trim();
+    if (!e1 || !e2 || e1.toLowerCase() !== e2.toLowerCase()) {
+      setError('Emails do not match.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e1)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+    setSending(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: e1,
+        options: {
+          emailRedirectTo: `${window.location.origin}/seller`, // redirect back here after clicking link
+        },
+      });
+      if (error) throw error;
+      setSentTo(e1);
+    } catch (e) {
+      setError(e.message || 'Could not send verification link.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (sentTo) {
+    return (
+      <div className="max-w-lg mx-auto bg-white rounded-xl shadow p-6">
+        <h2 className="text-xl font-semibold mb-2">Verify your email</h2>
+        <p className="text-gray-700">We sent a sign-in link to <strong>{sentTo}</strong>.</p>
+        <p className="text-gray-600 text-sm mt-1">Open that link on this device to continue your seller onboarding.</p>
+        <button
+          className="mt-4 text-sm text-blue-700 underline"
+          onClick={() => { setSentTo(''); setEmail(''); setConfirm(''); }}
+        >
+          Wrong email? Change it
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-lg mx-auto bg-white rounded-xl shadow p-6">
+      <h2 className="text-xl font-semibold mb-2">Start with your email</h2>
+      <p className="text-gray-600 text-sm mb-4">We’ll send a one-click sign-in link. You’ll manage your listing with this email.</p>
+
+      <label className="block text-sm font-medium mb-1">Email</label>
+      <input
+        className="w-full border rounded p-2"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="you@company.com"
+        type="email"
+      />
+      {suggestion && suggestion.toLowerCase() !== email.toLowerCase() && (
+        <div className="text-[12px] text-amber-700 mt-1">
+          Did you mean{' '}
+          <button className="underline" onClick={() => setEmail(suggestion)}>{suggestion}</button>
+          ?
+        </div>
+      )}
+
+      <label className="block text-sm font-medium mt-3 mb-1">Confirm email</label>
+      <input
+        className="w-full border rounded p-2"
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        placeholder="retype your email"
+        type="email"
+      />
+
+      {error && <div className="text-sm text-rose-700 mt-2">{error}</div>}
+
+      <button
+        className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold disabled:opacity-60"
+        onClick={sendMagicLink}
+        disabled={sending}
+      >
+        {sending ? 'Sending…' : 'Send sign-in link'}
+      </button>
+    </div>
+  );
+}
+
+/* ---------------------------- Seller Wizard ---------------------------- */
+
+export default function SellerWizard() {
   const router = useRouter();
+
+  // 🔐 Check auth (verified email)
+  const [authUser, setAuthUser] = useState(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      const u = data?.user || null;
+      setAuthUser(u);
+      setLoadingAuth(false);
+      // Pre-fill the form email if logged in
+      if (u?.email) {
+        setFormData(prev => ({ ...prev, email: u.email }));
+      }
+    })();
+  }, []);
+
   const [step, setStep] = useState(1);
   const [previewMode, setPreviewMode] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
@@ -74,9 +217,8 @@ export default function SellerWizard() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               sentenceSummary: formData.sentenceSummary,
-              customerProfile: formData.customerProfile,   // <-- replaced multiple customer fields with this single field
+              customerProfile: formData.customerProfile,
               bestSellers: formData.bestSellers,
-              // Removed customerLove, repeatCustomers, keepsThemComing here
               ownerInvolvement: formData.ownerInvolvement,
               opportunity: formData.growthPotential,
               proudOf: formData.proudOf,
@@ -105,7 +247,7 @@ export default function SellerWizard() {
       };
       fetchDescription();
     }
-  }, [previewMode]);
+  }, [previewMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -153,7 +295,6 @@ export default function SellerWizard() {
   };
 
   const deleteImageAt = (index) => {
-    // Revoke the object URL to avoid memory leaks
     const url = imagePreviews[index];
     if (url) URL.revokeObjectURL(url);
 
@@ -162,7 +303,6 @@ export default function SellerWizard() {
   };
 
   useEffect(() => {
-    // Cleanup all object URLs on unmount
     return () => {
       imagePreviews.forEach(u => URL.revokeObjectURL(u));
     };
@@ -170,6 +310,10 @@ export default function SellerWizard() {
 
   const handleSubmit = async () => {
     try {
+      if (!authUser) {
+        alert('Please verify your email first.');
+        return;
+      }
       setIsSubmitting(true);
 
       // Upload images to Supabase Storage
@@ -194,13 +338,12 @@ export default function SellerWizard() {
         uploadedImageUrls.push(publicUrlData.publicUrl);
       }
 
-      // Helper to convert empty strings to null to keep backend clean
       const cleanString = (val) => (typeof val === 'string' && val.trim() === '') ? null : val?.trim() || null;
 
-      // Prepare payload with camelCase keys from formData matched to snake_case backend keys
+      // 🔐 Use verified auth email/id — avoids orphaned listings
       const payload = {
         name: cleanString(formData.name) || 'Unnamed Seller',
-        email: cleanString(formData.email) || 'noemail@example.com',
+        email: authUser.email,                // ⬅️ enforce verified email
         business_name: cleanString(formData.businessName) || 'Unnamed Business',
         hide_business_name: !!formData.hideBusinessName,
         industry: cleanString(formData.industry) || 'Unknown Industry',
@@ -243,13 +386,13 @@ export default function SellerWizard() {
         willing_to_mentor: !!formData.willingToMentor,
         sentence_summary: cleanString(formData.sentenceSummary),
 
-        // Updated customer fields — only these two now:
         customer_profile: cleanString(formData.customerProfile),
         best_sellers: cleanString(formData.bestSellers),
 
         proud_of: cleanString(formData.proudOf),
         advice_to_buyer: cleanString(formData.adviceToBuyer),
-        auth_id: cleanString(formData.authId),
+
+        auth_id: authUser.id,                // ⬅️ enforce owner link for RLS
         financing_preference: cleanString(formData.financingPreference),
         down_payment: Number(formData.downPayment) || 0,
         term_length: Number(formData.termLength) || 0,
@@ -278,9 +421,7 @@ export default function SellerWizard() {
       setSubmitError('');
       setIsSubmitting(false);
 
-      // Optionally redirect or reset form here:
       // router.push('/thank-you');
-
     } catch (error) {
       console.error("❌ Submission error:", error);
       setSubmitError('Submission error, please try again.');
@@ -303,7 +444,6 @@ export default function SellerWizard() {
         accept="image/*"
         className="w-full border rounded p-2"
       />
-      {/* Thumbnails */}
       {imagePreviews.length > 0 && (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-2">
           {imagePreviews.map((src, i) => (
@@ -546,6 +686,29 @@ export default function SellerWizard() {
     );
   };
 
+  // --------------- Render ---------------
+
+  if (loadingAuth) {
+    return <main className="bg-white min-h-screen p-6 font-sans"><div className="max-w-2xl mx-auto">Loading…</div></main>;
+  }
+
+  // ⛔ If not verified, show the email gate instead of the wizard
+  if (!authUser) {
+    return (
+      <main className="bg-white min-h-screen p-6 font-sans">
+        <Head>
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+        </Head>
+        <div className="max-w-2xl mx-auto">
+          <h1 className="text-3xl font-bold mb-6 text-center">Seller Onboarding</h1>
+          <EmailVerifyGate />
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="bg-white min-h-screen p-6 font-sans">
       <Head>
@@ -559,7 +722,15 @@ export default function SellerWizard() {
           step === 1 ? (
             <div className="space-y-4">
               <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="email" placeholder="Email" value={formData.email} onChange={handleChange} className="w-full border p-3 rounded" />
+              {/* Email is verified via Supabase; show but disable editing */}
+              <input
+                name="email"
+                placeholder="Email (verified)"
+                value={formData.email}
+                onChange={handleChange}
+                className="w-full border p-3 rounded bg-gray-50"
+                disabled
+              />
               <label htmlFor="businessName" className="block mb-1 font-semibold">
                 Business Name
               </label>
