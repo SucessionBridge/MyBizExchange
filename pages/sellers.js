@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import supabase from '../lib/supabaseClient'; // ✅ correct
+import supabase from '../lib/supabaseClient';
 import FloatingInput from '../components/FloatingInput';
-import EditDescriptionModal from '../components/EditDescriptionModal'; // ✅ NEW
+import EditDescriptionModal from '../components/EditDescriptionModal';
 
 /* ---------------- Email verification gate (magic link) ---------------- */
 function EmailVerifyGate() {
@@ -13,6 +13,15 @@ function EmailVerifyGate() {
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [suggestion, setSuggestion] = useState('');
+  const [asBroker, setAsBroker] = useState(false); // 👈 NEW
+
+  useEffect(() => {
+    // detect broker context from URL (?as=broker)
+    try {
+      const p = new URLSearchParams(window.location.search);
+      setAsBroker(p.get('as') === 'broker');
+    } catch {}
+  }, []);
 
   const COMMON_DOMAINS = [
     'gmail.com','yahoo.com','outlook.com','hotmail.com','icloud.com',
@@ -24,14 +33,13 @@ function EmailVerifyGate() {
     const domain = domainRaw.toLowerCase();
     if (!domain) return '';
 
-    // common full-domain/partial typos
     const fixes = {
       gmai: 'gmail.com',
       gmial: 'gmail.com',
       gmal: 'gmail.com',
       hotmai: 'hotmail.com',
       yaho: 'yahoo.com',
-      'icloud.co': 'icloud.com', // keep quoted because of the dot
+      'icloud.co': 'icloud.com',
     };
     for (const bad in fixes) {
       if (domain.startsWith(bad)) return `${local}@${fixes[bad]}`;
@@ -39,7 +47,6 @@ function EmailVerifyGate() {
     if (domain.endsWith('.con')) return `${local}@${domain.replace(/\.con$/, '.com')}`;
     if (domain.endsWith('.cmo')) return `${local}@${domain.replace(/\.cmo$/, '.com')}`;
 
-    // very light “distance” guess to nearby common domains
     const dist = (a, b) => {
       if (Math.abs(a.length - b.length) > 2) return 99;
       let d = 0;
@@ -75,15 +82,15 @@ function EmailVerifyGate() {
 
     setSending(true);
     try {
-     const { error } = await supabase.auth.signInWithOtp({
-  email: e1,
-  options: {
-    // ⬇️ this makes the email link open /auth/callback and then go to /seller
-    emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent('/seller')}`,
-  },
-});
+      // 👇 preserve broker context so the flow returns to /seller?as=broker
+      const nextDest = asBroker ? '/seller?as=broker' : '/seller';
+      const { error } = await supabase.auth.signInWithOtp({
+        email: e1,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextDest)}`,
+        },
+      });
 
- 
       if (error) throw error;
       setSentTo(e1);
     } catch (e) {
@@ -177,7 +184,6 @@ export default function SellerWizard() {
       const u = data?.user || null;
       setAuthUser(u);
       setLoadingAuth(false);
-      // Pre-fill the form email if logged in
       if (u?.email) {
         setFormData(prev => ({ ...prev, email: u.email }));
       }
@@ -193,9 +199,9 @@ export default function SellerWizard() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
-  const [editTarget, setEditTarget] = useState(null); // ✅ NEW for modal target
+  const [editTarget, setEditTarget] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [currentEditType, setCurrentEditType] = useState('manual'); // 'manual' or 'ai'
+  const [currentEditType, setCurrentEditType] = useState('manual');
   const [tempDescription, setTempDescription] = useState('');
   const [tempAIDescription, setTempAIDescription] = useState('');
   const [formData, setFormData] = useState({
@@ -349,6 +355,27 @@ export default function SellerWizard() {
       }
       setIsSubmitting(true);
 
+      // 👇 NEW: detect broker mode and fetch broker id if verified
+      const asBroker = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('as') === 'broker';
+      let brokerId = null;
+      if (asBroker) {
+        const { data: b } = await supabase
+          .from('brokers')
+          .select('id, verified')
+          .eq('auth_id', authUser.id)
+          .single();
+        if (!b) {
+          window.location.href = '/broker-onboarding';
+          return;
+        }
+        if (!b.verified) {
+          alert('Your broker profile is pending verification.');
+          window.location.href = '/broker-onboarding';
+          return;
+        }
+        brokerId = b.id;
+      }
+
       // Upload images to Supabase Storage
       const uploadedImageUrls = [];
       for (const file of formData.images) {
@@ -376,7 +403,7 @@ export default function SellerWizard() {
       // 🔐 Use verified auth email/id — avoids orphaned listings
       const payload = {
         name: cleanString(formData.name) || 'Unnamed Seller',
-        email: authUser.email,                // ⬅️ enforce verified email
+        email: authUser.email, // keep using verified email field in your schema
         business_name: cleanString(formData.businessName) || 'Unnamed Business',
         hide_business_name: !!formData.hideBusinessName,
         industry: cleanString(formData.industry) || 'Unknown Industry',
@@ -425,16 +452,16 @@ export default function SellerWizard() {
         proud_of: cleanString(formData.proudOf),
         advice_to_buyer: cleanString(formData.adviceToBuyer),
 
-        auth_id: authUser.id,                // ⬅️ enforce owner link for RLS
+        auth_id: authUser.id, // RLS owner link
         financing_preference: cleanString(formData.financingPreference),
         down_payment: Number(formData.downPayment) || 0,
         term_length: Number(formData.termLength) || 0,
         seller_financing_interest_rate: Number(formData.sellerFinancingInterestRate || formData.interestRate) || 0,
         interest_rate: Number(formData.interestRate) || 0,
         image_urls: uploadedImageUrls,
-      };
 
-      console.log("📤 Payload to backend:", payload);
+        broker_id: brokerId, // 👈 NEW: ties listing to the verified broker when in broker mode
+      };
 
       const res = await fetch('/api/submit-seller-listing', {
         method: 'POST',
@@ -453,7 +480,6 @@ export default function SellerWizard() {
       setSubmitSuccess(true);
       setSubmitError('');
       setIsSubmitting(false);
-
       // router.push('/thank-you');
     } catch (error) {
       console.error("❌ Submission error:", error);
@@ -781,7 +807,6 @@ export default function SellerWizard() {
           ) : step === 2 ? (
             <div className="space-y-4">
               {/* Step 2 inputs */}
-
               <input
                 name="industry"
                 placeholder="Industry"
@@ -1138,3 +1163,4 @@ export default function SellerWizard() {
     </main>
   );
 }
+
