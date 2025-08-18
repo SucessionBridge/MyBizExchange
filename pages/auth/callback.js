@@ -7,10 +7,10 @@ function safeNext(p) {
   try {
     // Only allow redirects within this site
     const url = new URL(p, window.location.origin);
-    if (url.origin !== window.location.origin) return '/seller';
+    if (url.origin !== window.location.origin) return '/sellers';
     return url.pathname + url.search + url.hash;
   } catch {
-    return '/seller';
+    return '/sellers';
   }
 }
 
@@ -28,7 +28,7 @@ export default function AuthCallback() {
       }
 
       const params = new URLSearchParams(window.location.search);
-      const next = safeNext(params.get('next') || '/seller'); // ⬅️ default /seller
+      const next = safeNext(params.get('next') || '/sellers'); // ⬅️ default /sellers
       router.replace(next);
     })();
   }, [router]);
