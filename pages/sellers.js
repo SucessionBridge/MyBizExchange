@@ -82,8 +82,8 @@ function EmailVerifyGate() {
 
     setSending(true);
     try {
-      // 👇 preserve broker context so the flow returns to /seller?as=broker
-      const nextDest = asBroker ? '/seller?as=broker' : '/seller';
+      // 👇 preserve broker context so the flow returns to /sellers?as=broker
+      const nextDest = asBroker ? '/sellers?as=broker' : '/sellers';
       localStorage.setItem('pendingNext', nextDest);
       const { error } = await supabase.auth.signInWithOtp({
         email: e1,
@@ -109,7 +109,7 @@ function EmailVerifyGate() {
           We sent a sign-in link to <strong>{sentTo}</strong>.
         </p>
         <p className="text-gray-600 text-sm mt-1">
-          Open that link on this device to continue your seller onboarding.
+          Open that link on this device to continue your sellers onboarding.
         </p>
         <button
           className="mt-4 text-sm text-blue-700 underline"
