@@ -20,7 +20,14 @@ function EmailVerifyGate() {
     const [local, domainRaw = ''] = String(addr).split('@');
     const domain = domainRaw.toLowerCase();
     if (!domain) return '';
-    const fixes = { gmai: 'gmail.com', gmial: 'gmail.com', gmal: 'gmail.com', hotmai: 'hotmail.com', yaho: 'yahoo.com', icloud.co: 'icloud.com' };
+    const fixes = {
+      'gmai': 'gmail.com',
+      'gmial': 'gmail.com',
+      'gmal': 'gmail.com',
+      'hotmai': 'hotmail.com',
+      'yaho': 'yahoo.com',
+      'icloud.co': 'icloud.com'
+    };
     for (const bad in fixes) if (domain.startsWith(bad)) return `${local}@${fixes[bad]}`;
     if (domain.endsWith('.con')) return `${local}@${domain.replace(/\.con$/, '.com')}`;
     if (domain.endsWith('.cmo')) return `${local}@${domain.replace(/\.cmo$/, '.com')}`;
@@ -57,9 +64,7 @@ function EmailVerifyGate() {
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email: e1,
-        options: {
-          emailRedirectTo: `${window.location.origin}/seller`, // redirect back here after clicking link
-        },
+        options: { emailRedirectTo: `${window.location.origin}/seller` },
       });
       if (error) throw error;
       setSentTo(e1);
@@ -69,6 +74,9 @@ function EmailVerifyGate() {
       setSending(false);
     }
   };
+
+  // ... (rest of component unchanged)
+}
 
   if (sentTo) {
     return (
