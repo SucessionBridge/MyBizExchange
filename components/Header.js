@@ -158,7 +158,14 @@ export default function Header() {
               )}
             </div>
           ) : (
-            <Link href="/login"><span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Login</span></Link>
+            <>
+              <Link href="/login">
+                <span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Login</span>
+              </Link>
+              <Link href="/login?role=broker">
+                <span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Broker Login</span>
+              </Link>
+            </>
           )}
         </nav>
 
@@ -238,7 +245,14 @@ export default function Header() {
                 </button>
               </>
             ) : (
-              <Link href="/login"><span className="py-2" onClick={() => setIsOpen(false)}>Login</span></Link>
+              <>
+                <Link href="/login">
+                  <span className="py-2" onClick={() => setIsOpen(false)}>Login</span>
+                </Link>
+                <Link href="/login?role=broker">
+                  <span className="py-2" onClick={() => setIsOpen(false)}>Broker Login</span>
+                </Link>
+              </>
             )}
           </nav>
         </div>
