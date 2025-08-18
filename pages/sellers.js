@@ -6,7 +6,6 @@ import FloatingInput from '../components/FloatingInput';
 import EditDescriptionModal from '../components/EditDescriptionModal'; // ✅ NEW
 
 /* ---------------- Email verification gate (magic link) ---------------- */
-
 function EmailVerifyGate() {
   const [email, setEmail] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -15,26 +14,37 @@ function EmailVerifyGate() {
   const [sending, setSending] = useState(false);
   const [suggestion, setSuggestion] = useState('');
 
-  const COMMON_DOMAINS = ['gmail.com','yahoo.com','outlook.com','hotmail.com','icloud.com','aol.com','comcast.net','live.com','proton.me'];
+  const COMMON_DOMAINS = [
+    'gmail.com','yahoo.com','outlook.com','hotmail.com','icloud.com',
+    'aol.com','comcast.net','live.com','proton.me'
+  ];
+
   const suggestDomain = (addr) => {
     const [local, domainRaw = ''] = String(addr).split('@');
     const domain = domainRaw.toLowerCase();
     if (!domain) return '';
+
+    // common full-domain/partial typos
     const fixes = {
-      'gmai': 'gmail.com',
-      'gmial': 'gmail.com',
-      'gmal': 'gmail.com',
-      'hotmai': 'hotmail.com',
-      'yaho': 'yahoo.com',
-      'icloud.co': 'icloud.com'
+      gmai: 'gmail.com',
+      gmial: 'gmail.com',
+      gmal: 'gmail.com',
+      hotmai: 'hotmail.com',
+      yaho: 'yahoo.com',
+      'icloud.co': 'icloud.com', // keep quoted because of the dot
     };
-    for (const bad in fixes) if (domain.startsWith(bad)) return `${local}@${fixes[bad]}`;
+    for (const bad in fixes) {
+      if (domain.startsWith(bad)) return `${local}@${fixes[bad]}`;
+    }
     if (domain.endsWith('.con')) return `${local}@${domain.replace(/\.con$/, '.com')}`;
     if (domain.endsWith('.cmo')) return `${local}@${domain.replace(/\.cmo$/, '.com')}`;
-    const dist = (a,b) => {
+
+    // very light “distance” guess to nearby common domains
+    const dist = (a, b) => {
       if (Math.abs(a.length - b.length) > 2) return 99;
       let d = 0;
-      for (let i = 0; i < Math.max(a.length, b.length); i++) if (a[i] !== b[i]) d++;
+      const L = Math.max(a.length, b.length);
+      for (let i = 0; i < L; i++) if (a[i] !== b[i]) d++;
       return d;
     };
     let best = ''; let bestD = 99;
@@ -42,16 +52,18 @@ function EmailVerifyGate() {
       const dd = dist(domain, d);
       if (dd < bestD) { bestD = dd; best = d; }
     }
-    if (best && bestD <= 2) return `${local}@${best}`;
-    return '';
+    return best && bestD <= 2 ? `${local}@${best}` : '';
   };
 
-  useEffect(() => { setSuggestion(suggestDomain(email)); }, [email]);
+  useEffect(() => {
+    setSuggestion(suggestDomain(email));
+  }, [email]);
 
   const sendMagicLink = async () => {
     setError('');
     const e1 = email.trim();
     const e2 = confirm.trim();
+
     if (!e1 || !e2 || e1.toLowerCase() !== e2.toLowerCase()) {
       setError('Emails do not match.');
       return;
@@ -60,11 +72,15 @@ function EmailVerifyGate() {
       setError('Please enter a valid email address.');
       return;
     }
+
     setSending(true);
     try {
       const { error } = await supabase.auth.signInWithOtp({
         email: e1,
-        options: { emailRedirectTo: `${window.location.origin}/seller` },
+        options: {
+          // Redirect back to this page after clicking the link
+          emailRedirectTo: `${window.location.origin}/sellers`,
+        },
       });
       if (error) throw error;
       setSentTo(e1);
@@ -75,15 +91,16 @@ function EmailVerifyGate() {
     }
   };
 
-  // ... (rest of component unchanged)
-}
-
   if (sentTo) {
     return (
       <div className="max-w-lg mx-auto bg-white rounded-xl shadow p-6">
         <h2 className="text-xl font-semibold mb-2">Verify your email</h2>
-        <p className="text-gray-700">We sent a sign-in link to <strong>{sentTo}</strong>.</p>
-        <p className="text-gray-600 text-sm mt-1">Open that link on this device to continue your seller onboarding.</p>
+        <p className="text-gray-700">
+          We sent a sign-in link to <strong>{sentTo}</strong>.
+        </p>
+        <p className="text-gray-600 text-sm mt-1">
+          Open that link on this device to continue your seller onboarding.
+        </p>
         <button
           className="mt-4 text-sm text-blue-700 underline"
           onClick={() => { setSentTo(''); setEmail(''); setConfirm(''); }}
@@ -97,7 +114,9 @@ function EmailVerifyGate() {
   return (
     <div className="max-w-lg mx-auto bg-white rounded-xl shadow p-6">
       <h2 className="text-xl font-semibold mb-2">Start with your email</h2>
-      <p className="text-gray-600 text-sm mb-4">We’ll send a one-click sign-in link. You’ll manage your listing with this email.</p>
+      <p className="text-gray-600 text-sm mb-4">
+        We’ll send a one-click sign-in link. You’ll manage your listing with this email.
+      </p>
 
       <label className="block text-sm font-medium mb-1">Email</label>
       <input
@@ -110,7 +129,9 @@ function EmailVerifyGate() {
       {suggestion && suggestion.toLowerCase() !== email.toLowerCase() && (
         <div className="text-[12px] text-amber-700 mt-1">
           Did you mean{' '}
-          <button className="underline" onClick={() => setEmail(suggestion)}>{suggestion}</button>
+          <button className="underline" onClick={() => setEmail(suggestion)}>
+            {suggestion}
+          </button>
           ?
         </div>
       )}
@@ -122,6 +143,7 @@ function EmailVerifyGate() {
         onChange={(e) => setConfirm(e.target.value)}
         placeholder="retype your email"
         type="email"
+        onKeyDown={(e) => { if (e.key === 'Enter') sendMagicLink(); }}
       />
 
       {error && <div className="text-sm text-rose-700 mt-2">{error}</div>}
@@ -136,6 +158,7 @@ function EmailVerifyGate() {
     </div>
   );
 }
+
 
 /* ---------------------------- Seller Wizard ---------------------------- */
 
