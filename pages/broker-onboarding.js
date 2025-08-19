@@ -1,9 +1,8 @@
+// pages/broker-onboarding.js
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import supabase from '../lib/supabaseClient';
-import FloatingInput from '../components/FloatingInput';
-import EditDescriptionModal from '../components/EditDescriptionModal';
 
 /* ---------------- Email verification gate (magic link) ---------------- */
 function EmailVerifyGate() {
@@ -71,7 +70,6 @@ function EmailVerifyGate() {
 
     setSending(true);
     try {
-      // Always come back to broker onboarding
       const nextDest = '/broker-onboarding';
       localStorage.setItem('pendingNext', nextDest);
       const { error } = await supabase.auth.signInWithOtp({
@@ -161,7 +159,7 @@ function EmailVerifyGate() {
 
 /* ---------------------------- Broker Listing Wizard ---------------------------- */
 
-export default function BrokerListingWizard() {
+export default function BrokerOnboarding() {
   const router = useRouter();
 
   // 🔐 Check auth (verified email)
@@ -183,11 +181,7 @@ export default function BrokerListingWizard() {
   const [step, setStep] = useState(1);
   const [previewMode, setPreviewMode] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
-  const [isEditing, setIsEditing] = useState(false);
-  const [listingId, setListingId] = useState(null);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [editTarget, setEditTarget] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -214,7 +208,7 @@ export default function BrokerListingWizard() {
     inventory_value: '',
     equipment_value: '',
     includesInventory: false,
-    includesBuilding: false,
+    real_estate_included: false,
     relocatable: false,
     home_based: false,
     financingType: 'buyer-financed',
@@ -234,6 +228,10 @@ export default function BrokerListingWizard() {
     proudOf: '',
     adviceToBuyer: '',
     annualProfit: '',
+    seller_financing_considered: '',
+    down_payment: '',
+    interest_rate: '',
+    term_length: '',
     images: []
   });
 
@@ -258,7 +256,7 @@ export default function BrokerListingWizard() {
               annualRevenue: formData.annualRevenue,
               annualProfit: formData.annualProfit,
               includesInventory: formData.includesInventory,
-              includesBuilding: formData.includesBuilding
+              includesBuilding: formData.real_estate_included
             })
           });
 
@@ -283,7 +281,7 @@ export default function BrokerListingWizard() {
     setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
-  // ✅ Modal controls for editing descriptions
+  // Modal controls for editing descriptions
   const openModal = (type) => {
     setEditTarget(type);
     setCurrentEditType(type);
@@ -294,12 +292,7 @@ export default function BrokerListingWizard() {
     }
     setShowModal(true);
   };
-
-  const closeModal = () => {
-    setShowModal(false);
-    setEditTarget(null);
-  };
-
+  const closeModal = () => { setShowModal(false); setEditTarget(null); };
   const saveModalChanges = () => {
     if (editTarget === 'manual') {
       setFormData(prev => ({ ...prev, businessDescription: tempDescription }));
@@ -309,7 +302,7 @@ export default function BrokerListingWizard() {
     closeModal();
   };
 
-  // ✅ Image upload + live previews + delete
+  // Image upload + previews
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -344,19 +337,17 @@ export default function BrokerListingWizard() {
         return;
       }
       setIsSubmitting(true);
+      setSubmitError('');
 
-      // Always broker mode on this page
-      let brokerId = null;
-
-      // Get existing broker row (or create a minimal one)
-      const { data: existing } = await supabase
+      // Ensure broker row exists; create minimal if needed
+      const { data: existing, error: exErr } = await supabase
         .from('brokers')
         .select('id, verified')
         .eq('auth_id', authUser.id)
         .maybeSingle();
+      if (exErr) throw exErr;
 
-      let verified = existing?.verified ?? false;
-
+      let brokerId, verified = false;
       if (!existing) {
         const minimal = { auth_id: authUser.id, email: authUser.email };
         const { data: upserted, error: upErr } = await supabase
@@ -364,33 +355,33 @@ export default function BrokerListingWizard() {
           .upsert(minimal, { onConflict: 'auth_id' })
           .select('id, verified')
           .single();
-        if (upErr) {
-          alert('Could not initialize broker profile.');
-          setIsSubmitting(false);
-          return;
-        }
+        if (upErr) throw upErr;
         brokerId = upserted.id;
         verified = upserted.verified ?? false;
       } else {
         brokerId = existing.id;
+        verified = existing.verified ?? false;
       }
 
       if (!verified) {
-        // Optional hard gate; flip to a soft notice if you prefer
+        // Soft notice
         alert('Your broker profile is pending verification. You can submit, but listings may be hidden until verified.');
       }
 
-      // Upload images to Supabase Storage
+      // Upload images to Supabase Storage (bucket: seller-images)
       const uploadedImageUrls = [];
-      for (const file of formData.images) {
-        const filePath = `seller-${Date.now()}-${file.name}`;
+      for (let i = 0; i < formData.images.length; i++) {
+        const file = formData.images[i];
+        const safeName = String(file.name || `file_${i}`).replace(/[^\w.\-]/g, '_');
+        const filePath = `${authUser.id}/${Date.now()}_${i}_${safeName}`;
+
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('seller-images')
-          .upload(filePath, file);
+          .upload(filePath, file, { upsert: false });
 
         if (uploadError) {
-          console.error("❌ Image upload failed:", uploadError.message);
-          alert("Image upload failed. Please try again.");
+          console.error('❌ Image upload failed:', uploadError.message);
+          alert('Image upload failed. Please try again.');
           setIsSubmitting(false);
           return;
         }
@@ -404,39 +395,45 @@ export default function BrokerListingWizard() {
 
       const cleanString = (val) => (typeof val === 'string' && val.trim() === '') ? null : val?.trim() || null;
 
-      // Use verified auth email/id — avoids orphaned listings
+      // Build payload expected by /api/submit-seller-listing
+      const sellerFinancingBool =
+        formData.seller_financing_considered === 'yes' || formData.seller_financing_considered === 'maybe';
+
       const payload = {
         name: cleanString(formData.name) || 'Unnamed Seller',
         email: authUser.email,
         business_name: cleanString(formData.businessName) || 'Unnamed Business',
         hide_business_name: !!formData.hideBusinessName,
         industry: cleanString(formData.industry) || 'Unknown Industry',
-        location: cleanString(formData.location) ||
+        location:
+          cleanString(formData.location) ||
           (formData.location_city && formData.location_state
             ? `${formData.location_city.trim()}, ${formData.location_state.trim()}`
             : 'Unknown Location'),
         location_city: cleanString(formData.location_city),
         location_state: cleanString(formData.location_state),
-        years_in_business: Number(formData.years_in_business) || 0,
-        owner_hours_per_week: Number(formData.owner_hours_per_week) || 0,
-        seller_financing_considered: formData.seller_financing_considered ? formData.seller_financing_considered.toString() : null,
-        website: cleanString(formData.website),
-        annual_revenue: Number(formData.annualRevenue) || 0,
-        annual_profit: Number(formData.annualProfit) || 0,
-        sde: Number(formData.sde) || 0,
-        asking_price: Number(formData.askingPrice) || 0,
-        employees: Number(formData.employees) || 0,
-        monthly_lease: Number(formData.monthly_lease) || 0,
-        inventory_value: Number(formData.inventory_value) || 0,
-        equipment_value: Number(formData.equipment_value) || 0,
-        includes_inventory: !!formData.includesInventory,
-        includes_building: !!formData.includesBuilding,
-        relocatable: !!formData.relocatable,
-        home_based: !!formData.home_based,
+
         financing_type: cleanString(formData.financingType) || 'buyer-financed',
         description_choice: formData.descriptionChoice,
         business_description: formData.descriptionChoice === 'manual' ? cleanString(formData.businessDescription) : null,
         ai_description: formData.descriptionChoice === 'ai' ? cleanString(formData.aiDescription) : null,
+
+        asking_price: Number(formData.askingPrice) || null,
+        includes_inventory: !!formData.includesInventory,
+        includes_building: !!formData.real_estate_included,
+        annual_revenue: Number(formData.annualRevenue) || null,
+        annual_profit: Number(formData.annualProfit) || null,
+        sde: Number(formData.sde) || null,
+        inventory_value: Number(formData.inventory_value) || null,
+        equipment_value: Number(formData.equipment_value) || null,
+        monthly_lease: Number(formData.monthly_lease) || null,
+        employees: Number(formData.employees) || null,
+        home_based: !!formData.home_based,
+        relocatable: !!formData.relocatable,
+        website: cleanString(formData.website),
+
+        customer_profile: cleanString(formData.customerProfile),
+        best_sellers: cleanString(formData.bestSellers),
 
         marketing_method: cleanString(formData.marketingMethod),
         owner_involvement: cleanString(formData.ownerInvolvement),
@@ -448,23 +445,23 @@ export default function BrokerListingWizard() {
         training_offered: cleanString(formData.trainingOffered),
         creative_financing: !!formData.creativeFinancing,
         willing_to_mentor: !!formData.willingToMentor,
+        years_in_business: Number(formData.years_in_business) || null,
         sentence_summary: cleanString(formData.sentenceSummary),
-
-        customer_profile: cleanString(formData.customerProfile),
-        best_sellers: cleanString(formData.bestSellers),
-
         proud_of: cleanString(formData.proudOf),
         advice_to_buyer: cleanString(formData.adviceToBuyer),
 
-        auth_id: authUser.id, // RLS owner link
+        auth_id: authUser.id,
+        status: 'active',
         financing_preference: cleanString(formData.financingPreference),
-        down_payment: Number(formData.downPayment) || 0,
-        term_length: Number(formData.termLength) || 0,
-        seller_financing_interest_rate: Number(formData.sellerFinancingInterestRate || formData.interestRate) || 0,
-        interest_rate: Number(formData.interestRate) || 0,
-        image_urls: uploadedImageUrls,
 
-        broker_id: brokerId, // tie listing to the broker
+        seller_financing_considered: sellerFinancingBool, // boolean for API
+        down_payment: Number(formData.down_payment) || null,
+        term_length: Number(formData.term_length) || null,
+        seller_financing_interest_rate: Number(formData.interest_rate) || null,
+        interest_rate: Number(formData.interest_rate) || null,
+
+        image_urls: uploadedImageUrls,
+        broker_id: brokerId, // tie to broker
       };
 
       const res = await fetch('/api/submit-seller-listing', {
@@ -474,18 +471,24 @@ export default function BrokerListingWizard() {
       });
 
       if (!res.ok) {
-        const errData = await res.json();
-        console.error("❌ Submission failed:", errData);
-        setSubmitError(errData.error || 'Unknown error');
+        // Try to parse JSON error; if HTML, catch below
+        let errMsg = 'Unknown error';
+        try {
+          const errData = await res.json();
+          errMsg = errData?.detail || errData?.error || errMsg;
+        } catch {
+          errMsg = 'Submission failed (non-JSON error). Check server logs.';
+        }
+        setSubmitError(errMsg);
         setIsSubmitting(false);
         return;
       }
 
       // Success → Broker Dashboard
-      window.location.href = '/broker-dashboard';
+      router.replace('/broker-dashboard');
     } catch (error) {
-      console.error("❌ Submission error:", error);
-      setSubmitError('Submission error, please try again.');
+      console.error('❌ Submission error:', error);
+      setSubmitError(error.message || 'Submission error, please try again.');
       setIsSubmitting(false);
     }
   };
@@ -597,12 +600,12 @@ export default function BrokerListingWizard() {
             <p><strong>Inventory Value:</strong> {formatCurrency(formData.inventory_value)}</p>
             <p><strong>Equipment Value:</strong> {formatCurrency(formData.equipment_value)}</p>
             <p><strong>Includes Inventory:</strong> {formData.includesInventory ? 'Yes' : 'No'}</p>
-            <p><strong>Includes Building:</strong> {formData.includesBuilding ? 'Yes' : 'No'}</p>
+            <p><strong>Includes Building:</strong> {formData.real_estate_included ? 'Yes' : 'No'}</p>
             <p><strong>Years in Business:</strong> {formData.years_in_business || 'Undisclosed'}</p>
             <p><strong>Owner Hours/Week:</strong> {formData.owner_hours_per_week || 'Undisclosed'}</p>
             <p><strong>Seller Financing Considered:</strong>
               {formData.seller_financing_considered
-                ? formData.seller_financing_considered.charAt(0).toUpperCase() + formData.seller_financing_considered.slice(1)
+                ? String(formData.seller_financing_considered).charAt(0).toUpperCase() + String(formData.seller_financing_considered).slice(1)
                 : 'Undisclosed'}
             </p>
           </div>
@@ -708,7 +711,7 @@ export default function BrokerListingWizard() {
           {submitError && <p className="text-sm text-red-600">❌ {submitError}</p>}
         </div>
 
-        {/* ✨ Edit Description Modal */}
+        {/* Inline Edit Description Modal */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
@@ -780,10 +783,18 @@ export default function BrokerListingWizard() {
         <h1 className="text-3xl font-bold mb-6 text-center">
           {previewMode ? 'Listing Preview' : 'Broker: Create a Listing'}
         </h1>
-        {previewMode ? renderPreview() : (
+        {previewMode ? (
+          renderPreview()
+        ) : (
           step === 1 ? (
             <div className="space-y-4">
-              <input name="name" placeholder="Seller Contact Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input
+                name="name"
+                placeholder="Seller Contact Name"
+                value={formData.name}
+                onChange={handleChange}
+                className="w-full border p-3 rounded"
+              />
               {/* Email is verified via Supabase; show but disable editing */}
               <input
                 name="email"
@@ -804,12 +815,21 @@ export default function BrokerListingWizard() {
                 className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
 
-              <label className="flex items-center"><input name="hideBusinessName" type="checkbox" checked={formData.hideBusinessName} onChange={handleChange} className="mr-2" />Hide Business Name</label>
+              <label className="flex items-center">
+                <input
+                  name="hideBusinessName"
+                  type="checkbox"
+                  checked={formData.hideBusinessName}
+                  onChange={handleChange}
+                  className="mr-2"
+                />
+                Hide Business Name
+              </label>
+
               <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
             </div>
           ) : step === 2 ? (
             <div className="space-y-4">
-              {/* Step 2 inputs (unchanged) */}
               <input
                 name="industry"
                 placeholder="Industry"
@@ -833,7 +853,7 @@ export default function BrokerListingWizard() {
                 className="w-full border p-3 rounded"
               >
                 <option value="">Select State/Province</option>
-                {/* Provinces & States list kept as-is */}
+                {/* Canadian Provinces */}
                 <option value="Alberta">Alberta</option>
                 <option value="British Columbia">British Columbia</option>
                 <option value="Manitoba">Manitoba</option>
@@ -847,7 +867,7 @@ export default function BrokerListingWizard() {
                 <option value="Northwest Territories">Northwest Territories</option>
                 <option value="Nunavut">Nunavut</option>
                 <option value="Yukon">Yukon</option>
-                {/* US states ... (unchanged) */}
+                {/* US States */}
                 <option value="Alabama">Alabama</option>
                 <option value="Alaska">Alaska</option>
                 <option value="Arizona">Arizona</option>
@@ -926,7 +946,6 @@ export default function BrokerListingWizard() {
                 <option value="rent-to-own">Rent to Own</option>
               </select>
 
-              {/* Seller Financing box kept as-is */}
               <div className="bg-gray-50 p-4 rounded border mt-4">
                 <h3 className="font-semibold mb-2">Seller Financing Option</h3>
                 <p className="text-sm text-gray-600 mb-2">
@@ -955,6 +974,7 @@ export default function BrokerListingWizard() {
           ) : (
             <div className="space-y-4">
               <textarea name="businessDescription" placeholder="Brief business description" value={formData.businessDescription} onChange={handleChange} className="w-full border p-3 rounded" />
+
               <input name="ownerInvolvement" placeholder="Owner Involvement" value={formData.ownerInvolvement} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="growthPotential" placeholder="Growth Potential" value={formData.growthPotential} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="reasonForSelling" placeholder="Reason for Selling" value={formData.reasonForSelling} onChange={handleChange} className="w-full border p-3 rounded" />
@@ -967,8 +987,10 @@ export default function BrokerListingWizard() {
               <input name="keepsThemComing" placeholder="Why do they return?" value={formData.keepsThemComing} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="proudOf" placeholder="Something you're proud of" value={formData.proudOf} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="adviceToBuyer" placeholder="Advice for future owner" value={formData.adviceToBuyer} onChange={handleChange} className="w-full border p-3 rounded" />
-              <button onClick={() => setPreviewMode(true)} className="w-full bg-yellow-500 text-white py-3 rounded">Preview My Listing</button>
-              {renderBackButton()}
+              <div className="flex gap-2">
+                <button onClick={() => setPreviewMode(true)} className="w-1/2 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded">Preview Listing</button>
+                <button onClick={() => setStep(2)} className="w-1/2 bg-gray-200 hover:bg-gray-300 text-gray-900 py-3 rounded">Back</button>
+              </div>
             </div>
           )
         )}
@@ -976,5 +998,6 @@ export default function BrokerListingWizard() {
     </main>
   );
 }
+
 
 
