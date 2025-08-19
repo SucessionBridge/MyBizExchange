@@ -13,15 +13,6 @@ function EmailVerifyGate() {
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [suggestion, setSuggestion] = useState('');
-  const [asBroker, setAsBroker] = useState(false); // 👈 NEW
-
-  useEffect(() => {
-    // detect broker context from URL (?as=broker)
-    try {
-      const p = new URLSearchParams(window.location.search);
-      setAsBroker(p.get('as') === 'broker');
-    } catch {}
-  }, []);
 
   const COMMON_DOMAINS = [
     'gmail.com','yahoo.com','outlook.com','hotmail.com','icloud.com',
@@ -62,9 +53,7 @@ function EmailVerifyGate() {
     return best && bestD <= 2 ? `${local}@${best}` : '';
   };
 
-  useEffect(() => {
-    setSuggestion(suggestDomain(email));
-  }, [email]);
+  useEffect(() => { setSuggestion(suggestDomain(email)); }, [email]);
 
   const sendMagicLink = async () => {
     setError('');
@@ -82,8 +71,8 @@ function EmailVerifyGate() {
 
     setSending(true);
     try {
-      // 👇 preserve broker context so the flow returns to /sellers?as=broker
-      const nextDest = asBroker ? '/sellers?as=broker' : '/sellers';
+      // Always come back to broker onboarding
+      const nextDest = '/broker-onboarding';
       localStorage.setItem('pendingNext', nextDest);
       const { error } = await supabase.auth.signInWithOtp({
         email: e1,
@@ -109,7 +98,7 @@ function EmailVerifyGate() {
           We sent a sign-in link to <strong>{sentTo}</strong>.
         </p>
         <p className="text-gray-600 text-sm mt-1">
-          Open that link on this device to continue your sellers onboarding.
+          Open that link on this device to continue your <strong>broker listing onboarding</strong>.
         </p>
         <button
           className="mt-4 text-sm text-blue-700 underline"
@@ -125,7 +114,7 @@ function EmailVerifyGate() {
     <div className="max-w-lg mx-auto bg-white rounded-xl shadow p-6">
       <h2 className="text-xl font-semibold mb-2">Start with your email</h2>
       <p className="text-gray-600 text-sm mb-4">
-        We’ll send a one-click sign-in link. You’ll manage your listing with this email.
+        We’ll send a one-click sign-in link. You’ll manage your listings with this email.
       </p>
 
       <label className="block text-sm font-medium mb-1">Email</label>
@@ -170,9 +159,9 @@ function EmailVerifyGate() {
 }
 
 
-/* ---------------------------- Seller Wizard ---------------------------- */
+/* ---------------------------- Broker Listing Wizard ---------------------------- */
 
-export default function SellerWizard() {
+export default function BrokerListingWizard() {
   const router = useRouter();
 
   // 🔐 Check auth (verified email)
@@ -356,25 +345,39 @@ export default function SellerWizard() {
       }
       setIsSubmitting(true);
 
-      // 👇 NEW: detect broker mode and fetch broker id if verified
-      const asBroker = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('as') === 'broker';
+      // Always broker mode on this page
       let brokerId = null;
-      if (asBroker) {
-        const { data: b } = await supabase
+
+      // Get existing broker row (or create a minimal one)
+      const { data: existing } = await supabase
+        .from('brokers')
+        .select('id, verified')
+        .eq('auth_id', authUser.id)
+        .maybeSingle();
+
+      let verified = existing?.verified ?? false;
+
+      if (!existing) {
+        const minimal = { auth_id: authUser.id, email: authUser.email };
+        const { data: upserted, error: upErr } = await supabase
           .from('brokers')
+          .upsert(minimal, { onConflict: 'auth_id' })
           .select('id, verified')
-          .eq('auth_id', authUser.id)
           .single();
-        if (!b) {
-          window.location.href = '/broker-onboarding';
+        if (upErr) {
+          alert('Could not initialize broker profile.');
+          setIsSubmitting(false);
           return;
         }
-        if (!b.verified) {
-          alert('Your broker profile is pending verification.');
-          window.location.href = '/broker-onboarding';
-          return;
-        }
-        brokerId = b.id;
+        brokerId = upserted.id;
+        verified = upserted.verified ?? false;
+      } else {
+        brokerId = existing.id;
+      }
+
+      if (!verified) {
+        // Optional hard gate; flip to a soft notice if you prefer
+        alert('Your broker profile is pending verification. You can submit, but listings may be hidden until verified.');
       }
 
       // Upload images to Supabase Storage
@@ -401,10 +404,10 @@ export default function SellerWizard() {
 
       const cleanString = (val) => (typeof val === 'string' && val.trim() === '') ? null : val?.trim() || null;
 
-      // 🔐 Use verified auth email/id — avoids orphaned listings
+      // Use verified auth email/id — avoids orphaned listings
       const payload = {
         name: cleanString(formData.name) || 'Unnamed Seller',
-        email: authUser.email, // keep using verified email field in your schema
+        email: authUser.email,
         business_name: cleanString(formData.businessName) || 'Unnamed Business',
         hide_business_name: !!formData.hideBusinessName,
         industry: cleanString(formData.industry) || 'Unknown Industry',
@@ -461,7 +464,7 @@ export default function SellerWizard() {
         interest_rate: Number(formData.interestRate) || 0,
         image_urls: uploadedImageUrls,
 
-        broker_id: brokerId, // 👈 NEW: ties listing to the verified broker when in broker mode
+        broker_id: brokerId, // tie listing to the broker
       };
 
       const res = await fetch('/api/submit-seller-listing', {
@@ -478,10 +481,8 @@ export default function SellerWizard() {
         return;
       }
 
-      setSubmitSuccess(true);
-      setSubmitError('');
-      setIsSubmitting(false);
-      // router.push('/thank-you');
+      // Success → Broker Dashboard
+      window.location.href = '/broker-dashboard';
     } catch (error) {
       console.error("❌ Submission error:", error);
       setSubmitError('Submission error, please try again.');
@@ -496,7 +497,7 @@ export default function SellerWizard() {
 
   const renderImages = () => (
     <div className="space-y-2">
-      <label className="block font-medium text-gray-700">Photos of your business (max 8)</label>
+      <label className="block font-medium text-gray-700">Photos of the business (max 8)</label>
       <input
         type="file"
         multiple
@@ -622,7 +623,7 @@ export default function SellerWizard() {
         {/* Description Section */}
         {(formData.aiDescription || formData.businessDescription) && (
           <div>
-            <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Description</h3>
+            <h3 className="text-xl font-semibold border-b pb-2 mb-3">Listing Description</h3>
             <div className="mb-4">
               <label className="block font-medium mb-1">Choose which description to publish:</label>
               <div className="flex items-center gap-6">
@@ -635,7 +636,7 @@ export default function SellerWizard() {
                     onChange={handleChange}
                     className="mr-2"
                   />
-                  Written by Seller
+                  Written by Broker
                 </label>
                 <label className="flex items-center">
                   <input
@@ -654,7 +655,7 @@ export default function SellerWizard() {
             <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <h4 className="font-semibold mb-1 flex justify-between items-center">
-                  Written by Seller:
+                  Written by Broker:
                   <button
                     type="button"
                     onClick={() => openModal('manual')}
@@ -704,7 +705,6 @@ export default function SellerWizard() {
             </button>
           </div>
           {isSubmitting && <p className="text-sm text-gray-600">⏳ Please wait while we submit your listing...</p>}
-          {submitSuccess && <p className="text-sm text-green-600">✅ Your listing has been submitted successfully!</p>}
           {submitError && <p className="text-sm text-red-600">❌ {submitError}</p>}
         </div>
 
@@ -713,7 +713,7 @@ export default function SellerWizard() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-lg">
               <h3 className="text-xl font-bold mb-4">
-                Edit {currentEditType === 'manual' ? 'Seller-Written' : 'AI-Enhanced'} Description
+                Edit {currentEditType === 'manual' ? 'Broker-Written' : 'AI-Enhanced'} Description
               </h3>
               <textarea
                 className="w-full border p-3 rounded mb-4 min-h-[150px]"
@@ -762,7 +762,7 @@ export default function SellerWizard() {
           <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
         </Head>
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-3xl font-bold mb-6 text-center">Seller Onboarding</h1>
+          <h1 className="text-3xl font-bold mb-6 text-center">Broker Listing Onboarding</h1>
           <EmailVerifyGate />
         </div>
       </main>
@@ -777,15 +777,17 @@ export default function SellerWizard() {
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
       </Head>
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-center">{previewMode ? 'Listing Preview' : 'Seller Onboarding'}</h1>
+        <h1 className="text-3xl font-bold mb-6 text-center">
+          {previewMode ? 'Listing Preview' : 'Broker: Create a Listing'}
+        </h1>
         {previewMode ? renderPreview() : (
           step === 1 ? (
             <div className="space-y-4">
-              <input name="name" placeholder="Your Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="name" placeholder="Seller Contact Name" value={formData.name} onChange={handleChange} className="w-full border p-3 rounded" />
               {/* Email is verified via Supabase; show but disable editing */}
               <input
                 name="email"
-                placeholder="Email (verified)"
+                placeholder="Broker Email (verified)"
                 value={formData.email}
                 onChange={handleChange}
                 className="w-full border p-3 rounded bg-gray-50"
@@ -807,7 +809,7 @@ export default function SellerWizard() {
             </div>
           ) : step === 2 ? (
             <div className="space-y-4">
-              {/* Step 2 inputs */}
+              {/* Step 2 inputs (unchanged) */}
               <input
                 name="industry"
                 placeholder="Industry"
@@ -831,8 +833,7 @@ export default function SellerWizard() {
                 className="w-full border p-3 rounded"
               >
                 <option value="">Select State/Province</option>
-
-                {/* Canadian Provinces */}
+                {/* Provinces & States list kept as-is */}
                 <option value="Alberta">Alberta</option>
                 <option value="British Columbia">British Columbia</option>
                 <option value="Manitoba">Manitoba</option>
@@ -846,8 +847,7 @@ export default function SellerWizard() {
                 <option value="Northwest Territories">Northwest Territories</option>
                 <option value="Nunavut">Nunavut</option>
                 <option value="Yukon">Yukon</option>
-
-                {/* US States */}
+                {/* US states ... (unchanged) */}
                 <option value="Alabama">Alabama</option>
                 <option value="Alaska">Alaska</option>
                 <option value="Arizona">Arizona</option>
@@ -900,191 +900,39 @@ export default function SellerWizard() {
                 <option value="Wyoming">Wyoming</option>
               </select>
 
-              <input
-                type="number"
-                name="years_in_business"
-                placeholder="Years in Business"
-                value={formData.years_in_business}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
+              <input type="number" name="years_in_business" placeholder="Years in Business" value={formData.years_in_business} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input type="number" name="owner_hours_per_week" placeholder="Owner Hours per Week" value={formData.owner_hours_per_week} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input type="text" name="website" placeholder="Website" value={formData.website} onChange={handleChange} className="w-full border p-3 rounded" />
+              <p className="text-xs text-gray-500 mt-1">Your website URL helps buyers learn more about the business.</p>
+              <input type="number" name="annualRevenue" placeholder="Annual Revenue" value={formData.annualRevenue} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input type="number" name="annualProfit" placeholder="Annual Profit" value={formData.annualProfit} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input type="number" name="sde" placeholder="SDE" value={formData.sde} onChange={handleChange} className="w-full border p-3 rounded" />
+              <p className="text-sm text-gray-500 mt-1">SDE = owner benefit before taxes; common for small business valuation.</p>
+              <input type="number" name="askingPrice" placeholder="Asking Price" value={formData.askingPrice} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input type="number" name="employees" placeholder="Number of Employees" value={formData.employees} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input type="number" name="monthly_lease" placeholder="Monthly Lease Amount" value={formData.monthly_lease} onChange={handleChange} className="w-full border p-3 rounded" />
+              <p className="text-xs text-gray-500 mt-1">Leased premises only.</p>
+              <input type="number" name="inventory_value" placeholder="Inventory Value" value={formData.inventory_value} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input type="number" name="equipment_value" placeholder="Equipment Value" value={formData.equipment_value} onChange={handleChange} className="w-full border p-3 rounded" />
+              <label className="flex items-center"><input name="includesInventory" type="checkbox" checked={formData.includesInventory} onChange={handleChange} className="mr-2" />Includes Inventory</label>
+              <label className="flex items-center"><input name="real_estate_included" type="checkbox" checked={formData.real_estate_included} onChange={handleChange} className="mr-2" />Real Estate Included</label>
+              <label className="flex items-center"><input name="relocatable" type="checkbox" checked={formData.relocatable} onChange={handleChange} className="mr-2" />Relocatable</label>
+              <label className="flex items-center"><input name="home_based" type="checkbox" checked={formData.home_based} onChange={handleChange} className="mr-2" />Home-Based</label>
 
-              <input
-                type="number"
-                name="owner_hours_per_week"
-                placeholder="Owner Hours per Week"
-                value={formData.owner_hours_per_week}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
-
-              <input
-                type="text"
-                name="website"
-                placeholder="Website"
-                value={formData.website}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Your website URL helps buyers learn more about your business. For privacy and security, it will only be visible to logged-in users on SuccessionBridge. This helps protect your contact details and ensures only serious buyers can reach you.
-              </p>
-              <input
-                type="number"
-                name="annualRevenue"
-                placeholder="Annual Revenue"
-                value={formData.annualRevenue}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
-
-              <input
-                type="number"
-                name="annualProfit"
-                placeholder="Annual Profit"
-                value={formData.annualProfit}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
-
-              <input
-                type="number"
-                name="sde"
-                placeholder="SDE"
-                value={formData.sde}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                Seller’s Discretionary Earnings (SDE) is the total financial benefit to a single owner-operator in a year.
-                Includes net profit <strong>before taxes</strong>, owner’s salary, discretionary expenses, interest, depreciation,
-                and one-time expenses. Commonly used to value small businesses.
-              </p>
-
-              <input
-                type="number"
-                name="askingPrice"
-                placeholder="Asking Price"
-                value={formData.askingPrice}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
-
-              <input
-                type="number"
-                name="employees"
-                placeholder="Number of Employees"
-                value={formData.employees}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
-
-              <input
-                type="number"
-                name="monthly_lease"
-                placeholder="Monthly Lease Amount"
-                value={formData.monthly_lease}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                For leased premises only. Please enter how much rent you pay monthly for your business location.
-                (Exclude equipment or vehicle leases.)
-              </p>
-              <input
-                type="number"
-                name="inventory_value"
-                placeholder="Inventory Value"
-                value={formData.inventory_value}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
-
-              <input
-                type="number"
-                name="equipment_value"
-                placeholder="Equipment Value"
-                value={formData.equipment_value}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
-
-              <label className="flex items-center">
-                <input
-                  name="includesInventory"
-                  type="checkbox"
-                  checked={formData.includesInventory}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                Includes Inventory
-              </label>
-
-              <label className="flex items-center">
-                <input
-                  name="real_estate_included"
-                  type="checkbox"
-                  checked={formData.real_estate_included}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                Real Estate Included
-              </label>
-
-              <label className="flex items-center">
-                <input
-                  name="relocatable"
-                  type="checkbox"
-                  checked={formData.relocatable}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                Relocatable
-              </label>
-
-              <label className="flex items-center">
-                <input
-                  name="home_based"
-                  type="checkbox"
-                  checked={formData.home_based}
-                  onChange={handleChange}
-                  className="mr-2"
-                />
-                Home-Based
-              </label>
-
-              <label htmlFor="financingType" className="block font-semibold mb-1">
-                Financing Preference
-              </label>
-              <select
-                id="financingType"
-                name="financingType"
-                value={formData.financingType}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              >
+              <label htmlFor="financingType" className="block font-semibold mb-1">Financing Preference</label>
+              <select id="financingType" name="financingType" value={formData.financingType} onChange={handleChange} className="w-full border p-3 rounded">
                 <option value="buyer-financed">Buyer Financed</option>
                 <option value="seller-financed">Seller Financed</option>
                 <option value="rent-to-own">Rent to Own</option>
               </select>
-              <p className="text-xs text-gray-500 mt-1">
-                Select your preferred financing option for the buyer.
-                This helps match your listing with buyers interested in these terms.
-              </p>
 
-              {/* 🔹 Seller Financing Encouragement Box */}
+              {/* Seller Financing box kept as-is */}
               <div className="bg-gray-50 p-4 rounded border mt-4">
                 <h3 className="font-semibold mb-2">Seller Financing Option</h3>
                 <p className="text-sm text-gray-600 mb-2">
-                  Offering seller financing can help you sell faster and attract more qualified buyers.
-                  You set the terms, including down payment and interest rate. Even selecting “Maybe” increases your exposure.
+                  Offering seller financing can help sell faster and attract more qualified buyers.
                 </p>
-                <select
-                  name="seller_financing_considered"
-                  value={formData.seller_financing_considered}
-                  onChange={handleChange}
-                  className="w-full border p-2 rounded"
-                >
+                <select name="seller_financing_considered" value={formData.seller_financing_considered} onChange={handleChange} className="w-full border p-2 rounded">
                   <option value="">Select</option>
                   <option value="yes">Yes</option>
                   <option value="maybe">Maybe</option>
@@ -1093,36 +941,9 @@ export default function SellerWizard() {
 
                 {(formData.seller_financing_considered === 'yes' || formData.seller_financing_considered === 'maybe') && (
                   <div className="mt-3 space-y-2">
-                    <input
-                      name="down_payment"
-                      type="number"
-                      placeholder="Typical Down Payment (%)"
-                      value={formData.down_payment || ''}
-                      onChange={handleChange}
-                      className="w-full border p-2 rounded"
-                      min={0}
-                      max={100}
-                    />
-                    <input
-                      name="interest_rate"
-                      type="number"
-                      placeholder="Interest Rate (%)"
-                      value={formData.interest_rate || ''}
-                      onChange={handleChange}
-                      className="w-full border p-2 rounded"
-                      min={0}
-                      max={100}
-                      step="0.01"
-                    />
-                    <input
-                      name="term_length"
-                      type="number"
-                      placeholder="Term Length (Years)"
-                      value={formData.term_length || ''}
-                      onChange={handleChange}
-                      className="w-full border p-2 rounded"
-                      min={0}
-                    />
+                    <input name="down_payment" type="number" placeholder="Typical Down Payment (%)" value={formData.down_payment || ''} onChange={handleChange} className="w-full border p-2 rounded" min={0} max={100} />
+                    <input name="interest_rate" type="number" placeholder="Interest Rate (%)" value={formData.interest_rate || ''} onChange={handleChange} className="w-full border p-2 rounded" min={0} max={100} step="0.01" />
+                    <input name="term_length" type="number" placeholder="Term Length (Years)" value={formData.term_length || ''} onChange={handleChange} className="w-full border p-2 rounded" min={0} />
                   </div>
                 )}
               </div>
@@ -1134,27 +955,18 @@ export default function SellerWizard() {
           ) : (
             <div className="space-y-4">
               <textarea name="businessDescription" placeholder="Brief business description" value={formData.businessDescription} onChange={handleChange} className="w-full border p-3 rounded" />
-
               <input name="ownerInvolvement" placeholder="Owner Involvement" value={formData.ownerInvolvement} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="growthPotential" placeholder="Growth Potential" value={formData.growthPotential} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="reasonForSelling" placeholder="Reason for Selling" value={formData.reasonForSelling} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="trainingOffered" placeholder="Training Offered" value={formData.trainingOffered} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="sentenceSummary" placeholder="1-sentence summary of business" value={formData.sentenceSummary} onChange={handleChange} className="w-full border p-3 rounded" />
-              <textarea
-                name="customerProfile"
-                placeholder="Describe your typical customers (type, demographics, preferences)"
-                value={formData.customerProfile}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-                rows={3}
-              />
-
-              <input name="bestSellers" placeholder="What are your best-selling products/services?" value={formData.bestSellers} onChange={handleChange} className="w-full border p-3 rounded" />
+              <textarea name="customerProfile" placeholder="Describe the typical customers" value={formData.customerProfile} onChange={handleChange} className="w-full border p-3 rounded" rows={3} />
+              <input name="bestSellers" placeholder="Best-selling products/services" value={formData.bestSellers} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="customerLove" placeholder="What do customers love most?" value={formData.customerLove} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="repeatCustomers" placeholder="How many are repeat buyers?" value={formData.repeatCustomers} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="keepsThemComing" placeholder="Why do they return?" value={formData.keepsThemComing} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="proudOf" placeholder="Something you're proud of?" value={formData.proudOf} onChange={handleChange} className="w-full border p-3 rounded" />
-              <input name="adviceToBuyer" placeholder="Advice for future owner?" value={formData.adviceToBuyer} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="proudOf" placeholder="Something you're proud of" value={formData.proudOf} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="adviceToBuyer" placeholder="Advice for future owner" value={formData.adviceToBuyer} onChange={handleChange} className="w-full border p-3 rounded" />
               <button onClick={() => setPreviewMode(true)} className="w-full bg-yellow-500 text-white py-3 rounded">Preview My Listing</button>
               {renderBackButton()}
             </div>
