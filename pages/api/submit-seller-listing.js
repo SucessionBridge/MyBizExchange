@@ -5,20 +5,17 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Helper function to generate a random 4-digit number and prefix "SB-"
+// Helper: SB-1234
 function generateAdId() {
-  const randomNum = Math.floor(1000 + Math.random() * 9000); // 4 digit number between 1000-9999
+  const randomNum = Math.floor(1000 + Math.random() * 9000);
   return `SB-${randomNum}`;
 }
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
   try {
     const data = req.body;
-
     console.log('📨 Incoming seller payload:', data);
 
     // Validate required string fields
@@ -37,7 +34,6 @@ export default async function handler(req, res) {
       }
       return false;
     };
-
     const parseNullableNumber = (val) => {
       if (val === null || val === undefined) return null;
       if (typeof val === 'string' && val.trim() === '') return null;
@@ -45,9 +41,9 @@ export default async function handler(req, res) {
       return isNaN(n) ? null : n;
     };
 
-    // Generate Ad ID for this listing
     const adId = generateAdId();
 
+    // ---------- Build row (unchanged fields) ----------
     const row = {
       name: data.name.trim(),
       email: data.email.trim(),
@@ -80,7 +76,7 @@ export default async function handler(req, res) {
       relocatable: parseBoolean(data.relocatable),
       website: data.website || '',
 
-      // Updated customer fields:
+      // Customers
       customer_profile: data.customer_profile || '',
       best_sellers: data.best_sellers || '',
 
@@ -100,23 +96,58 @@ export default async function handler(req, res) {
       proud_of: data.proud_of || '',
       advice_to_buyer: data.advice_to_buyer || '',
       delete_reason: data.delete_reason || '',
+
+      // Auth / status
       auth_id: data.auth_id && data.auth_id.trim() !== '' ? data.auth_id : null,
       status: data.status || 'active',
+
+      // Financing details
       financing_preference: data.financing_preference || '',
       seller_financing_considered: parseBoolean(data.seller_financing_considered),
       down_payment: parseNullableNumber(data.down_payment),
       term_length: parseNullableNumber(data.term_length),
       seller_financing_interest_rate: parseNullableNumber(data.seller_financing_interest_rate || data.interest_rate),
       interest_rate: parseNullableNumber(data.interest_rate),
+
+      // Images
       image_urls: Array.isArray(data.image_urls) ? data.image_urls : [],
 
-      ad_id: adId, // <-- added unique Ad ID here
+      ad_id: adId,
     };
+
+    // ---------- NEW: attach broker_id based on auth_id ----------
+    try {
+      if (row.auth_id) {
+        // Try to find existing broker row for this user
+        const { data: broker, error: brokerErr } = await supabase
+          .from('brokers')
+          .select('id')
+          .eq('auth_id', row.auth_id)
+          .maybeSingle();
+
+        if (broker?.id) {
+          row.broker_id = broker.id;
+        } else {
+          // If not found, create a minimal broker profile (keeps flow smooth)
+          const { data: created, error: createErr } = await supabase
+            .from('brokers')
+            .upsert({ auth_id: row.auth_id, email: row.email }, { onConflict: 'auth_id' })
+            .select('id')
+            .single();
+
+          if (!createErr && created?.id) {
+            row.broker_id = created.id;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('⚠️ Broker lookup/upsert warning:', e?.message || e);
+      // Proceed without broker_id if anything fails
+    }
 
     console.log('🔍 Prepared row for insertion:', row);
 
     const { error } = await supabase.from('sellers').insert([row]);
-
     if (error) {
       console.error('❌ Supabase insert error:', error);
       return res.status(500).json({ error: 'Insert failed', detail: error.message });
@@ -128,6 +159,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Server error', detail: err.message });
   }
 }
-
 
 
