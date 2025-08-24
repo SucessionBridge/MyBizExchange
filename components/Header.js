@@ -10,7 +10,7 @@ export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState(null);
 
-  // 👇 NEW: broker role state
+  // 👇 broker role state
   const [isBroker, setIsBroker] = useState(false);
   const [brokerVerified, setBrokerVerified] = useState(false);
 
@@ -29,15 +29,26 @@ export default function Header() {
   const sellTimer = useRef(null);
   const buyTimer = useRef(null);
 
+  // Initial user fetch
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+      setUser(user ?? null);
     };
     checkUser();
   }, []);
 
-  // 👇 NEW: when logged in, check for broker profile
+  // 🔄 keep header in sync with auth (e.g., after logout)
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // When user changes, (re)check broker profile
   useEffect(() => {
     const run = async () => {
       if (!user?.id) {
@@ -61,9 +72,17 @@ export default function Header() {
     run();
   }, [user?.id]);
 
+  // ✅ updated: log out → home, clear UI state immediately
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/login');
+    try {
+      await supabase.auth.signOut();
+    } finally {
+      setUser(null); // flip header immediately
+      setDashOpen(false);
+      setIsOpen(false);
+      localStorage.removeItem('pendingNext');
+      router.replace('/'); // go to home page
+    }
   };
 
   const openWithDelay = (setter, timerRef) => {
@@ -178,7 +197,7 @@ export default function Header() {
                     Seller Dashboard
                   </button>
 
-                  {/* 👇 NEW: Broker action */}
+                  {/* Broker action */}
                   {isBroker ? (
                     <button
                       onClick={() => {
@@ -282,7 +301,7 @@ export default function Header() {
                   Seller Dashboard
                 </button>
 
-                {/* 👇 NEW: Broker action (mobile) */}
+                {/* Broker action (mobile) */}
                 {isBroker ? (
                   <button
                     onClick={() => {
