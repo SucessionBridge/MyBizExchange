@@ -5,12 +5,11 @@ import supabase from '../../lib/supabaseClient';
 
 function safeNext(p) {
   try {
-    // Only allow redirects within this site
     const url = new URL(p, window.location.origin);
-    if (url.origin !== window.location.origin) return '/sellers';
+    if (url.origin !== window.location.origin) return '/';
     return url.pathname + url.search + url.hash;
   } catch {
-    return '/sellers';
+    return '/';
   }
 }
 
@@ -18,26 +17,71 @@ export default function AuthCallback() {
   const router = useRouter();
 
   useEffect(() => {
-    (async () => {
-      // Turn the code in the URL into a session
-      const { error } = await supabase.auth.exchangeCodeForSession();
-      if (error) {
-        console.error('Session error:', error.message);
-        router.replace('/login');
-        return;
-      }
+    if (!router.isReady) return;
 
-      const params = new URLSearchParams(window.location.search);
-      const next = safeNext(params.get('next') || '/sellers'); // ⬅️ default /sellers
-      router.replace(next);
+    (async () => {
+      try {
+        const url = new URL(window.location.href);
+
+        // prefer ?next=, then localStorage, finally home
+        const nextParam = url.searchParams.get('next');
+        const pendingNext = localStorage.getItem('pendingNext');
+        const nextDest = safeNext(nextParam || pendingNext || '/');
+
+        // 1) HASH flow: #access_token & #refresh_token
+        const hash = url.hash?.startsWith('#') ? url.hash.slice(1) : '';
+        const hashParams = new URLSearchParams(hash);
+        const access_token = hashParams.get('access_token');
+        const refresh_token = hashParams.get('refresh_token');
+
+        if (access_token && refresh_token) {
+          const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+          if (error) {
+            console.error('setSession error:', error);
+            router.replace('/login');
+            return;
+          }
+          localStorage.removeItem('pendingNext');
+          router.replace(nextDest);
+          return;
+        }
+
+        // 2) CODE flow: ?code=
+        const code = url.searchParams.get('code');
+        if (code) {
+          // explicitly pass code (more reliable if other params are present)
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (error) {
+            console.error('exchangeCodeForSession error:', error);
+            router.replace('/login');
+            return;
+          }
+          localStorage.removeItem('pendingNext');
+          router.replace(nextDest);
+          return;
+        }
+
+        // 3) Fallback: already signed in?
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          localStorage.removeItem('pendingNext');
+          router.replace(nextDest);
+          return;
+        }
+
+        // Nothing to exchange and no session -> go to login
+        router.replace('/login');
+      } catch (err) {
+        console.error('Auth callback fatal:', err);
+        router.replace('/login');
+      }
     })();
-  }, [router]);
+  }, [router.isReady]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">
-      Logging you in...
+      Signing you in…
     </div>
   );
 }
-
 
