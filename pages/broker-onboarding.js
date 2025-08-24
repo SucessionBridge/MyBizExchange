@@ -23,20 +23,12 @@ function EmailVerifyGate() {
     const domain = domainRaw.toLowerCase();
     if (!domain) return '';
 
-    const fixes = {
-      gmai: 'gmail.com',
-      gmial: 'gmail.com',
-      gmal: 'gmail.com',
-      hotmai: 'hotmail.com',
-      yaho: 'yahoo.com',
-      'icloud.co': 'icloud.com',
-    };
-    for (const bad in fixes) {
-      if (domain.startsWith(bad)) return `${local}@${fixes[bad]}`;
-    }
+    const fixes = { gmai:'gmail.com', gmial:'gmail.com', gmal:'gmail.com', hotmai:'hotmail.com', yaho:'yahoo.com', 'icloud.co':'icloud.com' };
+    for (const bad in fixes) if (domain.startsWith(bad)) return `${local}@${fixes[bad]}`;
     if (domain.endsWith('.con')) return `${local}@${domain.replace(/\.con$/, '.com')}`;
     if (domain.endsWith('.cmo')) return `${local}@${domain.replace(/\.cmo$/, '.com')}`;
 
+    // tiny distance check to nudge typos to common domains
     const dist = (a, b) => {
       if (Math.abs(a.length - b.length) > 2) return 99;
       let d = 0;
@@ -71,12 +63,14 @@ function EmailVerifyGate() {
     setSending(true);
     try {
       const nextDest = '/broker-onboarding';
+      // keep intended landing for hash-based links
       localStorage.setItem('pendingNext', nextDest);
+
       const { error } = await supabase.auth.signInWithOtp({
         email: e1,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextDest)}`,
-        },
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextDest)}`
+        }
       });
 
       if (error) throw error;
@@ -92,12 +86,8 @@ function EmailVerifyGate() {
     return (
       <div className="max-w-lg mx-auto bg-white rounded-xl shadow p-6">
         <h2 className="text-xl font-semibold mb-2">Verify your email</h2>
-        <p className="text-gray-700">
-          We sent a sign-in link to <strong>{sentTo}</strong>.
-        </p>
-        <p className="text-gray-600 text-sm mt-1">
-          Open that link on this device to continue your <strong>broker listing onboarding</strong>.
-        </p>
+        <p className="text-gray-700">We sent a one-click sign-in link to <strong>{sentTo}</strong>.</p>
+        <p className="text-gray-600 text-sm mt-1">Open it on this device to continue your <strong>broker listing onboarding</strong>.</p>
         <button
           className="mt-4 text-sm text-blue-700 underline"
           onClick={() => { setSentTo(''); setEmail(''); setConfirm(''); }}
@@ -111,9 +101,7 @@ function EmailVerifyGate() {
   return (
     <div className="max-w-lg mx-auto bg-white rounded-xl shadow p-6">
       <h2 className="text-xl font-semibold mb-2">Start with your email</h2>
-      <p className="text-gray-600 text-sm mb-4">
-        We’ll send a one-click sign-in link. You’ll manage your listings with this email.
-      </p>
+      <p className="text-gray-600 text-sm mb-4">We’ll send a one-click sign-in link. You’ll manage your listings with this email.</p>
 
       <label className="block text-sm font-medium mb-1">Email</label>
       <input
@@ -122,14 +110,12 @@ function EmailVerifyGate() {
         onChange={(e) => setEmail(e.target.value)}
         placeholder="you@company.com"
         type="email"
+        inputMode="email"
+        autoComplete="email"
       />
       {suggestion && suggestion.toLowerCase() !== email.toLowerCase() && (
         <div className="text-[12px] text-amber-700 mt-1">
-          Did you mean{' '}
-          <button className="underline" onClick={() => setEmail(suggestion)}>
-            {suggestion}
-          </button>
-          ?
+          Did you mean <button className="underline" onClick={() => setEmail(suggestion)}>{suggestion}</button>?
         </div>
       )}
 
@@ -155,7 +141,6 @@ function EmailVerifyGate() {
     </div>
   );
 }
-
 
 /* ---------------------------- Broker Listing Wizard ---------------------------- */
 
@@ -259,13 +244,10 @@ export default function BrokerOnboarding() {
               includesBuilding: formData.real_estate_included
             })
           });
-
           if (!res.ok) {
-            const err = await res.json();
-            console.error('AI description error:', err.message);
+            try { console.error('AI description error:', (await res.json()).message); } catch {}
             return;
           }
-
           const data = await res.json();
           setFormData(prev => ({ ...prev, aiDescription: data.description }));
         } catch (err) {
@@ -285,20 +267,14 @@ export default function BrokerOnboarding() {
   const openModal = (type) => {
     setEditTarget(type);
     setCurrentEditType(type);
-    if (type === 'manual') {
-      setTempDescription(formData.businessDescription || '');
-    } else {
-      setTempAIDescription(formData.aiDescription || '');
-    }
+    if (type === 'manual') setTempDescription(formData.businessDescription || '');
+    else setTempAIDescription(formData.aiDescription || '');
     setShowModal(true);
   };
   const closeModal = () => { setShowModal(false); setEditTarget(null); };
   const saveModalChanges = () => {
-    if (editTarget === 'manual') {
-      setFormData(prev => ({ ...prev, businessDescription: tempDescription }));
-    } else if (editTarget === 'ai') {
-      setFormData(prev => ({ ...prev, aiDescription: tempAIDescription }));
-    }
+    if (editTarget === 'manual') setFormData(prev => ({ ...prev, businessDescription: tempDescription }));
+    else if (editTarget === 'ai') setFormData(prev => ({ ...prev, aiDescription: tempAIDescription }));
     closeModal();
   };
 
@@ -311,7 +287,6 @@ export default function BrokerOnboarding() {
     const selected = files.slice(0, remaining);
 
     const newPreviews = selected.map(file => URL.createObjectURL(file));
-
     setFormData(prev => ({ ...prev, images: [...prev.images, ...selected] }));
     setImagePreviews(prev => [...prev, ...newPreviews]);
   };
@@ -319,15 +294,12 @@ export default function BrokerOnboarding() {
   const deleteImageAt = (index) => {
     const url = imagePreviews[index];
     if (url) URL.revokeObjectURL(url);
-
     setImagePreviews(prev => prev.filter((_, i) => i !== index));
     setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
   };
 
   useEffect(() => {
-    return () => {
-      imagePreviews.forEach(u => URL.revokeObjectURL(u));
-    };
+    return () => { imagePreviews.forEach(u => URL.revokeObjectURL(u)); };
   }, [imagePreviews]);
 
   const handleSubmit = async () => {
@@ -364,7 +336,7 @@ export default function BrokerOnboarding() {
       }
 
       if (!verified) {
-        // Soft notice
+        // Soft notice — you can hard-gate if you prefer
         alert('Your broker profile is pending verification. You can submit, but listings may be hidden until verified.');
       }
 
@@ -393,7 +365,8 @@ export default function BrokerOnboarding() {
         uploadedImageUrls.push(publicUrlData.publicUrl);
       }
 
-      const cleanString = (val) => (typeof val === 'string' && val.trim() === '') ? null : val?.trim() || null;
+      const cleanString = (val) =>
+        (typeof val === 'string' && val.trim() === '') ? null : val?.trim() || null;
 
       // Build payload expected by /api/submit-seller-listing
       const sellerFinancingBool =
@@ -471,7 +444,6 @@ export default function BrokerOnboarding() {
       });
 
       if (!res.ok) {
-        // Try to parse JSON error; if HTML, catch below
         let errMsg = 'Unknown error';
         try {
           const errData = await res.json();
@@ -535,20 +507,12 @@ export default function BrokerOnboarding() {
 
   const renderPreview = () => {
     const toTitleCase = (str) =>
-      str
-        .toLowerCase()
-        .split(' ')
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
+      str.toLowerCase().split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
     const getListingTitle = () => {
-      if (formData.industry) {
-        return `${toTitleCase(formData.industry)} Business for Sale`;
-      } else if (formData.hideBusinessName) {
-        return 'Confidential Business Listing';
-      } else {
-        return formData.businessName;
-      }
+      if (formData.industry) return `${toTitleCase(formData.industry)} Business for Sale`;
+      if (formData.hideBusinessName) return 'Confidential Business Listing';
+      return formData.businessName;
     };
 
     return (
@@ -560,15 +524,11 @@ export default function BrokerOnboarding() {
             : formData.location}
         </p>
 
-        {(imagePreviews.length > 0) && (
+        {imagePreviews.length > 0 && (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
             {imagePreviews.map((src, i) => (
               <div key={i} className="relative">
-                <img
-                  src={src}
-                  alt={`Image ${i + 1}`}
-                  className="rounded-md border h-32 w-full object-cover"
-                />
+                <img src={src} alt={`Image ${i + 1}`} className="rounded-md border h-32 w-full object-cover" />
                 <button
                   type="button"
                   onClick={() => deleteImageAt(i)}
@@ -582,18 +542,15 @@ export default function BrokerOnboarding() {
           </div>
         )}
 
-        {/* Financials + Business Details */}
         <div className="grid md:grid-cols-2 gap-10 text-base mt-6">
           <div>
             <h3 className="text-xl font-semibold border-b pb-2 mb-3">Financial Overview</h3>
             <p><strong>Asking Price:</strong> {formatCurrency(formData.askingPrice)}</p>
-
             {(formData.seller_financing_considered === 'yes' || formData.seller_financing_considered === 'maybe') && (
               <div className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded font-medium mt-2">
                 💰 Seller Financing Possible
               </div>
             )}
-
             <p><strong>Annual Revenue:</strong> {formatCurrency(formData.annualRevenue)}</p>
             <p><strong>SDE:</strong> {formatCurrency(formData.sde)}</p>
             <p><strong>Annual Profit:</strong> {formatCurrency(formData.annualProfit)}</p>
@@ -603,11 +560,7 @@ export default function BrokerOnboarding() {
             <p><strong>Includes Building:</strong> {formData.real_estate_included ? 'Yes' : 'No'}</p>
             <p><strong>Years in Business:</strong> {formData.years_in_business || 'Undisclosed'}</p>
             <p><strong>Owner Hours/Week:</strong> {formData.owner_hours_per_week || 'Undisclosed'}</p>
-            <p><strong>Seller Financing Considered:</strong>
-              {formData.seller_financing_considered
-                ? String(formData.seller_financing_considered).charAt(0).toUpperCase() + String(formData.seller_financing_considered).slice(1)
-                : 'Undisclosed'}
-            </p>
+            <p><strong>Seller Financing Considered:</strong> {formData.seller_financing_considered || 'Undisclosed'}</p>
           </div>
           <div>
             <h3 className="text-xl font-semibold border-b pb-2 mb-3">Business Details</h3>
@@ -616,14 +569,12 @@ export default function BrokerOnboarding() {
             <p><strong>Home-Based:</strong> {formData.home_based ? 'Yes' : 'No'}</p>
             <p><strong>Relocatable:</strong> {formData.relocatable ? 'Yes' : 'No'}</p>
             <p><strong>Financing Type:</strong> {formData.financingType.replace('-', ' ')}</p>
-            <p><strong>Customer Type:</strong> {formData.customerType}</p>
             <p><strong>Owner Involvement:</strong> {formData.ownerInvolvement}</p>
             <p><strong>Reason for Selling:</strong> {formData.reasonForSelling}</p>
             <p><strong>Training Offered:</strong> {formData.trainingOffered}</p>
           </div>
         </div>
 
-        {/* Description Section */}
         {(formData.aiDescription || formData.businessDescription) && (
           <div>
             <h3 className="text-xl font-semibold border-b pb-2 mb-3">Listing Description</h3>
@@ -752,10 +703,14 @@ export default function BrokerOnboarding() {
   // --------------- Render ---------------
 
   if (loadingAuth) {
-    return <main className="bg-white min-h-screen p-6 font-sans"><div className="max-w-2xl mx-auto">Loading…</div></main>;
+    return (
+      <main className="bg-white min-h-screen p-6 font-sans">
+        <div className="max-w-2xl mx-auto">Loading…</div>
+      </main>
+    );
   }
 
-  // ⛔ If not verified, show the email gate instead of the wizard
+  // ⛔ Not verified → show email gate
   if (!authUser) {
     return (
       <main className="bg-white min-h-screen p-6 font-sans">
@@ -804,9 +759,7 @@ export default function BrokerOnboarding() {
                 className="w-full border p-3 rounded bg-gray-50"
                 disabled
               />
-              <label htmlFor="businessName" className="block mb-1 font-semibold">
-                Business Name
-              </label>
+              <label htmlFor="businessName" className="block mb-1 font-semibold">Business Name</label>
               <input
                 id="businessName"
                 name="businessName"
@@ -830,28 +783,10 @@ export default function BrokerOnboarding() {
             </div>
           ) : step === 2 ? (
             <div className="space-y-4">
-              <input
-                name="industry"
-                placeholder="Industry"
-                value={formData.industry}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
+              <input name="industry" placeholder="Industry" value={formData.industry} onChange={handleChange} className="w-full border p-3 rounded" />
+              <input name="location_city" placeholder="City" value={formData.location_city} onChange={handleChange} className="w-full border p-3 rounded" />
 
-              <input
-                name="location_city"
-                placeholder="City"
-                value={formData.location_city}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
-
-              <select
-                name="location_state"
-                value={formData.location_state}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              >
+              <select name="location_state" value={formData.location_state} onChange={handleChange} className="w-full border p-3 rounded">
                 <option value="">Select State/Province</option>
                 {/* Canadian Provinces */}
                 <option value="Alberta">Alberta</option>
@@ -948,9 +883,7 @@ export default function BrokerOnboarding() {
 
               <div className="bg-gray-50 p-4 rounded border mt-4">
                 <h3 className="font-semibold mb-2">Seller Financing Option</h3>
-                <p className="text-sm text-gray-600 mb-2">
-                  Offering seller financing can help sell faster and attract more qualified buyers.
-                </p>
+                <p className="text-sm text-gray-600 mb-2">Offering seller financing can help sell faster and attract more qualified buyers.</p>
                 <select name="seller_financing_considered" value={formData.seller_financing_considered} onChange={handleChange} className="w-full border p-2 rounded">
                   <option value="">Select</option>
                   <option value="yes">Yes</option>
@@ -987,6 +920,7 @@ export default function BrokerOnboarding() {
               <input name="keepsThemComing" placeholder="Why do they return?" value={formData.keepsThemComing} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="proudOf" placeholder="Something you're proud of" value={formData.proudOf} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="adviceToBuyer" placeholder="Advice for future owner" value={formData.adviceToBuyer} onChange={handleChange} className="w-full border p-3 rounded" />
+
               <div className="flex gap-2">
                 <button onClick={() => setPreviewMode(true)} className="w-1/2 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded">Preview Listing</button>
                 <button onClick={() => setStep(2)} className="w-1/2 bg-gray-200 hover:bg-gray-300 text-gray-900 py-3 rounded">Back</button>
@@ -998,6 +932,3 @@ export default function BrokerOnboarding() {
     </main>
   );
 }
-
-
-
