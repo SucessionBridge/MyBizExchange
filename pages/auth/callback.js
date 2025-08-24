@@ -19,32 +19,17 @@ export default function AuthCallback() {
   useEffect(() => {
     if (!router.isReady) return;
 
+    let unsub = null;
+    let timer = null;
+
     (async () => {
       try {
-        const href = window.location.href;
-        const url = new URL(href);
-
-        // prefer ?next=, then localStorage, finally home
+        const url = new URL(window.location.href);
         const nextParam = url.searchParams.get('next');
         const pendingNext = localStorage.getItem('pendingNext');
         const nextDest = safeNext(nextParam || pendingNext || '/');
 
-        // --- PRIMARY PATH: Supabase v2 recommended call (parses ?code or #fragment) ---
-        try {
-          const { error } = await supabase.auth.exchangeCodeForSession(href);
-          if (!error) {
-            // success
-            try { localStorage.removeItem('pendingNext'); } catch {}
-            router.replace(nextDest);
-            return;
-          }
-          // if error, we'll fall back below
-          console.warn('exchangeCodeForSession failed, trying fallbacks:', error?.message);
-        } catch (e) {
-          console.warn('exchangeCodeForSession threw, trying fallbacks:', e?.message);
-        }
-
-        // --- FALLBACK 1: old hash-based links (#access_token / #refresh_token) ---
+        // Try HASH flow first: #access_token & #refresh_token
         const hash = url.hash?.startsWith('#') ? url.hash.slice(1) : '';
         const hashParams = new URLSearchParams(hash);
         const access_token = hashParams.get('access_token');
@@ -53,31 +38,53 @@ export default function AuthCallback() {
         if (access_token && refresh_token) {
           const { error } = await supabase.auth.setSession({ access_token, refresh_token });
           if (!error) {
-            try { localStorage.removeItem('pendingNext'); } catch {}
+            localStorage.removeItem('pendingNext');
             router.replace(nextDest);
             return;
           }
-          console.error('setSession error:', error);
-          router.replace('/login');
-          return;
         }
 
-        // --- FALLBACK 2: maybe the session is already set ---
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          try { localStorage.removeItem('pendingNext'); } catch {}
-          router.replace(nextDest);
-          return;
+        // Try CODE flow: ?code=
+        const code = url.searchParams.get('code');
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error) {
+            localStorage.removeItem('pendingNext');
+            router.replace(nextDest);
+            return;
+          }
         }
 
-        // Nothing worked → back to login
-        router.replace('/login');
+        // Fallback: wait briefly for session event, then check directly
+        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (session) {
+            localStorage.removeItem('pendingNext');
+            router.replace(nextDest);
+          }
+        });
+        unsub = data?.subscription;
+
+        // If nothing after ~1.2s, check once & then punt to /login (preserving next)
+        timer = setTimeout(async () => {
+          const { data: s } = await supabase.auth.getSession();
+          if (s?.session) {
+            localStorage.removeItem('pendingNext');
+            router.replace(nextDest);
+          } else {
+            router.replace('/login' + (nextDest && nextDest !== '/' ? `?next=${encodeURIComponent(nextDest)}` : ''));
+          }
+        }, 1200);
       } catch (err) {
         console.error('Auth callback fatal:', err);
         router.replace('/login');
       }
     })();
-  }, [router.isReady, router]);
+
+    return () => {
+      if (unsub) unsub.unsubscribe();
+      if (timer) clearTimeout(timer);
+    };
+  }, [router.isReady]);
 
   return (
     <div className="min-h-screen flex items-center justify-center">
@@ -85,4 +92,5 @@ export default function AuthCallback() {
     </div>
   );
 }
+
 
