@@ -10,17 +10,19 @@ export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState(null);
 
-  // 👇 broker role state
+  // Broker role state
   const [isBroker, setIsBroker] = useState(false);
   const [brokerVerified, setBrokerVerified] = useState(false);
 
   // desktop dropdowns
   const [sellOpen, setSellOpen] = useState(false);
   const [buyOpen, setBuyOpen] = useState(false);
+  const [brokerOpen, setBrokerOpen] = useState(false);
 
   // mobile collapsibles
   const [sellOpenM, setSellOpenM] = useState(false);
   const [buyOpenM, setBuyOpenM] = useState(false);
+  const [brokerOpenM, setBrokerOpenM] = useState(false);
 
   // dashboard dropdown
   const [dashOpen, setDashOpen] = useState(false);
@@ -28,27 +30,17 @@ export default function Header() {
   const router = useRouter();
   const sellTimer = useRef(null);
   const buyTimer = useRef(null);
+  const brokerTimer = useRef(null);
 
-  // Initial user fetch
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      setUser(user ?? null);
+      setUser(user || null);
     };
     checkUser();
   }, []);
 
-  // 🔄 keep header in sync with auth (e.g., after logout)
-  useEffect(() => {
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // When user changes, (re)check broker profile
+  // when logged in, check for broker profile
   useEffect(() => {
     const run = async () => {
       if (!user?.id) {
@@ -72,16 +64,18 @@ export default function Header() {
     run();
   }, [user?.id]);
 
-  // ✅ updated: log out → home, clear UI state immediately
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
     } finally {
-      setUser(null); // flip header immediately
+      // reset local header state and go home
+      setUser(null);
+      setIsBroker(false);
+      setBrokerVerified(false);
       setDashOpen(false);
       setIsOpen(false);
-      localStorage.removeItem('pendingNext');
-      router.replace('/'); // go to home page
+      toast.success('Logged out');
+      router.push('/');
     }
   };
 
@@ -160,6 +154,44 @@ export default function Header() {
             )}
           </div>
 
+          {/* FOR BROKERS dropdown (NEW) */}
+          <div
+            className="relative"
+            onMouseEnter={() => openWithDelay(setBrokerOpen, brokerTimer)}
+            onMouseLeave={() => closeWithDelay(setBrokerOpen, brokerTimer)}
+          >
+            <button className="inline-flex items-center gap-1 px-2 py-1.5 rounded hover:text-blue-600" aria-haspopup="true" aria-expanded={brokerOpen}>
+              For Brokers <ChevronDown size={16} />
+            </button>
+            {brokerOpen && (
+              <div
+                className="absolute left-0 mt-2 w-72 rounded-lg border border-gray-200 bg-white shadow-lg p-2 z-50"
+                onMouseEnter={() => openWithDelay(setBrokerOpen, brokerTimer)}
+                onMouseLeave={() => closeWithDelay(setBrokerOpen, brokerTimer)}
+              >
+                {!user && (
+                  <>
+                    <Link href="/login?role=broker"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Login</a></Link>
+                    <Link href="/broker-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Onboarding</a></Link>
+                  </>
+                )}
+                {user && (
+                  <>
+                    {isBroker ? (
+                      <>
+                        <Link href="/broker-dashboard"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Dashboard{brokerVerified ? '' : ' (pending)'}</a></Link>
+                        <Link href="/broker-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Listing</a></Link>
+                      </>
+                    ) : (
+                      <Link href="/broker-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Onboarding</a></Link>
+                    )}
+                  </>
+                )}
+                <Link href="/pricing"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Pricing</a></Link>
+              </div>
+            )}
+          </div>
+
           {/* quick links */}
           <Link href="/business-valuation"><span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Valuation</span></Link>
           <Link href="/scorecard"><span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Sellability Scorecard</span></Link>
@@ -178,7 +210,7 @@ export default function Header() {
                 <div className="absolute right-0 mt-2 w-56 bg-white border rounded shadow z-50">
                   <button
                     onClick={() => {
-                      toast.success('Switched to Buyer Dashboard');
+                      toast.success('Opening Buyer Dashboard');
                       setDashOpen(false);
                       router.push('/buyer-dashboard');
                     }}
@@ -188,7 +220,7 @@ export default function Header() {
                   </button>
                   <button
                     onClick={() => {
-                      toast.success('Switched to Seller Dashboard');
+                      toast.success('Opening Seller Dashboard');
                       setDashOpen(false);
                       router.push('/seller-dashboard');
                     }}
@@ -197,7 +229,6 @@ export default function Header() {
                     Seller Dashboard
                   </button>
 
-                  {/* Broker action */}
                   {isBroker ? (
                     <button
                       onClick={() => {
@@ -273,6 +304,35 @@ export default function Header() {
               </div>
             )}
 
+            {/* FOR BROKERS collapsible (NEW) */}
+            <button onClick={() => setBrokerOpenM((v) => !v)} className="flex items-center justify-between py-2">
+              <span>For Brokers</span>
+              <ChevronDown className={`transition ${brokerOpenM ? 'rotate-180' : ''}`} size={18} />
+            </button>
+            {brokerOpenM && (
+              <div className="pl-3 pb-2 space-y-2">
+                {!user && (
+                  <>
+                    <Link href="/login?role=broker"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Login</span></Link>
+                    <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Onboarding</span></Link>
+                  </>
+                )}
+                {user && (
+                  <>
+                    {isBroker ? (
+                      <>
+                        <Link href="/broker-dashboard"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Dashboard{brokerVerified ? '' : ' (pending)'}</span></Link>
+                        <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Create Listing</span></Link>
+                      </>
+                    ) : (
+                      <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Onboarding</span></Link>
+                    )}
+                  </>
+                )}
+                <Link href="/pricing"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Pricing</span></Link>
+              </div>
+            )}
+
             {/* quick links */}
             <Link href="/business-valuation"><span className="py-2" onClick={() => setIsOpen(false)}>Valuation</span></Link>
             <Link href="/scorecard"><span className="py-2" onClick={() => setIsOpen(false)}>Sellability Scorecard</span></Link>
@@ -282,7 +342,7 @@ export default function Header() {
               <>
                 <button
                   onClick={() => {
-                    toast.success('Switched to Buyer Dashboard');
+                    toast.success('Opening Buyer Dashboard');
                     router.push('/buyer-dashboard');
                     setIsOpen(false);
                   }}
@@ -292,7 +352,7 @@ export default function Header() {
                 </button>
                 <button
                   onClick={() => {
-                    toast.success('Switched to Seller Dashboard');
+                    toast.success('Opening Seller Dashboard');
                     router.push('/seller-dashboard');
                     setIsOpen(false);
                   }}
@@ -301,7 +361,6 @@ export default function Header() {
                   Seller Dashboard
                 </button>
 
-                {/* Broker action (mobile) */}
                 {isBroker ? (
                   <button
                     onClick={() => {
@@ -338,4 +397,3 @@ export default function Header() {
     </header>
   );
 }
-
