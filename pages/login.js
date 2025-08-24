@@ -1,3 +1,4 @@
+// pages/login.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
@@ -17,35 +18,33 @@ export default function Login() {
       : null;
   const nextPath = explicitNext || (isBroker ? '/broker-onboarding' : null);
 
-  // ✅ If user is logged in, send them somewhere useful
+  // If user is logged in, send them somewhere useful
   useEffect(() => {
     if (!router.isReady || !session?.user) return;
 
     (async () => {
-      if (isBroker) {
-        // Broker entry: check if they have a broker row
-        const { data: broker } = await supabase
-          .from('brokers')
-          .select('id')
-          .eq('auth_id', session.user.id)
-          .maybeSingle();
+      const authId = session.user.id;
 
+      // ✅ Prefer broker flow if either (a) they came via ?role=broker OR (b) they already have a broker row
+      const { data: broker } = await supabase
+        .from('brokers')
+        .select('id')
+        .eq('auth_id', authId)
+        .maybeSingle();
+
+      if (isBroker || broker) {
         router.replace(broker ? '/broker-dashboard' : '/broker-onboarding');
         return;
       }
 
-      // Buyer-first behavior (your original logic)
+      // Otherwise follow the original buyer-first behavior
       const { data: buyer } = await supabase
         .from('buyers')
         .select('id')
-        .eq('auth_id', session.user.id)
+        .eq('auth_id', authId)
         .maybeSingle();
 
-      if (buyer) {
-        router.replace('/buyer-dashboard');
-      } else {
-        router.replace('/buyer-onboarding');
-      }
+      router.replace(buyer ? '/buyer-dashboard' : '/buyer-onboarding');
     })();
   }, [router.isReady, session, isBroker, router]);
 
