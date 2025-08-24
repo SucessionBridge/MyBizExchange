@@ -74,6 +74,7 @@ export default function Header() {
       setBrokerVerified(false);
       setDashOpen(false);
       setIsOpen(false);
+      try { localStorage.removeItem('pendingNext'); } catch {}
       toast.success('Logged out');
       router.push('/');
     }
@@ -150,11 +151,15 @@ export default function Header() {
                 <Link href="/guides/how-to-sell"><a className="block px-3 py-2 rounded hover:bg-gray-50">How to Sell Your Business</a></Link>
                 <Link href="/guides/prep-to-sell"><a className="block px-3 py-2 rounded hover:bg-gray-50">Get Your Business Ready to Sell</a></Link>
                 <Link href="/pricing"><a className="block px-3 py-2 rounded hover:bg-gray-50">Pricing</a></Link>
+
+                {/* NEW: Broker Login shortcut inside Sell menu */}
+                <div className="my-2 border-t" />
+                <Link href="/login?role=broker"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Login</a></Link>
               </div>
             )}
           </div>
 
-          {/* FOR BROKERS dropdown (NEW) */}
+          {/* FOR BROKERS dropdown (existing) */}
           <div
             className="relative"
             onMouseEnter={() => openWithDelay(setBrokerOpen, brokerTimer)}
@@ -263,7 +268,7 @@ export default function Header() {
           )}
         </nav>
 
-        {/* Mobile hamburger */}
+      {/* Mobile hamburger */}
         <div className="md:hidden">
           <button onClick={() => setIsOpen((v) => !v)} aria-label="Toggle menu" className="text-gray-800">
             {isOpen ? <X size={24} /> : <Menu size={24} />}
@@ -301,10 +306,14 @@ export default function Header() {
                 <Link href="/guides/how-to-sell"><span className="block py-1.5" onClick={() => setIsOpen(false)}>How to Sell</span></Link>
                 <Link href="/guides/prep-to-sell"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Get Ready to Sell</span></Link>
                 <Link href="/pricing"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Pricing</span></Link>
+
+                {/* NEW: Broker Login shortcut in mobile Sell section */}
+                <div className="my-2 border-t" />
+                <Link href="/login?role=broker"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Login</span></Link>
               </div>
             )}
 
-            {/* FOR BROKERS collapsible (NEW) */}
+            {/* FOR BROKERS collapsible (existing) */}
             <button onClick={() => setBrokerOpenM((v) => !v)} className="flex items-center justify-between py-2">
               <span>For Brokers</span>
               <ChevronDown className={`transition ${brokerOpenM ? 'rotate-180' : ''}`} size={18} />
@@ -397,3 +406,4 @@ export default function Header() {
     </header>
   );
 }
+
