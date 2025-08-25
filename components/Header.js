@@ -159,7 +159,7 @@ export default function Header() {
             )}
           </div>
 
-          {/* FOR BROKERS dropdown (existing) */}
+          {/* FOR BROKERS dropdown */}
           <div
             className="relative"
             onMouseEnter={() => openWithDelay(setBrokerOpen, brokerTimer)}
@@ -185,7 +185,8 @@ export default function Header() {
                     {isBroker ? (
                       <>
                         <Link href="/broker-dashboard"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Dashboard{brokerVerified ? '' : ' (pending)'}</a></Link>
-                        <Link href="/broker-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Listing</a></Link>
+                        {/* CHANGED: Create Listing now goes to broker listing flow */}
+                        <Link href="/broker/listings/new"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Listing</a></Link>
                       </>
                     ) : (
                       <Link href="/broker-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Onboarding</a></Link>
@@ -268,7 +269,7 @@ export default function Header() {
           )}
         </nav>
 
-      {/* Mobile hamburger */}
+        {/* Mobile hamburger */}
         <div className="md:hidden">
           <button onClick={() => setIsOpen((v) => !v)} aria-label="Toggle menu" className="text-gray-800">
             {isOpen ? <X size={24} /> : <Menu size={24} />}
@@ -313,7 +314,7 @@ export default function Header() {
               </div>
             )}
 
-            {/* FOR BROKERS collapsible (existing) */}
+            {/* FOR BROKERS collapsible */}
             <button onClick={() => setBrokerOpenM((v) => !v)} className="flex items-center justify-between py-2">
               <span>For Brokers</span>
               <ChevronDown className={`transition ${brokerOpenM ? 'rotate-180' : ''}`} size={18} />
@@ -331,7 +332,8 @@ export default function Header() {
                     {isBroker ? (
                       <>
                         <Link href="/broker-dashboard"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Dashboard{brokerVerified ? '' : ' (pending)'}</span></Link>
-                        <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Create Listing</span></Link>
+                        {/* CHANGED: Create Listing now goes to broker listing flow */}
+                        <Link href="/broker/listings/new"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Create Listing</span></Link>
                       </>
                     ) : (
                       <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Onboarding</span></Link>
