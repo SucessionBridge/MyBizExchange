@@ -124,7 +124,8 @@ export default function Header() {
                 onMouseLeave={() => closeWithDelay(setBuyOpen, buyTimer)}
               >
                 <Link href="/listings"><a className="block px-3 py-2 rounded hover:bg-gray-50">Browse Listings</a></Link>
-                <Link href="/buyer-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Your Buyer Profile</a></Link>
+             <Link href="/broker/listings/new"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Listing</a></Link>
+
                 <Link href="/guides/how-buyers-value"><a className="block px-3 py-2 rounded hover:bg-gray-50">How Buyers Value Businesses</a></Link>
                 <Link href="/guides/financing-options"><a className="block px-3 py-2 rounded hover:bg-gray-50">Financing Options</a></Link>
               </div>
@@ -177,7 +178,7 @@ export default function Header() {
                 {!user && (
                   <>
                     <Link href="/login?role=broker"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Login</a></Link>
-                    <Link href="/broker-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Onboarding</a></Link>
+                    <Link href="/broker/listings/new"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Create Listing</span></Link>
                   </>
                 )}
                 {user && (
