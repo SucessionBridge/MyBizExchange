@@ -150,9 +150,11 @@ export default function BrokerNewListing() {
         const safeName = String(file.name || `file_${i}`).replace(/[^\w.\-]/g, '_');
         const filePath = `broker-${brokerId}/${Date.now()}_${i}_${safeName}`;
 
-        const { data: uploaded, error: upErr } = await supabase
-          .from('seller-images')
-          .upload(filePath, file, { upsert: false });
+       const { data: uploaded, error: upErr } = await supabase
+  .storage
+  .from('seller-images')
+  .upload(filePath, file, { upsert: false });
+
 
         if (upErr) {
           setSubmitting(false);
