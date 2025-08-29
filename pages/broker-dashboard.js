@@ -78,7 +78,7 @@ export default function BrokerDashboard() {
             Pending verification
           </span>
         )}
-        {/* New listing now goes to the new broker listing flow */}
+        {/* ✅ New listing goes to the broker flow */}
         <Link
           href="/broker/listings/new"
           className="ml-auto px-3 py-2 rounded bg-black text-white"
