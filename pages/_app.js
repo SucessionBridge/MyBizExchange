@@ -17,32 +17,40 @@ const merriweather = Merriweather({ subsets: ['latin'], weight: ['400', '700'], 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
 
-  // Handle Supabase magic links that land on "/" with a URL hash
+  // Handle only the rare case where Supabase lands you on "/" with a URL hash.
+  // Otherwise, let /auth/callback handle the exchange+redirect.
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    // 🔒 Only run this helper on the site root.
+    if (window.location.pathname !== '/') return;
+
     const hash = window.location.hash || '';
-    if (hash.includes('access_token') || hash.includes('type=magiclink') || hash.includes('provider_token')) {
-      (async () => {
-        try {
-          await supabase.auth.getSessionFromUrl({ storeSession: true });
-        } catch (_) {
-          // no-op
-        } finally {
-          const next = localStorage.getItem('pendingNext') || '/sellers';
-          localStorage.removeItem('pendingNext');
-          router.replace(next);
-        }
-      })();
-    }
-  }, [router]);
+    const hasMagicBits =
+      hash.includes('access_token') ||
+      hash.includes('type=magiclink') ||
+      hash.includes('provider_token');
+
+    if (!hasMagicBits) return;
+
+    (async () => {
+      try {
+        await supabase.auth.getSessionFromUrl({ storeSession: true });
+      } catch (_) {
+        // no-op
+      } finally {
+        const next = localStorage.getItem('pendingNext') || '/';
+        localStorage.removeItem('pendingNext');
+        router.replace(next);
+      }
+    })();
+  }, [router.isReady]); // use router.isReady to avoid double-invoke on route changes
 
   return (
     <SessionContextProvider supabaseClient={supabase} initialSession={pageProps.initialSession}>
       <ErrorBoundary>
-        {/* Flex column so footer anchors to bottom */}
         <div className={`${inter.variable} ${merriweather.variable} font-sans bg-white text-gray-800 min-h-screen flex flex-col`}>
           <Header />
-          {/* flex-1 lets the main content grow and push footer down */}
           <main className="flex-1 pt-20 px-4">
             <Component {...pageProps} />
           </main>
