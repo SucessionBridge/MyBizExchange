@@ -1,4 +1,4 @@
-// pages/login.js
+// pages/login.js 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
@@ -16,7 +16,9 @@ export default function Login() {
     router?.isReady && typeof router?.query?.next === 'string'
       ? router.query.next
       : null;
-  const nextPath = explicitNext || (isBroker ? '/broker-onboarding' : null);
+
+  // 🔁 CHANGED: default broker next goes to /broker-dashboard (not /broker-onboarding)
+  const nextPath = explicitNext || (isBroker ? '/broker-dashboard' : null);
 
   // If user is logged in, send them somewhere useful
   useEffect(() => {
@@ -25,7 +27,7 @@ export default function Login() {
     (async () => {
       const authId = session.user.id;
 
-      // ✅ Prefer broker flow if either (a) they came via ?role=broker OR (b) they already have a broker row
+      // Prefer broker flow if either (a) they came via ?role=broker OR (b) they already have a broker row
       const { data: broker } = await supabase
         .from('brokers')
         .select('id')
