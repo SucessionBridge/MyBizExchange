@@ -124,7 +124,7 @@ export default function Header() {
                 onMouseLeave={() => closeWithDelay(setBuyOpen, buyTimer)}
               >
                 <Link href="/listings"><a className="block px-3 py-2 rounded hover:bg-gray-50">Browse Listings</a></Link>
-             <Link href="/broker/listings/new"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Listing</a></Link>
+                <Link href="/broker/listings/new"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Listing</a></Link>
 
                 <Link href="/guides/how-buyers-value"><a className="block px-3 py-2 rounded hover:bg-gray-50">How Buyers Value Businesses</a></Link>
                 <Link href="/guides/financing-options"><a className="block px-3 py-2 rounded hover:bg-gray-50">Financing Options</a></Link>
@@ -155,7 +155,8 @@ export default function Header() {
 
                 {/* NEW: Broker Login shortcut inside Sell menu */}
                 <div className="my-2 border-t" />
-                <Link href="/login?role=broker"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Login</a></Link>
+                {/* UPDATED: add &next to force broker landing */}
+                <Link href="/login?role=broker&next=/broker/dashboard"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Login</a></Link>
               </div>
             )}
           </div>
@@ -177,7 +178,8 @@ export default function Header() {
               >
                 {!user && (
                   <>
-                    <Link href="/login?role=broker"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Login</a></Link>
+                    {/* UPDATED: add &next to force broker landing */}
+                    <Link href="/login?role=broker&next=/broker/dashboard"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Login</a></Link>
                     <Link href="/broker/listings/new"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Create Listing</span></Link>
                   </>
                 )}
@@ -311,7 +313,8 @@ export default function Header() {
 
                 {/* NEW: Broker Login shortcut in mobile Sell section */}
                 <div className="my-2 border-t" />
-                <Link href="/login?role=broker"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Login</span></Link>
+                {/* UPDATED: add &next to force broker landing */}
+                <Link href="/login?role=broker&next=/broker/dashboard"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Login</span></Link>
               </div>
             )}
 
@@ -324,7 +327,8 @@ export default function Header() {
               <div className="pl-3 pb-2 space-y-2">
                 {!user && (
                   <>
-                    <Link href="/login?role=broker"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Login</span></Link>
+                    {/* UPDATED: add &next to force broker landing */}
+                    <Link href="/login?role=broker&next=/broker/dashboard"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Login</span></Link>
                     <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Onboarding</span></Link>
                   </>
                 )}
