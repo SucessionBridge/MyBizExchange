@@ -3,50 +3,22 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../../lib/supabaseClient';
 
-function safeNext(p) {
+function normalizeNext(p) {
   try {
     const url = new URL(p, window.location.origin);
+    // only allow internal redirects
     if (url.origin !== window.location.origin) return '/';
+
+    // fold legacy broker paths to the canonical route
+    if (url.pathname === '/broker/dashboard' || url.pathname === '/broker') {
+      url.pathname = '/broker-dashboard';
+      url.search = ''; // drop any accidental extra params
+      url.hash = '';
+    }
     return url.pathname + url.search + url.hash;
   } catch {
     return '/';
   }
-}
-
-// Normalize legacy / bad paths written by older flows
-function normalizeNext(path) {
-  if (!path) return '/';
-  if (path === '/broker/dashboard') return '/broker-dashboard'; // legacy wrong path
-  // add other one-off corrections here if needed
-  return path;
-}
-
-// If user has a broker profile, keep them out of buyer pages by mistake
-async function chooseDest(nextPath) {
-  const normalized = normalizeNext(safeNext(nextPath || '/'));
-
-  // Only override when they'd otherwise land on buyer pages
-  if (normalized !== '/buyer-onboarding' && normalized !== '/buyer-dashboard') {
-    return normalized;
-  }
-
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return normalized;
-
-    const { data: br } = await supabase
-      .from('brokers')
-      .select('id')
-      .eq('auth_id', user.id)
-      .maybeSingle();
-
-    // If they are a broker, prefer broker dashboard over buyer pages
-    if (br?.id) return '/broker-dashboard';
-  } catch {
-    // ignore and fall through
-  }
-
-  return normalized;
 }
 
 export default function AuthCallback() {
@@ -61,11 +33,14 @@ export default function AuthCallback() {
     (async () => {
       try {
         const url = new URL(window.location.href);
+
+        // prefer ?next=, then localStorage, finally home — all normalized
         const nextParam = url.searchParams.get('next');
         const pendingNext = localStorage.getItem('pendingNext');
         const rawNext = nextParam || pendingNext || '/';
+        const nextDest = normalizeNext(rawNext);
 
-        // --- HASH flow: #access_token & #refresh_token ---
+        // HASH flow: #access_token & #refresh_token
         const hash = url.hash?.startsWith('#') ? url.hash.slice(1) : '';
         const hashParams = new URLSearchParams(hash);
         const access_token = hashParams.get('access_token');
@@ -75,44 +50,38 @@ export default function AuthCallback() {
           const { error } = await supabase.auth.setSession({ access_token, refresh_token });
           if (!error) {
             localStorage.removeItem('pendingNext');
-            const dest = await chooseDest(rawNext);
-            router.replace(dest);
+            router.replace(nextDest);
             return;
           }
         }
 
-        // --- CODE flow: ?code= ---
+        // CODE flow: ?code=
         const code = url.searchParams.get('code');
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (!error) {
             localStorage.removeItem('pendingNext');
-            const dest = await chooseDest(rawNext);
-            router.replace(dest);
+            router.replace(nextDest);
             return;
           }
         }
 
-        // --- Fallback: wait briefly for session event, then check directly ---
-        const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        // Fallback: wait for session event, then check once
+        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
           if (session) {
             localStorage.removeItem('pendingNext');
-            const dest = await chooseDest(rawNext);
-            router.replace(dest);
+            router.replace(nextDest);
           }
         });
         unsub = data?.subscription;
 
-        // If nothing after ~1.2s, check once & then punt to /login (preserving next)
         timer = setTimeout(async () => {
           const { data: s } = await supabase.auth.getSession();
           if (s?.session) {
             localStorage.removeItem('pendingNext');
-            const dest = await chooseDest(rawNext);
-            router.replace(dest);
+            router.replace(nextDest);
           } else {
-            const safe = normalizeNext(safeNext(rawNext));
-            router.replace('/login' + (safe && safe !== '/' ? `?next=${encodeURIComponent(safe)}` : ''));
+            router.replace('/login' + (nextDest && nextDest !== '/' ? `?next=${encodeURIComponent(nextDest)}` : ''));
           }
         }, 1200);
       } catch (err) {
@@ -122,7 +91,7 @@ export default function AuthCallback() {
     })();
 
     return () => {
-      if (unsub) unsub.unsubscribe?.();
+      if (unsub) unsub.unsubscribe();
       if (timer) clearTimeout(timer);
     };
   }, [router.isReady]);
@@ -133,5 +102,3 @@ export default function AuthCallback() {
     </div>
   );
 }
-
-
