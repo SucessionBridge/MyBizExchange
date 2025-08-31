@@ -1,4 +1,4 @@
-// pages/login.js 
+// pages/login.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
@@ -10,14 +10,31 @@ export default function Login() {
   const session = useSession();
   const router = useRouter();
 
+  // --- NEW: sanitize/normalize next destinations (handles old /broker/dashboard) ---
+  function sanitizeNext(p) {
+    try {
+      if (!p) return null;
+      const url = new URL(p, window.location.origin);
+      // only allow internal redirects
+      if (url.origin !== window.location.origin) return null;
+
+      // normalize legacy broker paths to the canonical route
+      if (url.pathname === '/broker/dashboard' || url.pathname === '/broker') {
+        url.pathname = '/broker-dashboard';
+        url.search = '';
+        url.hash = '';
+      }
+      return url.pathname + url.search + url.hash;
+    } catch {
+      return null;
+    }
+  }
+
   // Detect broker role and optional explicit next (only once router is ready)
   const isBroker = router?.isReady && router?.query?.role === 'broker';
-  const explicitNext =
-    router?.isReady && typeof router?.query?.next === 'string'
-      ? router.query.next
-      : null;
+  const explicitNext = router?.isReady ? sanitizeNext(router?.query?.next) : null;
 
-  // 🔁 CHANGED: default broker next goes to /broker-dashboard (not /broker-onboarding)
+  // Default broker next goes to /broker-dashboard
   const nextPath = explicitNext || (isBroker ? '/broker-dashboard' : null);
 
   // If user is logged in, send them somewhere useful
@@ -58,7 +75,7 @@ export default function Login() {
       // Persist intended destination for hash-based magic-link landings
       localStorage.setItem('pendingNext', nextPath || '/');
 
-      // Build callback URL; include ?next= when we have one
+      // Build callback URL; include ?next= when we have one (already sanitized)
       const callbackUrl = `${window.location.origin}/auth/callback${
         nextPath ? `?next=${encodeURIComponent(nextPath)}` : ''
       }`;
