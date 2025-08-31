@@ -13,6 +13,42 @@ function safeNext(p) {
   }
 }
 
+// Normalize legacy / bad paths written by older flows
+function normalizeNext(path) {
+  if (!path) return '/';
+  if (path === '/broker/dashboard') return '/broker-dashboard'; // legacy wrong path
+  // add other one-off corrections here if needed
+  return path;
+}
+
+// If user has a broker profile, keep them out of buyer pages by mistake
+async function chooseDest(nextPath) {
+  const normalized = normalizeNext(safeNext(nextPath || '/'));
+
+  // Only override when they'd otherwise land on buyer pages
+  if (normalized !== '/buyer-onboarding' && normalized !== '/buyer-dashboard') {
+    return normalized;
+  }
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return normalized;
+
+    const { data: br } = await supabase
+      .from('brokers')
+      .select('id')
+      .eq('auth_id', user.id)
+      .maybeSingle();
+
+    // If they are a broker, prefer broker dashboard over buyer pages
+    if (br?.id) return '/broker-dashboard';
+  } catch {
+    // ignore and fall through
+  }
+
+  return normalized;
+}
+
 export default function AuthCallback() {
   const router = useRouter();
 
@@ -27,9 +63,9 @@ export default function AuthCallback() {
         const url = new URL(window.location.href);
         const nextParam = url.searchParams.get('next');
         const pendingNext = localStorage.getItem('pendingNext');
-        const nextDest = safeNext(nextParam || pendingNext || '/');
+        const rawNext = nextParam || pendingNext || '/';
 
-        // Try HASH flow first: #access_token & #refresh_token
+        // --- HASH flow: #access_token & #refresh_token ---
         const hash = url.hash?.startsWith('#') ? url.hash.slice(1) : '';
         const hashParams = new URLSearchParams(hash);
         const access_token = hashParams.get('access_token');
@@ -39,27 +75,30 @@ export default function AuthCallback() {
           const { error } = await supabase.auth.setSession({ access_token, refresh_token });
           if (!error) {
             localStorage.removeItem('pendingNext');
-            router.replace(nextDest);
+            const dest = await chooseDest(rawNext);
+            router.replace(dest);
             return;
           }
         }
 
-        // Try CODE flow: ?code=
+        // --- CODE flow: ?code= ---
         const code = url.searchParams.get('code');
         if (code) {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (!error) {
             localStorage.removeItem('pendingNext');
-            router.replace(nextDest);
+            const dest = await chooseDest(rawNext);
+            router.replace(dest);
             return;
           }
         }
 
-        // Fallback: wait briefly for session event, then check directly
-        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        // --- Fallback: wait briefly for session event, then check directly ---
+        const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
           if (session) {
             localStorage.removeItem('pendingNext');
-            router.replace(nextDest);
+            const dest = await chooseDest(rawNext);
+            router.replace(dest);
           }
         });
         unsub = data?.subscription;
@@ -69,9 +108,11 @@ export default function AuthCallback() {
           const { data: s } = await supabase.auth.getSession();
           if (s?.session) {
             localStorage.removeItem('pendingNext');
-            router.replace(nextDest);
+            const dest = await chooseDest(rawNext);
+            router.replace(dest);
           } else {
-            router.replace('/login' + (nextDest && nextDest !== '/' ? `?next=${encodeURIComponent(nextDest)}` : ''));
+            const safe = normalizeNext(safeNext(rawNext));
+            router.replace('/login' + (safe && safe !== '/' ? `?next=${encodeURIComponent(safe)}` : ''));
           }
         }, 1200);
       } catch (err) {
@@ -81,7 +122,7 @@ export default function AuthCallback() {
     })();
 
     return () => {
-      if (unsub) unsub.unsubscribe();
+      if (unsub) unsub.unsubscribe?.();
       if (timer) clearTimeout(timer);
     };
   }, [router.isReady]);
