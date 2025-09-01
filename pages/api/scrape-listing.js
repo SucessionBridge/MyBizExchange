@@ -1,6 +1,9 @@
 // pages/api/scrape-listing.js
 import * as cheerio from "cheerio";
 
+// Allow longer execution on Vercel (seconds)
+export const maxDuration = 60;
+
 export const config = {
   api: {
     bodyParser: { sizeLimit: "1mb" },
@@ -127,7 +130,7 @@ export default async function handler(req, res) {
   }
 
   const controller = new AbortController();
-  const timeoutMs = 20000;
+  const timeoutMs = 30000; // 30s
   const to = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
@@ -174,14 +177,18 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ ok: true, extracted });
   } catch (err) {
-    const isAbort = err?.name === "AbortError";
+    clearTimeout(to);
+    const msg = String(err?.message || "");
+    const isAbort =
+      err?.name === "AbortError" || /aborted|abortcontroller/i.test(msg);
     return res.status(200).json({
       ok: false,
       code: isAbort ? "TIMEOUT" : "SCRAPE_ERROR",
-      error: isAbort ? `Timed out after ${timeoutMs}ms.` : String(err?.message || "Unknown error"),
+      error: isAbort ? `Timed out after ${timeoutMs}ms.` : "Fetch failed.",
     });
   } finally {
     clearTimeout(to);
   }
 }
+
 
