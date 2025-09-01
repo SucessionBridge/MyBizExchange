@@ -17,8 +17,8 @@ export default function BrokerNewListing() {
   const [mode, setMode] = useState('choose'); // 'choose' | 'manual' | 'import'
 
   // Minimal manual form state
-  const [images, setImages] = useState([]);
-  const [imagePreviews, setImagePreviews] = useState([]);
+  const [images, setImages] = useState([]); // local File objects
+  const [imagePreviews, setImagePreviews] = useState([]); // local object URLs
 
   const [form, setForm] = useState({
     businessName: '',
@@ -30,6 +30,13 @@ export default function BrokerNewListing() {
     sde: '',
     description: '',
   });
+
+  // Import mode state
+  const [importUrl, setImportUrl] = useState('');
+  const [importText, setImportText] = useState('');
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importedImageUrls, setImportedImageUrls] = useState([]); // remote images discovered from URL
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -92,7 +99,7 @@ export default function BrokerNewListing() {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    const remaining = Math.max(0, 8 - images.length);
+    const remaining = Math.max(0, 8 - (images.length + importedImageUrls.length));
     const selected = files.slice(0, remaining);
 
     const previews = selected.map((f) => URL.createObjectURL(f));
@@ -105,6 +112,10 @@ export default function BrokerNewListing() {
     if (u) URL.revokeObjectURL(u);
     setImages((prev) => prev.filter((_, i) => i !== idx));
     setImagePreviews((prev) => prev.filter((_, i) => i !== idx));
+  };
+
+  const removeImportedAt = (idx) => {
+    setImportedImageUrls((prev) => prev.filter((_, i) => i !== idx));
   };
 
   useEffect(() => {
@@ -129,6 +140,48 @@ export default function BrokerNewListing() {
     return errs;
   };
 
+  // ----- Import via URL -> Prefill -----
+  const fetchFromUrl = async () => {
+    setImportError('');
+    if (!importUrl || !/^https?:\/\//i.test(importUrl)) {
+      setImportError('Please paste a full https:// URL.');
+      return;
+    }
+    setImportLoading(true);
+    try {
+      const res = await fetch(`/api/import-listing?url=${encodeURIComponent(importUrl)}`);
+      const json = await res.json();
+      if (!res.ok || !json?.ok) {
+        throw new Error(json?.error || 'Could not import this URL.');
+      }
+      const f = json.fields || {};
+      setForm((prev) => ({
+        ...prev,
+        businessName: f.businessName || prev.businessName,
+        industry: f.industry || prev.industry,
+        city: f.city || prev.city,
+        state: f.state || prev.state,
+        askingPrice: f.askingPrice ?? prev.askingPrice,
+        annualRevenue: f.annualRevenue ?? prev.annualRevenue,
+        sde: f.sde ?? prev.sde,
+        description: [prev.description, f.description].filter(Boolean).join('\n\n'),
+      }));
+      setImportedImageUrls(Array.isArray(f.imageUrls) ? f.imageUrls.slice(0, 8) : []);
+      setMode('manual'); // jump to review/edit
+    } catch (e) {
+      setImportError(e.message || 'Import failed.');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  // ----- Prefill using pasted text only -----
+  const useImportToPrefill = () => {
+    const text = importText || (importUrl ? `Source: ${importUrl}` : '');
+    setForm((f) => ({ ...f, description: (f.description || '') + (text ? `\n\n${text}` : '') }));
+    setMode('manual');
+  };
+
   // ----- Submit (manual create) -----
   const submitManual = async () => {
     if (!authUser || !brokerId) return;
@@ -143,18 +196,17 @@ export default function BrokerNewListing() {
       setSubmitting(true);
       setSubmitError('');
 
-      // Upload images to bucket `seller-images`
+      // Upload local images to bucket `seller-images`
       const uploadedImageUrls = [];
       for (let i = 0; i < images.length; i++) {
         const file = images[i];
         const safeName = String(file.name || `file_${i}`).replace(/[^\w.\-]/g, '_');
         const filePath = `broker-${brokerId}/${Date.now()}_${i}_${safeName}`;
 
-       const { data: uploaded, error: upErr } = await supabase
-  .storage
-  .from('seller-images')
-  .upload(filePath, file, { upsert: false });
-
+        const { data: uploaded, error: upErr } = await supabase
+          .storage
+          .from('seller-images')
+          .upload(filePath, file, { upsert: false });
 
         if (upErr) {
           setSubmitting(false);
@@ -166,9 +218,12 @@ export default function BrokerNewListing() {
         uploadedImageUrls.push(pub.publicUrl);
       }
 
+      // Combine imported remote images + uploaded local images
+      const allImageUrls = [...importedImageUrls, ...uploadedImageUrls].slice(0, 8);
+
       // Payload expected by /api/submit-seller-listing
       const payload = {
-        name: 'Broker', // minimal; or pull from broker.contact_name if you store it
+        name: 'Broker', // could be from broker.contact_name
         email: authUser.email,
         business_name: form.businessName.trim(),
         industry: form.industry.trim(),
@@ -185,7 +240,7 @@ export default function BrokerNewListing() {
         description_choice: 'manual',
         ai_description: '',
 
-        image_urls: uploadedImageUrls,
+        image_urls: allImageUrls,
 
         // linkage
         auth_id: authUser.id,
@@ -200,7 +255,6 @@ export default function BrokerNewListing() {
       });
 
       if (!res.ok) {
-        // Attempt to read JSON error; fallback to generic
         let msg = 'Create failed';
         try {
           const data = await res.json();
@@ -217,17 +271,6 @@ export default function BrokerNewListing() {
       setSubmitting(false);
       setSubmitError(e.message || 'Submission error, please try again.');
     }
-  };
-
-  // ----- Import (minimal placeholder) -----
-  const [importUrl, setImportUrl] = useState('');
-  const [importText, setImportText] = useState('');
-
-  const useImportToPrefill = () => {
-    // Minimal behavior: push import text into description and switch to manual
-    const text = importText || (importUrl ? `Source: ${importUrl}` : '');
-    setForm((f) => ({ ...f, description: (f.description || '') + (text ? `\n\n${text}` : '') }));
-    setMode('manual');
   };
 
   // ----- Render -----
@@ -269,7 +312,7 @@ export default function BrokerNewListing() {
             >
               <div className="text-lg font-semibold mb-1">Import existing listing</div>
               <p className="text-sm text-gray-600">
-                Paste a URL or text (PDF/DOCX upload coming soon). We’ll help you map fields.
+                Paste a URL or text. We’ll prefill your form with anything we can detect.
               </p>
             </button>
           </div>
@@ -277,43 +320,64 @@ export default function BrokerNewListing() {
 
         {mode === 'import' && (
           <div className="space-y-4 border rounded-lg p-4">
+            <h2 className="text-lg font-semibold">Import an existing listing</h2>
+            <p className="text-sm text-gray-600">
+              Paste a public URL to your listing. We’ll fetch the page and prefill the form with anything we can detect
+              (title, description, price, revenue/SDE, location, and images).
+            </p>
+            <div className="bg-gray-50 rounded p-3 text-xs text-gray-600">
+              <strong>Why this helps:</strong> It saves time and reduces copy/paste errors. You still review and can edit everything before publishing.
+            </div>
+
             <div>
-              <label className="block text-sm font-medium mb-1">Listing URL (optional)</label>
+              <label className="block text-sm font-medium mb-1">Listing URL</label>
               <input
                 className="w-full border rounded p-2"
-                placeholder="https://example.com/your-listing"
+                placeholder="https://your-broker-site.com/listings/awesome-business"
                 value={importUrl}
                 onChange={(e) => setImportUrl(e.target.value)}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                We only fetch public http/https pages. Login-walled pages may not work—use “Paste text” instead.
+              </p>
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">Paste listing text (optional)</label>
               <textarea
                 className="w-full border rounded p-2 min-h-[140px]"
-                placeholder="Paste the full listing text here…"
+                placeholder="If the site blocks fetching, paste the listing text here. We’ll add it to the Description."
                 value={importText}
                 onChange={(e) => setImportText(e.target.value)}
               />
+              <p className="text-xs text-gray-500 mt-1">
+                <strong>Why we ask:</strong> Some websites block automated fetching. Pasting text still gets you a fast prefill.
+              </p>
             </div>
+
+            {importError && <div className="text-sm text-red-600">{importError}</div>}
 
             <div className="flex gap-3">
               <button
-                onClick={useImportToPrefill}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+                onClick={fetchFromUrl}
+                disabled={importLoading}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded disabled:opacity-50"
               >
-                Continue → Prefill Form
+                {importLoading ? 'Fetching…' : 'Fetch & Prefill'}
+              </button>
+              <button
+                onClick={useImportToPrefill}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-900 px-4 py-2 rounded"
+              >
+                Continue → Prefill with text
               </button>
               <button
                 onClick={() => setMode('choose')}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-900 px-4 py-2 rounded"
+                className="bg-white border hover:bg-gray-50 text-gray-900 px-4 py-2 rounded"
               >
                 Back
               </button>
             </div>
-            <p className="text-xs text-gray-500">
-              (Next iteration: PDF/DOCX upload + auto-field mapping)
-            </p>
           </div>
         )}
 
@@ -376,6 +440,9 @@ export default function BrokerNewListing() {
                   onChange={handleChange}
                   placeholder="e.g., 450000"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Why we ask: it helps our buyers filter and improves match quality.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Annual revenue (USD)</label>
@@ -387,6 +454,9 @@ export default function BrokerNewListing() {
                   onChange={handleChange}
                   placeholder="e.g., 1200000"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Why we ask: revenue gives buyers a quick scale reference; you can round if preferred.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">SDE (USD)</label>
@@ -398,6 +468,9 @@ export default function BrokerNewListing() {
                   onChange={handleChange}
                   placeholder="e.g., 325000"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Why we ask: SDE (Seller’s Discretionary Earnings) is the most common profitability metric buyers compare.
+                </p>
               </div>
             </div>
 
@@ -410,6 +483,9 @@ export default function BrokerNewListing() {
                 onChange={handleChange}
                 placeholder="Brief overview of the business…"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Tip: lead with what makes this business attractive—defensible advantages, growth levers, clean books, etc.
+              </p>
             </div>
 
             <div>
@@ -417,6 +493,36 @@ export default function BrokerNewListing() {
                 Photos (up to 8)
               </label>
               <input type="file" accept="image/*" multiple onChange={handleImageUpload} />
+
+              {/* Imported (remote) images */}
+              {importedImageUrls.length > 0 && (
+                <>
+                  <div className="text-xs text-gray-600 mt-2">
+                    Imported images from the source page (you can remove any that don’t belong):
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-2">
+                    {importedImageUrls.map((src, i) => (
+                      <div key={`imp-${i}`} className="relative group">
+                        <img
+                          src={src}
+                          alt={`Imported ${i + 1}`}
+                          className="h-24 w-full object-cover rounded border"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeImportedAt(i)}
+                          className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow hover:bg-red-700"
+                          title="Remove"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Local uploads */}
               {imagePreviews.length > 0 && (
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-2">
                   {imagePreviews.map((src, i) => (
@@ -463,3 +569,4 @@ export default function BrokerNewListing() {
     </main>
   );
 }
+
