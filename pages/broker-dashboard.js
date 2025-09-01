@@ -1,62 +1,113 @@
 // pages/broker-dashboard.js
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
 
 export default function BrokerDashboard() {
+  const router = useRouter();
+
   const [broker, setBroker] = useState(null);
   const [threads, setThreads] = useState([]);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
+
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { window.location.href = '/login?role=broker'; return; }
+      try {
+        // 1) Require auth
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          // preserve intent
+          router.replace('/login?role=broker&next=/broker-dashboard');
+          return;
+        }
 
-      // Get broker profile (redirect to onboarding if missing)
-      const { data: br, error: brErr } = await supabase
-        .from('brokers')
-        .select('*')
-        .eq('auth_id', user.id)
-        .maybeSingle();
-
-      if (brErr) console.error('broker fetch error', brErr);
-
-      if (!br) { window.location.href = '/broker-onboarding'; return; }
-      setBroker(br);
-
-      // Fetch conversations + listings in parallel
-      const [thRes, lsRes] = await Promise.all([
-        supabase
-          .from('broker_conversations')
+        // 2) Load broker row (redirect to onboarding if none)
+        const { data: br, error: brErr } = await supabase
+          .from('brokers')
           .select('*')
-          .eq('broker_id', br.id)
-          .order('last_message_at', { ascending: false })
-          .limit(50),
-        supabase
-          .from('sellers')
-          .select('id, business_name, location_city, location_state, location, asking_price, created_at')
-          .eq('broker_id', br.id)
-          .order('created_at', { ascending: false })
-      ]);
+          .eq('auth_id', user.id)
+          .maybeSingle();
 
-      setThreads(thRes.data || []);
-      setListings(lsRes.data || []);
-      setLoading(false);
+        if (brErr) {
+          console.error('❌ Broker fetch error:', brErr.message || brErr);
+        }
+
+        if (!br) {
+          router.replace('/broker-onboarding?next=/broker-dashboard');
+          return;
+        }
+
+        if (cancelled) return;
+        setBroker(br);
+
+        // 3) Load conversations + listings in parallel, but don't blow up if a table is missing
+        const [thRes, lsRes] = await Promise.allSettled([
+          supabase
+            .from('broker_conversations')
+            .select('*')
+            .eq('broker_id', br.id)
+            .order('last_message_at', { ascending: false })
+            .limit(50),
+          supabase
+            .from('sellers')
+            .select('id,business_name,location_city,location_state,location,asking_price,created_at')
+            .eq('broker_id', br.id)
+            .order('created_at', { ascending: false })
+        ]);
+
+        if (!cancelled) {
+          // Conversations
+          if (thRes.status === 'fulfilled') {
+            if (thRes.value.error) {
+              // likely "relation does not exist" if the table isn't created yet
+              console.warn('⚠️ Conversations query error:', thRes.value.error.message);
+              setThreads([]);
+            } else {
+              setThreads(thRes.value.data || []);
+            }
+          } else {
+            console.warn('⚠️ Conversations load failed:', thRes.reason);
+            setThreads([]);
+          }
+
+          // Listings
+          if (lsRes.status === 'fulfilled') {
+            if (lsRes.value.error) {
+              console.warn('⚠️ Listings query error:', lsRes.value.error.message);
+              setListings([]);
+            } else {
+              setListings(lsRes.value.data || []);
+            }
+          } else {
+            console.warn('⚠️ Listings load failed:', lsRes.reason);
+            setListings([]);
+          }
+
+          setLoading(false);
+        }
+      } catch (e) {
+        console.error('❌ Broker dashboard fatal:', e);
+        if (!cancelled) setLoading(false);
+      }
     })();
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   const fmtMoney = (n) =>
-    typeof n === 'number' && !Number.isNaN(n) ? `$${n.toLocaleString()}` : '$0';
+    typeof n === 'number' && Number.isFinite(n) ? `$${n.toLocaleString()}` : 'Inquire';
 
   const listingLocation = (l) => {
-    if (l?.location_city || l?.location_state) {
-      const city = l.location_city || '';
-      const state = l.location_state ? `, ${l.location_state}` : '';
-      return `${city}${state}`.trim();
-    }
-    return l?.location || '';
+    const city = l?.location_city?.trim();
+    const state = l?.location_state?.trim();
+    if (city || state) return `${city || ''}${city && state ? ', ' : ''}${state || ''}`.trim();
+    return l?.location || 'Location undisclosed';
   };
 
   if (loading) {
@@ -78,7 +129,6 @@ export default function BrokerDashboard() {
             Pending verification
           </span>
         )}
-        {/* ✅ New listing goes to the broker flow */}
         <Link
           href="/broker/listings/new"
           className="ml-auto px-3 py-2 rounded bg-black text-white"
@@ -87,13 +137,13 @@ export default function BrokerDashboard() {
         </Link>
       </header>
 
-      {/* Conversations pinned at the top */}
+      {/* Conversations */}
       <section>
         <h2 className="text-lg font-semibold mb-3">Conversations</h2>
         <div className="grid gap-3">
           {(threads || []).map((t) => (
             <Link
-              key={`${t.listing_id}-${t.buyer_id}`}
+              key={`${t.listing_id}-${t.buyer_id}-${t.last_message_at || ''}`}
               href={`/messages?listingId=${t.listing_id}&buyerId=${t.buyer_id}`}
               className="flex items-center justify-between border rounded p-3 hover:bg-gray-50"
             >
