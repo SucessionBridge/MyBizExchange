@@ -52,7 +52,7 @@ export default function BrokerNewListing() {
       setCreatingBrokerRow(true);
       const { data: existing, error: exErr } = await supabase
         .from('brokers')
-        .select('id, verified, contact_name, email')
+        .select('id, verified, email')
         .eq('auth_id', u.id)
         .maybeSingle();
 
