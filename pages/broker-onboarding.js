@@ -24,25 +24,46 @@ export default function BrokerOnboarding() {
 
   // Require auth; prefill from existing brokers row if present
   useEffect(() => {
+    let mounted = true;
+
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user || null);
-      setLoadingUser(false);
+      const { data: uRes, error: userErr } = await supabase.auth.getUser();
 
-      if (!user) return;
+      if (userErr) {
+        if (mounted) {
+          setError(userErr.message);
+          setUser(null);
+          setLoadingUser(false);
+        }
+        return;
+      }
 
-      // prefill email
-      setForm((f) => ({ ...f, email: user.email || '' }));
+      const currUser = uRes?.user || null;
+
+      if (mounted) {
+        setUser(currUser);
+        setLoadingUser(false);
+      }
+
+      if (!currUser) return;
+
+      // Prefill email
+      if (mounted) {
+        setForm((f) => ({ ...f, email: currUser.email || '' }));
+      }
 
       const { data: br, error } = await supabase
         .from('brokers')
-        .select('email, first_name, last_name, phone, company_name, website, license_number, license_state, license_expiry')
-        .eq('auth_id', user.id)
+        .select(
+          'email, first_name, last_name, phone, company_name, website, license_number, license_state, license_expiry'
+        )
+        .eq('auth_id', currUser.id)
+        .limit(1)
         .maybeSingle();
 
-      if (!error && br) {
+      if (!error && br && mounted) {
         setForm({
-          email: br.email || user.email || '',
+          email: br.email || currUser.email || '',
           first_name: br.first_name || '',
           last_name: br.last_name || '',
           phone: br.phone || '',
@@ -54,6 +75,10 @@ export default function BrokerOnboarding() {
         });
       }
     })();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const onChange = (e) => {
@@ -84,11 +109,20 @@ export default function BrokerOnboarding() {
         license_expiry: form.license_expiry || null, // YYYY-MM-DD
       };
 
-      const { error } = await supabase
+      // Upsert by auth_id (RLS allows only own row)
+      const { error: upErr } = await supabase
         .from('brokers')
         .upsert(payload, { onConflict: 'auth_id' });
+      if (upErr) throw upErr;
 
-      if (error) throw error;
+      // Confirm row exists (and warm cache)
+      const { error: checkErr } = await supabase
+        .from('brokers')
+        .select('id')
+        .eq('auth_id', user.id)
+        .limit(1)
+        .maybeSingle();
+      if (checkErr) throw checkErr;
 
       // Done → dashboard
       router.replace('/broker-dashboard');
@@ -116,7 +150,10 @@ export default function BrokerOnboarding() {
           <p className="text-gray-600 mb-4">
             Please sign in to start your broker profile.
           </p>
-          <a href="/login?role=broker" className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded">
+          <a
+            href="/login?role=broker"
+            className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
+          >
             Broker Login
           </a>
         </div>
@@ -136,21 +173,42 @@ export default function BrokerOnboarding() {
             <div className="grid md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium">First name</label>
-                <input name="first_name" value={form.first_name} onChange={onChange} className="w-full border rounded p-2" />
+                <input
+                  name="first_name"
+                  value={form.first_name}
+                  onChange={onChange}
+                  className="w-full border rounded p-2"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium">Last name</label>
-                <input name="last_name" value={form.last_name} onChange={onChange} className="w-full border rounded p-2" />
+                <input
+                  name="last_name"
+                  value={form.last_name}
+                  onChange={onChange}
+                  className="w-full border rounded p-2"
+                />
               </div>
             </div>
             <div className="grid md:grid-cols-2 gap-3 mt-3">
               <div>
                 <label className="block text-sm font-medium">Email</label>
-                <input name="email" value={form.email} onChange={onChange} className="w-full border rounded p-2 bg-gray-50" disabled />
+                <input
+                  name="email"
+                  value={form.email}
+                  onChange={onChange}
+                  className="w-full border rounded p-2 bg-gray-50"
+                  disabled
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium">Phone</label>
-                <input name="phone" value={form.phone} onChange={onChange} className="w-full border rounded p-2" />
+                <input
+                  name="phone"
+                  value={form.phone}
+                  onChange={onChange}
+                  className="w-full border rounded p-2"
+                />
               </div>
             </div>
           </section>
@@ -161,11 +219,22 @@ export default function BrokerOnboarding() {
             <div className="grid md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium">Company name</label>
-                <input name="company_name" value={form.company_name} onChange={onChange} className="w-full border rounded p-2" />
+                <input
+                  name="company_name"
+                  value={form.company_name}
+                  onChange={onChange}
+                  className="w-full border rounded p-2"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium">Website</label>
-                <input name="website" value={form.website} onChange={onChange} className="w-full border rounded p-2" placeholder="https://…" />
+                <input
+                  name="website"
+                  value={form.website}
+                  onChange={onChange}
+                  className="w-full border rounded p-2"
+                  placeholder="https://…"
+                />
               </div>
             </div>
           </section>
@@ -176,15 +245,31 @@ export default function BrokerOnboarding() {
             <div className="grid md:grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium">License #</label>
-                <input name="license_number" value={form.license_number} onChange={onChange} className="w-full border rounded p-2" />
+                <input
+                  name="license_number"
+                  value={form.license_number}
+                  onChange={onChange}
+                  className="w-full border rounded p-2"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium">License State/Prov</label>
-                <input name="license_state" value={form.license_state} onChange={onChange} className="w-full border rounded p-2" />
+                <input
+                  name="license_state"
+                  value={form.license_state}
+                  onChange={onChange}
+                  className="w-full border rounded p-2"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium">Expiry</label>
-                <input type="date" name="license_expiry" value={form.license_expiry || ''} onChange={onChange} className="w-full border rounded p-2" />
+                <input
+                  type="date"
+                  name="license_expiry"
+                  value={form.license_expiry || ''}
+                  onChange={onChange}
+                  className="w-full border rounded p-2"
+                />
               </div>
             </div>
             <p className="text-xs text-gray-500 mt-2">
