@@ -217,69 +217,98 @@ export default function BrokerNewListing() {
     }
   };
 
-  // ----- Import (NEW) -----
+  // ----- Import (URL + optional freeform text) -----
   const [importUrl, setImportUrl] = useState('');
+  const [importText, setImportText] = useState('');
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState('');
-  const [importReasons, setImportReasons] = useState([]);
-  const [importTips, setImportTips] = useState([]);
+  const [importInfo, setImportInfo] = useState('');
+
+  function parseMoney(str) {
+    if (!str) return '';
+    const n = Number(String(str).replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(n) ? String(n) : '';
+  }
+
+  function applyExtracted(ex) {
+    const next = { ...form };
+
+    if (ex?.title) next.businessName = ex.title;
+    if (ex?.industry) next.industry = ex.industry;
+    if (ex?.description) {
+      next.description = [form.description, ex.description].filter(Boolean).join('\n\n').trim();
+    }
+    if (ex?.price) {
+      const p = parseMoney(ex.price);
+      if (p) next.askingPrice = p;
+    }
+    if (ex?.location) {
+      // Try to split "City, ST" or "City, State"
+      const m = ex.location.match(/^\s*([^,]+)\s*,\s*([A-Za-z]{2})\s*$/);
+      if (m) {
+        next.city = m[1];
+        next.state = m[2].toUpperCase();
+      } else {
+        next.city = ex.location;
+      }
+    }
+
+    setForm(next);
+
+    // If we got a lead image URL, show it as a preview (remote preview only)
+    if (ex?.image && imagePreviews.length < 8) {
+      setImagePreviews((prev) => [...prev, ex.image]);
+    }
+  }
 
   const runImport = async () => {
     setImportError('');
-    if (!importUrl.trim()) {
-      setImportError('Please paste a listing URL.');
+    setImportInfo('');
+
+    if (!importUrl.trim() && !importText.trim()) {
+      setImportError('Paste a listing URL or some listing text.');
       return;
     }
+
     try {
       setImportLoading(true);
-      const res = await fetch('/api/scrape-listing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: importUrl.trim() }),
-      });
 
-      // Always try JSON, but guard against HTML just in case
-      let payload;
-      const ct = res.headers.get('content-type') || '';
-      if (ct.includes('application/json')) {
-        payload = await res.json();
-      } else {
-        const t = await res.text();
-        throw new Error(t || `Unexpected response (${res.status})`);
+      // 1) If URL provided, ask the server to scrape it
+      if (importUrl.trim()) {
+        const res = await fetch('/api/scrape-listing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: importUrl.trim() }),
+        });
+
+        const ct = res.headers.get('content-type') || '';
+        let json = null;
+        if (ct.includes('application/json')) {
+          json = await res.json();
+        } else {
+          const t = await res.text();
+          throw new Error(t || `Unexpected response (${res.status})`);
+        }
+
+        if (!json?.ok) {
+          throw new Error(json?.error || 'We couldn’t auto-read that page.');
+        }
+
+        applyExtracted(json.extracted || {});
+        setImportInfo('We imported what we could. Please review the fields below—sites vary a lot, and some block bots, so not everything can be captured automatically.');
       }
 
-      if (!payload.ok) {
-        throw new Error(payload.error || 'Import failed');
+      // 2) If extra text provided, append to description
+      if (importText.trim()) {
+        setForm((f) => ({
+          ...f,
+          description: [f.description, `Source notes:\n${importText.trim()}`]
+            .filter(Boolean)
+            .join('\n\n'),
+        }));
       }
 
-      const pre = payload.prefill || {};
-      // Prefill form
-      setForm((f) => ({
-        ...f,
-        businessName: pre.businessName || f.businessName,
-        industry: pre.industry || f.industry,
-        city: pre.city || f.city,
-        state: pre.state || f.state,
-        askingPrice: pre.askingPrice ?? f.askingPrice,
-        annualRevenue: pre.annualRevenue ?? f.annualRevenue,
-        sde: pre.sde ?? f.sde,
-        description: [f.description, pre.description].filter(Boolean).join('\n\n'),
-      }));
-
-      // Prefill image previews as “remote” placeholders (you can re-upload later)
-      // We won’t upload remote images now; you can add uploads later if you want.
-      if (Array.isArray(pre.images) && pre.images.length) {
-        // Create object URLs is only for local files; for remote URLs just show them.
-        setImagePreviews((prev) => [
-          ...prev,
-          ...pre.images.slice(0, 8 - prev.length),
-        ]);
-      }
-
-      setImportReasons(pre.reasons || []);
-      setImportTips(pre.tips || []);
-
-      // Switch to manual so they can review & submit
+      // 3) Switch to the manual form so the broker can finish & publish
       setMode('manual');
     } catch (e) {
       setImportError(e.message || 'Import failed.');
@@ -324,7 +353,7 @@ export default function BrokerNewListing() {
             >
               <div className="text-lg font-semibold mb-1">Import existing listing</div>
               <p className="text-sm text-gray-600">
-                Paste your public listing URL — we’ll prefill the form for you. You can edit everything before publishing.
+                Paste a public listing URL (and optional text). We’ll prefill the form; you can edit everything before publishing.
               </p>
             </button>
           </div>
@@ -332,21 +361,47 @@ export default function BrokerNewListing() {
 
         {mode === 'import' && (
           <div className="space-y-4 border rounded-lg p-4">
+            <div className="text-sm text-gray-600">
+              Import saves time and reduces copy-paste mistakes. We try to grab the business name, price clues,
+              description, location, and a lead image.
+              <div className="mt-2 text-xs text-gray-500">
+                Why we might not capture everything:
+                <ul className="list-disc ml-5 mt-1">
+                  <li>Sites use very different HTML structures.</li>
+                  <li>Some pages block bots or require cookies.</li>
+                  <li>Numbers may be formatted oddly or embedded in images/PDFs.</li>
+                </ul>
+              </div>
+            </div>
+
             <div>
-              <label className="block text-sm font-medium mb-1">Listing URL</label>
+              <label className="block text-sm font-medium mb-1">Listing URL (optional)</label>
               <input
                 className="w-full border rounded p-2"
                 placeholder="https://yourcompany.com/listing/123"
                 value={importUrl}
                 onChange={(e) => setImportUrl(e.target.value)}
               />
-              <p className="text-xs text-gray-500 mt-2">
-                Why we ask: importing saves time and reduces copy-paste mistakes. We only prefill obvious fields so you stay in control.
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Paste listing text (optional)</label>
+              <textarea
+                className="w-full border rounded p-2 min-h-[140px]"
+                placeholder="Paste the full listing text here…"
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Adding text helps if the site blocks scraping — we’ll append it to Description so nothing is lost.
               </p>
             </div>
 
             {importError && (
               <div className="text-sm text-red-600">{importError}</div>
+            )}
+            {importInfo && (
+              <div className="text-sm text-emerald-700">{importInfo}</div>
             )}
 
             <div className="flex gap-3">
@@ -355,7 +410,7 @@ export default function BrokerNewListing() {
                 disabled={importLoading}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded disabled:opacity-50"
               >
-                {importLoading ? 'Importing…' : 'Import from URL'}
+                {importLoading ? 'Importing…' : 'Import & Prefill'}
               </button>
               <button
                 onClick={() => setMode('choose')}
@@ -365,26 +420,9 @@ export default function BrokerNewListing() {
               </button>
             </div>
 
-            {(importReasons.length > 0 || importTips.length > 0) && (
-              <div className="bg-gray-50 rounded p-3 text-sm">
-                {importReasons.length > 0 && (
-                  <>
-                    <div className="font-medium mb-1">Reasons we prefill</div>
-                    <ul className="list-disc ml-5 mb-2">
-                      {importReasons.map((r, i) => <li key={i}>{r}</li>)}
-                    </ul>
-                  </>
-                )}
-                {importTips.length > 0 && (
-                  <>
-                    <div className="font-medium mb-1">Tips after import</div>
-                    <ul className="list-disc ml-5">
-                      {importTips.map((t, i) => <li key={i}>{t}</li>)}
-                    </ul>
-                  </>
-                )}
-              </div>
-            )}
+            <p className="text-xs text-gray-500">
+              You’ll review all imported fields on the next screen before creating the listing.
+            </p>
           </div>
         )}
 
@@ -495,10 +533,12 @@ export default function BrokerNewListing() {
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-2">
                   {imagePreviews.map((src, i) => (
                     <div key={i} className="relative group">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={src}
                         alt={`Selected ${i + 1}`}
                         className="h-24 w-full object-cover rounded border"
+                        onError={(e) => { e.currentTarget.style.opacity = 0.5; }}
                       />
                       <button
                         type="button"
