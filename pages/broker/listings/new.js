@@ -230,43 +230,48 @@ export default function BrokerNewListing() {
     return Number.isFinite(n) ? String(n) : '';
   }
 
+  // CHANGED: functional setForm to prevent stale state merges
   function applyExtracted(ex) {
-    const next = { ...form };
+    setForm((prev) => {
+      const next = { ...prev };
 
-    if (ex?.title) next.businessName = ex.title;
-    if (ex?.industry) next.industry = ex.industry;
-    if (ex?.description) {
-      next.description = [form.description, ex.description].filter(Boolean).join('\n\n').trim();
-    }
-    if (ex?.price) {
-      const p = parseMoney(ex.price);
-      if (p) next.askingPrice = p;
-    }
-    if (ex?.location) {
-      // Try to split "City, ST" or "City, State"
-      const m = ex.location.match(/^\s*([^,]+)\s*,\s*([A-Za-z]{2})\s*$/);
-      if (m) {
-        next.city = m[1];
-        next.state = m[2].toUpperCase();
-      } else {
-        next.city = ex.location;
+      if (ex?.title) next.businessName = ex.title;
+      if (ex?.industry) next.industry = ex.industry;
+      if (ex?.description) {
+        next.description = [prev.description, ex.description].filter(Boolean).join('\n\n').trim();
       }
-    }
+      if (ex?.price) {
+        const p = parseMoney(ex.price);
+        if (p) next.askingPrice = p;
+      }
+      if (ex?.location) {
+        // Try to split "City, ST" or "City, State"
+        const m = ex.location.match(/^\s*([^,]+)\s*,\s*([A-Za-z]{2})\s*$/);
+        if (m) {
+          next.city = m[1];
+          next.state = m[2].toUpperCase();
+        } else {
+          next.city = ex.location;
+        }
+      }
 
-    setForm(next);
+      return next;
+    });
 
-    // If we got a lead image URL, show it as a preview (remote preview only)
+    // Remote preview only — do not upload here
     if (ex?.image && imagePreviews.length < 8) {
       setImagePreviews((prev) => [...prev, ex.image]);
     }
   }
 
+  // CHANGED: hardened import flow
   const runImport = async () => {
     setImportError('');
     setImportInfo('');
 
     if (!importUrl.trim() && !importText.trim()) {
       setImportError('Paste a listing URL or some listing text.');
+      setMode('import');
       return;
     }
 
@@ -282,20 +287,30 @@ export default function BrokerNewListing() {
         });
 
         const ct = res.headers.get('content-type') || '';
-        let json = null;
-        if (ct.includes('application/json')) {
-          json = await res.json();
-        } else {
-          const t = await res.text();
-          throw new Error(t || `Unexpected response (${res.status})`);
+        if (!ct.includes('application/json')) {
+          const t = await res.text().catch(() => '');
+          console.warn('Non-JSON from /api/scrape-listing', { ct, t: t?.slice(0, 200) });
+          setImportError('Import failed: server returned a non-JSON response.');
+          setMode('import');
+          return;
         }
 
-        if (!json?.ok) {
-          throw new Error(json?.error || 'We couldn’t auto-read that page.');
+        const data = await res.json();
+
+        if (!data?.ok) {
+          const code = data?.code;
+          let msg = data?.error || 'Import failed.';
+          if (code === 'TIMEOUT') msg = 'Timed out fetching that URL. Try again or paste details manually.';
+          if (code === 'UPSTREAM') msg = `The site returned an error (${data?.error}). Try another URL.`;
+          if (code === 'NON_HTML') msg = 'That URL is not an HTML page (e.g., it might be a PDF or JSON).';
+          if (code === 'EMPTY') msg = 'We parsed the page but could not detect listing fields.';
+          setImportError(msg);
+          setMode('import');
+          return;
         }
 
-        applyExtracted(json.extracted || {});
-        setImportInfo('We imported what we could. Please review the fields below—sites vary a lot, and some block bots, so not everything can be captured automatically.');
+        applyExtracted(data.extracted || {});
+        setImportInfo('We imported what we could. Please review the fields below before publishing.');
       }
 
       // 2) If extra text provided, append to description
@@ -311,7 +326,9 @@ export default function BrokerNewListing() {
       // 3) Switch to the manual form so the broker can finish & publish
       setMode('manual');
     } catch (e) {
+      console.error(e);
       setImportError(e.message || 'Import failed.');
+      setMode('import');
     } finally {
       setImportLoading(false);
     }
@@ -580,4 +597,5 @@ export default function BrokerNewListing() {
     </main>
   );
 }
+
 
