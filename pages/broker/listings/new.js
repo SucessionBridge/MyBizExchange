@@ -230,7 +230,7 @@ export default function BrokerNewListing() {
     return Number.isFinite(n) ? String(n) : '';
   }
 
-  // CHANGED: functional setForm to prevent stale state merges
+  // functional setForm to prevent stale state merges
   function applyExtracted(ex) {
     setForm((prev) => {
       const next = { ...prev };
@@ -264,7 +264,6 @@ export default function BrokerNewListing() {
     }
   }
 
-  // CHANGED: hardened import flow
   const runImport = async () => {
     setImportError('');
     setImportInfo('');
@@ -327,8 +326,11 @@ export default function BrokerNewListing() {
       setMode('manual');
     } catch (e) {
       console.error(e);
-      setImportError(e.message || 'Import failed.');
-      setMode('import');
+      const msg = /aborted|abortcontroller|timed out/i.test(String(e?.message || ''))
+        ? 'Timed out fetching that URL.'
+        : (e?.message || 'Import failed.');
+      setImportError(msg);
+      setMode('import'); // always remain in Import mode on failure
     } finally {
       setImportLoading(false);
     }
