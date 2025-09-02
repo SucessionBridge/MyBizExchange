@@ -1,4 +1,4 @@
-// pages/broker-dashboard.js
+// pages/broker-dashboard.js 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -27,7 +27,7 @@ export default function BrokerDashboard() {
         // 2) Load broker row (redirect to onboarding if none)
         const { data: br, error: brErr } = await supabase
           .from('brokers')
-          .select('*')
+          .select('id, verified, email') // CHANGED: only select what we render
           .eq('auth_id', user.id)
           .maybeSingle();
 
@@ -35,7 +35,7 @@ export default function BrokerDashboard() {
           console.error('❌ Broker fetch error:', brErr.message || brErr);
         }
 
-        if (!br) {
+        if (!br || !br.id) { // CHANGED: ensure we truly have a row
           router.replace('/broker-onboarding?next=/broker-dashboard');
           return;
         }
@@ -206,3 +206,4 @@ export default function BrokerDashboard() {
     </div>
   );
 }
+
