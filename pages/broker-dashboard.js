@@ -20,7 +20,6 @@ export default function BrokerDashboard() {
         // 1) Require auth
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-          // preserve intent
           router.replace('/login?role=broker&next=/broker-dashboard');
           return;
         }
@@ -60,21 +59,32 @@ export default function BrokerDashboard() {
         ]);
 
         if (!cancelled) {
-          // Conversations
+          // ---- Conversations (robust missing-table guard) ----
           if (thRes.status === 'fulfilled') {
-            if (thRes.value.error) {
-              // likely "relation does not exist" if the table isn't created yet
-              console.warn('⚠️ Conversations query error:', thRes.value.error.message);
-              setThreads([]);
+            const { data, error } = thRes.value || {};
+            if (error) {
+              const msg = String(error?.message || '');
+              const missing =
+                /relation .* does not exist/i.test(msg) ||
+                /does not exist/i.test(msg) ||
+                error?.code === '42P01'; // undefined_table
+
+              if (missing) {
+                console.warn('Conversations table missing; continuing without it.');
+                setThreads([]);
+              } else {
+                console.warn('⚠️ Conversations query error:', msg);
+                setThreads([]);
+              }
             } else {
-              setThreads(thRes.value.data || []);
+              setThreads(Array.isArray(data) ? data : []);
             }
           } else {
             console.warn('⚠️ Conversations load failed:', thRes.reason);
             setThreads([]);
           }
 
-          // Listings
+          // ---- Listings ----
           if (lsRes.status === 'fulfilled') {
             if (lsRes.value.error) {
               console.warn('⚠️ Listings query error:', lsRes.value.error.message);
@@ -163,7 +173,7 @@ export default function BrokerDashboard() {
             </Link>
           ))}
           {threads?.length === 0 && (
-            <div className="text-sm text-gray-500">No conversations yet.</div>
+            <div className="text-sm text-gray-500">Conversations are unavailable right now.</div>
           )}
         </div>
       </section>
