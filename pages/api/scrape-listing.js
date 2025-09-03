@@ -164,14 +164,13 @@ async function tryFetchAndParse(target, refererOrigin) {
   } catch (e) {
     const msg = String(e?.message || '').toLowerCase();
     if (msg.includes('aborted') || msg.includes('timeout')) {
-      return { ok: false, code: 'TIMEOUT', error: 'Timed out fetching URL.' };
+      return { ok: false, code: 'TIMEOUT', error: 'Timed out fetching URL.', via: 'direct' };
     }
-    // include Node error code if any (DNS, TLS, etc.)
-    return { ok: false, code: 'FETCH_ERROR', error: `Network error${e?.code ? ' (' + e.code + ')' : ''}` };
+    return { ok: false, code: 'FETCH_ERROR', error: `Network error${e?.code ? ' (' + e.code + ')' : ''}`, via: 'direct' };
   }
 
   if (!resp.ok) {
-    return { ok: false, code: 'UPSTREAM', error: `HTTP ${resp.status}` };
+    return { ok: false, code: 'UPSTREAM', error: `HTTP ${resp.status}`, via: 'direct' };
   }
 
   const ct = resp.headers.get('content-type') || '';
@@ -187,60 +186,60 @@ async function tryFetchAndParse(target, refererOrigin) {
     looksHtml;
 
   if (!isHtml) {
-    return { ok: false, code: 'NON_HTML', error: `Unsupported content-type: ${ct}` };
+    return { ok: false, code: 'NON_HTML', error: `Unsupported content-type: ${ct}`, via: 'direct' };
   }
 
   try {
     const extracted = extractFields(html, target);
-    if (!extracted) return { ok: false, code: 'EMPTY', error: 'Could not detect listing fields.' };
-    return { ok: true, extracted };
+    if (!extracted) return { ok: false, code: 'EMPTY', error: 'Could not detect listing fields.', via: 'direct' };
+    return { ok: true, extracted, via: 'direct' };
   } catch {
-    return { ok: false, code: 'PARSE_ERROR', error: 'Failed to parse page HTML.' };
+    return { ok: false, code: 'PARSE_ERROR', error: 'Failed to parse page HTML.', via: 'direct' };
   }
 }
 
 // Optional proxy fallback for blocked/slow sites.
-// Enable by setting env:
+// Enable via env:
 //   ALLOW_PROXY_SCRAPE=1
 //   SCRAPE_PROXY_URL=https://r.jina.ai/http/   (must include trailing slash)
 async function tryProxyFallback(target) {
   if (!process.env.ALLOW_PROXY_SCRAPE || !process.env.SCRAPE_PROXY_URL) {
-    return { ok: false, code: 'TIMEOUT', error: 'Timed out fetching URL.' };
     // same shape as direct TIMEOUT so UI messaging stays consistent
+    return { ok: false, code: 'TIMEOUT', error: 'Timed out fetching URL.', via: 'direct' };
   }
-  const base = process.env.SCRAPE_PROXY_URL;
-  const proxied = base + encodeURIComponent(target);
+
+  // IMPORTANT: use the RAW URL after /http/ (NO encoding)
+  const base = process.env.SCRAPE_PROXY_URL; // e.g. 'https://r.jina.ai/http/'
+  const proxied = base + target;
 
   let resp;
   try {
     resp = await fetchWithTimeout(
       proxied,
       { headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.8' } },
-      9000
+      12000
     );
-  } catch (e) {
-    return { ok: false, code: 'TIMEOUT', error: 'Timed out (proxy).' };
+  } catch {
+    return { ok: false, code: 'TIMEOUT', error: 'Timed out (proxy).', via: 'proxy' };
   }
 
   if (!resp.ok) {
-    return { ok: false, code: 'UPSTREAM', error: `Proxy HTTP ${resp.status}` };
+    return { ok: false, code: 'UPSTREAM', error: `Proxy HTTP ${resp.status}`, via: 'proxy' };
   }
 
-  // Many proxies return text/plain — sniff for HTML-ish content anyway.
   const ct = resp.headers.get('content-type') || '';
   let html = await readTextLimited(resp, 2_000_000);
   const looksHtml = /<html[\s>]/i.test(html.slice(0, 2000)) || /<!doctype html/i.test(html.slice(0, 2000));
   if (!(ct.includes('text/html') || looksHtml)) {
-    // Some proxies return article text only. Still try to extract basic fields.
-    // Treat as HTML fragment.
+    // Some proxies return plain text/article text—still try to extract.
   }
 
   try {
     const extracted = extractFields(html, target);
-    if (!extracted) return { ok: false, code: 'EMPTY', error: 'Proxy content had no listing fields.' };
-    return { ok: true, extracted };
+    if (!extracted) return { ok: false, code: 'EMPTY', error: 'Proxy content had no listing fields.', via: 'proxy' };
+    return { ok: true, extracted, via: 'proxy' };
   } catch {
-    return { ok: false, code: 'PARSE_ERROR', error: 'Failed to parse proxy response.' };
+    return { ok: false, code: 'PARSE_ERROR', error: 'Failed to parse proxy response.', via: 'proxy' };
   }
 }
 
