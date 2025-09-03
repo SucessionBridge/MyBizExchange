@@ -11,6 +11,10 @@ export const config = {
 const UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
+// Default proxy that works for many public pages
+const PROXY_BASE = (process.env.SCRAPE_PROXY_URL || 'https://r.jina.ai/http/').replace(/\/?$/, '/');
+const USE_PROXY = (process.env.ALLOW_PROXY_SCRAPE ?? '1') !== '0'; // default ON
+
 function isSafePublicUrl(u) {
   try {
     const url = new URL(u);
@@ -24,7 +28,7 @@ function isSafePublicUrl(u) {
   }
 }
 
-async function fetchWithTimeout(url, options = {}, timeoutMs = 9000) {
+async function fetchWithTimeout(url, options = {}, timeoutMs = 3000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -146,100 +150,61 @@ function extractFields(html, baseUrl) {
     image: image || '',
   };
 
-  const hasAny =
-    extracted.title || extracted.price || extracted.description || extracted.location || extracted.industry || extracted.image;
-
+  const hasAny = extracted.title || extracted.price || extracted.description || extracted.location || extracted.industry || extracted.image;
   return hasAny ? extracted : null;
 }
 
-async function tryFetchAndParse(target, refererOrigin) {
-  // Direct fetch first
-  let resp;
+// --- Direct and Proxy in PARALLEL (kept under serverless time limits) ---
+
+async function tryDirect(target, refererOrigin) {
   try {
-    resp = await fetchWithTimeout(
+    const resp = await fetchWithTimeout(
       target,
-      { headers: { Referer: refererOrigin + '/' } },
-      9000
+      { headers: { Referer: refererOrigin + '/', 'Cache-Control': 'no-cache' } },
+      3000 // short leash
     );
+    if (!resp.ok) return { ok: false, code: 'UPSTREAM', error: `HTTP ${resp.status}`, via: 'direct' };
+
+    const ct = resp.headers.get('content-type') || '';
+    let html = await readTextLimited(resp, 2_000_000);
+
+    const looksHtml =
+      /<!doctype html/i.test(html.slice(0, 2000)) ||
+      /<html[\s>]/i.test(html.slice(0, 2000));
+
+    const isHtml = ct.includes('text/html') || ct.includes('application/xhtml+xml') || looksHtml;
+    if (!isHtml) return { ok: false, code: 'NON_HTML', error: `Content-Type ${ct}`, via: 'direct' };
+
+    const extracted = extractFields(html, target);
+    if (!extracted) return { ok: false, code: 'EMPTY', error: 'No listing fields found.', via: 'direct' };
+    return { ok: true, via: 'direct', extracted };
   } catch (e) {
     const msg = String(e?.message || '').toLowerCase();
     if (msg.includes('aborted') || msg.includes('timeout')) {
-      return { ok: false, code: 'TIMEOUT', error: 'Timed out fetching URL.', via: 'direct' };
+      return { ok: false, code: 'TIMEOUT', error: 'Timed out (direct).', via: 'direct' };
     }
     return { ok: false, code: 'FETCH_ERROR', error: `Network error${e?.code ? ' (' + e.code + ')' : ''}`, via: 'direct' };
   }
-
-  if (!resp.ok) {
-    return { ok: false, code: 'UPSTREAM', error: `HTTP ${resp.status}`, via: 'direct' };
-  }
-
-  const ct = resp.headers.get('content-type') || '';
-  let html = await readTextLimited(resp, 2_000_000);
-
-  const looksHtml =
-    /<!doctype html/i.test(html.slice(0, 2000)) ||
-    /<html[\s>]/i.test(html.slice(0, 2000));
-
-  const isHtml =
-    ct.includes('text/html') ||
-    ct.includes('application/xhtml+xml') ||
-    looksHtml;
-
-  if (!isHtml) {
-    return { ok: false, code: 'NON_HTML', error: `Unsupported content-type: ${ct}`, via: 'direct' };
-  }
-
-  try {
-    const extracted = extractFields(html, target);
-    if (!extracted) return { ok: false, code: 'EMPTY', error: 'Could not detect listing fields.', via: 'direct' };
-    return { ok: true, extracted, via: 'direct' };
-  } catch {
-    return { ok: false, code: 'PARSE_ERROR', error: 'Failed to parse page HTML.', via: 'direct' };
-  }
 }
 
-// Optional proxy fallback for blocked/slow sites.
-// Enable via env:
-//   ALLOW_PROXY_SCRAPE=1
-//   SCRAPE_PROXY_URL=https://r.jina.ai/http/   (must include trailing slash)
-async function tryProxyFallback(target) {
-  if (!process.env.ALLOW_PROXY_SCRAPE || !process.env.SCRAPE_PROXY_URL) {
-    // same shape as direct TIMEOUT so UI messaging stays consistent
-    return { ok: false, code: 'TIMEOUT', error: 'Timed out fetching URL.', via: 'direct' };
-  }
+async function tryProxy(target) {
+  if (!USE_PROXY) return { ok: false, code: 'TIMEOUT', error: 'Proxy disabled.', via: 'proxy' };
+  const proxied = PROXY_BASE + target; // r.jina.ai expects the raw URL after /http/
 
-  // IMPORTANT: use the RAW URL after /http/ (NO encoding)
-  const base = process.env.SCRAPE_PROXY_URL; // e.g. 'https://r.jina.ai/http/'
-  const proxied = base + target;
-
-  let resp;
   try {
-    resp = await fetchWithTimeout(
+    const resp = await fetchWithTimeout(
       proxied,
       { headers: { 'User-Agent': UA, 'Accept-Language': 'en-US,en;q=0.8' } },
-      12000
+      6500
     );
+    if (!resp.ok) return { ok: false, code: 'UPSTREAM', error: `Proxy HTTP ${resp.status}`, via: 'proxy' };
+
+    let html = await readTextLimited(resp, 2_000_000);
+    const extracted = extractFields(html, target);
+    if (!extracted) return { ok: false, code: 'EMPTY', error: 'Proxy returned no listing fields.', via: 'proxy' };
+    return { ok: true, via: 'proxy', extracted };
   } catch {
     return { ok: false, code: 'TIMEOUT', error: 'Timed out (proxy).', via: 'proxy' };
-  }
-
-  if (!resp.ok) {
-    return { ok: false, code: 'UPSTREAM', error: `Proxy HTTP ${resp.status}`, via: 'proxy' };
-  }
-
-  const ct = resp.headers.get('content-type') || '';
-  let html = await readTextLimited(resp, 2_000_000);
-  const looksHtml = /<html[\s>]/i.test(html.slice(0, 2000)) || /<!doctype html/i.test(html.slice(0, 2000));
-  if (!(ct.includes('text/html') || looksHtml)) {
-    // Some proxies return plain text/article text—still try to extract.
-  }
-
-  try {
-    const extracted = extractFields(html, target);
-    if (!extracted) return { ok: false, code: 'EMPTY', error: 'Proxy content had no listing fields.', via: 'proxy' };
-    return { ok: true, extracted, via: 'proxy' };
-  } catch {
-    return { ok: false, code: 'PARSE_ERROR', error: 'Failed to parse proxy response.', via: 'proxy' };
   }
 }
 
@@ -269,22 +234,23 @@ export default async function handler(req, res) {
 
     const target = safe.url.toString();
 
-    // Try direct
-    const direct = await tryFetchAndParse(target, safe.url.origin);
-    if (direct.ok) return res.status(200).json(direct);
+    // Kick off both attempts in parallel
+    const directP = tryDirect(target, safe.url.origin);
+    const proxyP  = tryProxy(target);
 
-    // Only fallback to proxy for TIMEOUT/FETCH_ERROR (blocked/slow)
-    if (direct.code === 'TIMEOUT' || direct.code === 'FETCH_ERROR') {
-      const viaProxy = await tryProxyFallback(target);
-      return res.status(200).json(viaProxy);
-    }
+    const [direct, proxy] = await Promise.allSettled([directP, proxyP]);
+    const d = direct.status === 'fulfilled' ? direct.value : { ok: false, code: 'DIRECT_ERROR', error: String(direct.reason || 'direct failed') };
+    const p = proxy.status  === 'fulfilled' ? proxy.value  : { ok: false, code: 'PROXY_ERROR',  error: String(proxy.reason  || 'proxy failed')  };
 
-    // For other errors (UPSTREAM/NON_HTML/EMPTY/PARSE_ERROR), return as-is
-    return res.status(200).json(direct);
+    // Prefer a successful direct; otherwise accept a successful proxy
+    if (d.ok) return res.status(200).json(d);
+    if (p.ok) return res.status(200).json(p);
+
+    // Neither worked — return the more actionable error, prefer proxy’s error text
+    const fail = p?.code ? p : d;
+    return res.status(200).json(fail);
   } catch (err) {
     const message = err?.message || 'Unexpected server error.';
     return res.status(200).json({ ok: false, code: 'SERVER', error: message });
   }
 }
-
-
