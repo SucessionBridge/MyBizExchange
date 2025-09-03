@@ -184,7 +184,12 @@ export default async function handler(req, res) {
     // Fetch with timeout; many sites block HEAD so we do GET once.
     let resp;
     try {
-      resp = await fetchWithTimeout(target, {}, 10000); // 10s
+      // CHANGED: add Referer header and slightly shorter timeout (9s)
+      resp = await fetchWithTimeout(
+        target,
+        { headers: { Referer: safe.url.origin + '/' } },
+        9000
+      );
     } catch (e) {
       const msg = String(e?.message || '').toLowerCase();
       if (msg.includes('aborted') || msg.includes('timeout')) {
@@ -199,17 +204,25 @@ export default async function handler(req, res) {
         .json({ ok: false, code: 'UPSTREAM', error: `HTTP ${resp.status}` });
     }
 
+    // CHANGED: read body first, sniff for HTML even if content-type is wrong
     const ct = resp.headers.get('content-type') || '';
-    const isHtml = ct.includes('text/html') || ct.includes('application/xhtml+xml');
+    let html = await resp.text();
+    if (html.length > 2_000_000) html = html.slice(0, 2_000_000);
+
+    const looksHtml =
+      /<!doctype html/i.test(html.slice(0, 2000)) ||
+      /<html[\s>]/i.test(html.slice(0, 2000));
+
+    const isHtml =
+      ct.includes('text/html') ||
+      ct.includes('application/xhtml+xml') ||
+      looksHtml;
+
     if (!isHtml) {
       return res
         .status(200)
         .json({ ok: false, code: 'NON_HTML', error: `Unsupported content-type: ${ct}` });
     }
-
-    // Read body (limit to ~2MB to be safe)
-    let html = await resp.text();
-    if (html.length > 2_000_000) html = html.slice(0, 2_000_000);
 
     // Extract
     let extracted = null;
@@ -234,6 +247,3 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: false, code: 'SERVER', error: message });
   }
 }
-
-
-
