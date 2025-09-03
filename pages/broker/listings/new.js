@@ -230,6 +230,104 @@ export default function BrokerNewListing() {
     return Number.isFinite(n) ? String(n) : '';
   }
 
+  // --- proxy fallback (browser) ---
+  const PROXY_BASE = 'https://r.jina.ai/http/';
+
+  function firstNonEmptyClient(...vals) {
+    for (const v of vals) {
+      const s = (v ?? '').toString().trim();
+      if (s) return s;
+    }
+    return '';
+  }
+
+  function absUrlClient(base, maybe) {
+    if (!maybe) return '';
+    try { return new URL(maybe, base).toString(); } catch { return ''; }
+  }
+
+  function browserExtractFromProxy(html, baseUrl) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+
+    const q = (sel) => doc.querySelector(sel);
+    const get = (sel, attr = 'content') => (q(sel)?.getAttribute(attr) || '').trim();
+    const text = (sel) => (q(sel)?.textContent || '').trim();
+
+    const title = firstNonEmptyClient(
+      get('meta[property="og:title"]'),
+      get('meta[name="twitter:title"]'),
+      text('h1'),
+      text('title')
+    );
+
+    let description = firstNonEmptyClient(
+      get('meta[name="description"]'),
+      get('meta[property="og:description"]'),
+      get('meta[name="twitter:description"]')
+    );
+    if (!description) {
+      const paras = Array.from(doc.querySelectorAll('p'))
+        .map(p => (p.textContent || '').trim())
+        .filter(t => t && t.length > 80)
+        .slice(0, 4);
+      description = paras.join('\n\n');
+    }
+
+    const image = firstNonEmptyClient(
+      absUrlClient(baseUrl, get('meta[property="og:image"]')),
+      absUrlClient(baseUrl, get('meta[name="twitter:image"]')),
+      absUrlClient(baseUrl, q('img[src]')?.getAttribute('src') || '')
+    );
+
+    const metaPrice = firstNonEmptyClient(
+      get('meta[property="product:price:amount"]'),
+      (q('[itemprop="price"]')?.getAttribute('content') || q('[itemprop="price"]')?.textContent || '').trim(),
+      text('[data-testid="price"]'),
+      text('[class*="price"]')
+    );
+    let price = metaPrice;
+    if (!price) {
+      const bodyText = (doc.body?.textContent || '').toString();
+      const askingIdx = bodyText.search(/asking|list\s*price|price[\s:]/i);
+      const dollarMatch = bodyText.match(/\$\s?[\d.,]+(?:\s?(?:million|m|k))?/i);
+      if (askingIdx >= 0 && dollarMatch) price = dollarMatch[0];
+    }
+
+    let location = '';
+    const city = (q('[itemprop="addressLocality"]')?.textContent || '').trim();
+    const region = (q('[itemprop="addressRegion"]')?.textContent || '').trim();
+    if (city) location = region ? `${city}, ${region}` : city;
+    if (!location) {
+      location = firstNonEmptyClient(
+        text('[data-testid*="location"]'),
+        text('[class*="location"]')
+      );
+    }
+    if (!location) {
+      const m = (doc.body?.textContent || '').match(/\b([A-Za-z .'-]{2,}),\s*([A-Za-z]{2})\b/);
+      if (m) location = `${m[1]}, ${m[2]}`;
+    }
+
+    const industry = firstNonEmptyClient(
+      text('[itemprop="industry"]'),
+      get('meta[name="category"]'),
+      get('meta[property="article:section"]'),
+      text('[class*="industry"]')
+    );
+
+    const extracted = {
+      title: title || '',
+      price: price || '',
+      description: description || '',
+      location: location || '',
+      industry: industry || '',
+      image: image || ''
+    };
+
+    const hasAny = extracted.title || extracted.price || extracted.description || extracted.location || extracted.industry || extracted.image;
+    return hasAny ? extracted : null;
+  }
+
   // functional setForm to prevent stale state merges
   function applyExtracted(ex) {
     setForm((prev) => {
@@ -277,6 +375,8 @@ export default function BrokerNewListing() {
     try {
       setImportLoading(true);
 
+      let extracted = null;
+
       // 1) If URL provided, ask the server to scrape it
       if (importUrl.trim()) {
         const res = await fetch('/api/scrape-listing', {
@@ -286,33 +386,54 @@ export default function BrokerNewListing() {
         });
 
         const ct = res.headers.get('content-type') || '';
-        if (!ct.includes('application/json')) {
+        let data = null;
+        if (ct.includes('application/json')) {
+          data = await res.json();
+        } else {
           const t = await res.text().catch(() => '');
           console.warn('Non-JSON from /api/scrape-listing', { ct, t: t?.slice(0, 200) });
-          setImportError('Import failed: server returned a non-JSON response.');
-          setMode('import');
-          return;
         }
 
-        const data = await res.json();
+        if (data?.ok && data?.extracted) {
+          extracted = data.extracted;
+          setImportInfo('We imported what we could. Please review the fields below before publishing.');
+        } else {
+          const code = data?.code || 'UNKNOWN';
+          let handledByProxy = false;
 
-        if (!data?.ok) {
-          const code = data?.code;
-          let msg = data?.error || 'Import failed.';
-          if (code === 'TIMEOUT') msg = 'Timed out fetching that URL. Try again or paste details manually.';
-          if (code === 'UPSTREAM') msg = `The site returned an error (${data?.error}). Try another URL.`;
-          if (code === 'NON_HTML') msg = 'That URL is not an HTML page (e.g., it might be a PDF or JSON).';
-          if (code === 'EMPTY') msg = 'We parsed the page but could not detect listing fields.';
-          setImportError(msg);
-          setMode('import');
-          return;
+          // 2) If server timed out / blocked / upstream error → browser proxy fallback
+          if (code === 'TIMEOUT' || code === 'FETCH_ERROR' || code === 'UPSTREAM') {
+            try {
+              const proxied = PROXY_BASE + importUrl.trim();
+              const px = await fetch(proxied, { cache: 'no-store' });
+              const html = await px.text();
+              const ex = browserExtractFromProxy(html, importUrl.trim());
+              if (ex) {
+                extracted = ex;
+                handledByProxy = true;
+                setImportInfo('Imported via proxy. Please review the fields below.');
+              }
+            } catch (e) {
+              // fall through to show error below
+            }
+          }
+
+          if (!handledByProxy && !extracted) {
+            let msg = data?.error || 'Import failed.';
+            if (code === 'NON_HTML') msg = 'That URL is not an HTML page (e.g., it might be a PDF or JSON).';
+            if (code === 'EMPTY') msg = 'We parsed the page but could not detect listing fields.';
+            if (code === 'TIMEOUT' || code === 'FETCH_ERROR') msg = 'Timed out fetching that URL. Try again or paste details manually.';
+            setImportError(msg);
+            setMode('import');
+            return;
+          }
         }
-
-        applyExtracted(data.extracted || {});
-        setImportInfo('We imported what we could. Please review the fields below before publishing.');
       }
 
-      // 2) If extra text provided, append to description
+      // Apply extracted fields if any
+      if (extracted) applyExtracted(extracted);
+
+      // 3) If extra text provided, append to description
       if (importText.trim()) {
         setForm((f) => ({
           ...f,
@@ -322,7 +443,7 @@ export default function BrokerNewListing() {
         }));
       }
 
-      // 3) Switch to the manual form so the broker can finish & publish
+      // 4) Switch to the manual form so the broker can finish & publish
       setMode('manual');
     } catch (e) {
       console.error(e);
@@ -330,7 +451,7 @@ export default function BrokerNewListing() {
         ? 'Timed out fetching that URL.'
         : (e?.message || 'Import failed.');
       setImportError(msg);
-      setMode('import'); // always remain in Import mode on failure
+      setMode('import'); // remain in Import mode on failure
     } finally {
       setImportLoading(false);
     }
@@ -599,5 +720,3 @@ export default function BrokerNewListing() {
     </main>
   );
 }
-
-
