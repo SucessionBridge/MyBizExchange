@@ -230,6 +230,73 @@ export default function BrokerNewListing() {
     return Number.isFinite(n) ? String(n) : '';
   }
 
+  // NEW: robust client-side parser for pasted text (works without scraping)
+  function parseListingText(raw) {
+    if (!raw) return {};
+    const text = String(raw).replace(/\r/g, '').trim();
+
+    const toNumber = (v) => {
+      if (!v) return '';
+      const s = v.toLowerCase().replace(/[, ]/g, '');
+      if (/^\$?\d+(\.\d+)?m$/.test(s)) return String(Math.round(parseFloat(s) * 1_000_000));
+      if (/^\$?\d+(\.\d+)?k$/.test(s)) return String(Math.round(parseFloat(s) * 1_000));
+      const n = Number(s.replace(/^\$/, ''));
+      return Number.isFinite(n) ? String(n) : '';
+    };
+
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const title = (lines[0] && lines[0].length <= 120) ? lines[0] : '';
+
+    const pricePatterns = [
+      /asking(?:\s+price)?[:\-\s]*\$\s?([\d.,]+(?:\s?(?:m|million|k))?)/i,
+      /price[:\-\s]*\$\s?([\d.,]+(?:\s?(?:m|million|k))?)/i,
+      /\$\s?[\d.,]+(?:\s?(?:m|million|k))?/i,
+    ];
+    let price = '';
+    for (const re of pricePatterns) {
+      const m = text.match(re);
+      if (m) { price = Array.isArray(m) ? m[1] || m[0] : m[0]; break; }
+    }
+    price = toNumber(price);
+
+    const revRe = /(annual\s+)?revenue[:\-\s]*\$\s?([\d.,]+(?:\s?(?:m|million|k))?)/i;
+    const sdeRe = /\b(?:sde|seller'?s?\s+discretionary\s+earnings|cash\s*flow)[:\-\s]*\$\s?([\d.,]+(?:\s?(?:m|million|k))?)/i;
+    const revenue = toNumber((text.match(revRe) || [])[2] || '');
+    const sde = toNumber((text.match(sdeRe) || [])[1] || '');
+
+    const locMatch = text.match(/\b([A-Za-z .'-]{2,}),\s*([A-Za-z]{2})\b/);
+    const city = locMatch ? locMatch[1] : '';
+    const state = locMatch ? locMatch[2].toUpperCase() : '';
+
+    const industryMap = [
+      ['hvac', 'HVAC'],
+      ['plumb', 'Plumbing'],
+      ['electrical', 'Electrical'],
+      ['ecommerce', 'eCommerce'],
+      ['restaurant', 'Restaurant'],
+      ['landscap', 'Landscaping'],
+      ['marketing|agency', 'Marketing Agency'],
+      ['saas|software', 'Software'],
+      ['sign', 'Sign & Graphics'],
+      ['auto|car|dealership', 'Automotive'],
+    ];
+    let industry = '';
+    for (const [pat, label] of industryMap) {
+      if (new RegExp(pat, 'i').test(text)) { industry = label; break; }
+    }
+
+    return {
+      title,
+      price,
+      revenue,
+      sde,
+      city,
+      state,
+      industry,
+      description: text,
+    };
+  }
+
   // --- proxy fallback (browser) ---
   const PROXY_BASE = 'https://r.jina.ai/http/';
 
@@ -430,16 +497,25 @@ export default function BrokerNewListing() {
         }
       }
 
-      // Apply extracted fields if any
+      // Apply extracted fields from URL/proxy if any
       if (extracted) applyExtracted(extracted);
 
-      // 3) If extra text provided, append to description
+      // 3) If extra text provided, parse it locally (no network) and merge without overwriting
       if (importText.trim()) {
-        setForm((f) => ({
-          ...f,
-          description: [f.description, `Source notes:\n${importText.trim()}`]
+        const ex = parseListingText(importText.trim());
+        setForm((prev) => ({
+          ...prev,
+          businessName: prev.businessName || ex.title || prev.businessName,
+          industry: prev.industry || ex.industry || prev.industry,
+          askingPrice: prev.askingPrice || ex.price || prev.askingPrice,
+          annualRevenue: prev.annualRevenue || (ex.revenue ? String(ex.revenue) : '') || prev.annualRevenue,
+          sde: prev.sde || (ex.sde ? String(ex.sde) : '') || prev.sde,
+          city: prev.city || ex.city || prev.city,
+          state: prev.state || ex.state || prev.state,
+          description: [prev.description, ex.description ? ex.description : `Source notes:\n${importText.trim()}`]
             .filter(Boolean)
-            .join('\n\n'),
+            .join('\n\n')
+            .trim(),
         }));
       }
 
@@ -493,7 +569,7 @@ export default function BrokerNewListing() {
             >
               <div className="text-lg font-semibold mb-1">Import existing listing</div>
               <p className="text-sm text-gray-600">
-                Paste a public listing URL (and optional text). We’ll prefill the form; you can edit everything before publishing.
+                Paste a public listing URL (optional) and/or the listing text. We’ll prefill the form; you can edit everything before publishing.
               </p>
             </button>
           </div>
@@ -525,7 +601,7 @@ export default function BrokerNewListing() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Paste listing text (optional)</label>
+              <label className="block text-sm font-medium mb-1">Paste listing text (recommended)</label>
               <textarea
                 className="w-full border rounded p-2 min-h-[140px]"
                 placeholder="Paste the full listing text here…"
@@ -533,7 +609,7 @@ export default function BrokerNewListing() {
                 onChange={(e) => setImportText(e.target.value)}
               />
               <p className="text-xs text-gray-500 mt-1">
-                Adding text helps if the site blocks scraping — we’ll append it to Description so nothing is lost.
+                Text paste always works — we’ll parse the key fields for you. If the site blocks scraping, the text still imports fine.
               </p>
             </div>
 
