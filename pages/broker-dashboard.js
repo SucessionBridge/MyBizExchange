@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import supabase from '../lib/supabaseClient';
+import supabase from '../lib/supabaseBrowserClient';
 
 export default function BrokerDashboard() {
   const router = useRouter();
