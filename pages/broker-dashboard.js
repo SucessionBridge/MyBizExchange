@@ -1,4 +1,4 @@
-// pages/broker-dashboard.js 
+// pages/broker-dashboard.js
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -27,7 +27,7 @@ export default function BrokerDashboard() {
         // 2) Load broker row (redirect to onboarding if none)
         const { data: br, error: brErr } = await supabase
           .from('brokers')
-          .select('id, verified, email') // CHANGED: only select what we render
+          .select('id, verified, email')
           .eq('auth_id', user.id)
           .maybeSingle();
 
@@ -35,7 +35,7 @@ export default function BrokerDashboard() {
           console.error('❌ Broker fetch error:', brErr.message || brErr);
         }
 
-        if (!br || !br.id) { // CHANGED: ensure we truly have a row
+        if (!br || !br.id) {
           router.replace('/broker-onboarding?next=/broker-dashboard');
           return;
         }
@@ -53,7 +53,7 @@ export default function BrokerDashboard() {
             .limit(50),
           supabase
             .from('sellers')
-            .select('id,business_name,location_city,location_state,location,asking_price,created_at')
+            .select('id,business_name,location_city,location_state,location,asking_price,created_at,financing_type,status')
             .eq('broker_id', br.id)
             .order('created_at', { ascending: false })
         ]);
@@ -183,20 +183,61 @@ export default function BrokerDashboard() {
         <h2 className="text-lg font-semibold mb-3">My Listings</h2>
         <div className="grid md:grid-cols-2 gap-4">
           {(listings || []).map((l) => (
-            <Link key={l.id} href={`/listings/${l.id}`} className="border rounded p-4 hover:bg-gray-50">
-              <div className="font-medium">
-                {l.business_name || `Listing #${l.id}`}
+            <div key={l.id} className="border rounded p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <Link href={`/listings/${l.id}`} className="font-medium hover:underline block truncate">
+                    {l.business_name || `Listing #${l.id}`}
+                  </Link>
+                  <div className="text-sm text-gray-600">
+                    {listingLocation(l)}
+                  </div>
+                  <div className="text-sm mt-1">
+                    Asking: {fmtMoney(Number(l.asking_price || 0))}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    Created {l.created_at ? new Date(l.created_at).toLocaleDateString() : '—'}
+                  </div>
+
+                  {/* Financing + status badges */}
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {l.financing_type && (
+                      <span
+                        className={
+                          "text-xs px-2 py-1 rounded border " +
+                          (l.financing_type === 'seller-financing-available'
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : l.financing_type === 'seller-financing-considered'
+                              ? "bg-amber-50 text-amber-700 border-amber-200"
+                              : "bg-gray-50 text-gray-700 border-gray-200")
+                        }
+                        title="Financing"
+                      >
+                        {l.financing_type === 'seller-financing-available' && 'Seller financing available'}
+                        {l.financing_type === 'seller-financing-considered' && 'Seller financing considered'}
+                        {l.financing_type === 'buyer-financed' && 'Buyer financed'}
+                      </span>
+                    )}
+                    {l.status && (
+                      <span className="text-xs px-2 py-1 rounded border bg-gray-50 text-gray-700 border-gray-200">
+                        {l.status}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Edit button */}
+                <div className="shrink-0">
+                  <Link
+                    href={`/broker/listings/${l.id}/edit`}
+                    className="inline-flex items-center px-3 py-1.5 rounded bg-black text-white text-sm hover:opacity-90"
+                    title="Edit listing"
+                  >
+                    Edit
+                  </Link>
+                </div>
               </div>
-              <div className="text-sm text-gray-600">
-                {listingLocation(l)}
-              </div>
-              <div className="text-sm mt-1">
-                Asking: {fmtMoney(Number(l.asking_price || 0))}
-              </div>
-              <div className="text-xs text-gray-500 mt-1">
-                Created {l.created_at ? new Date(l.created_at).toLocaleDateString() : '—'}
-              </div>
-            </Link>
+            </div>
           ))}
           {listings?.length === 0 && (
             <div className="text-sm text-gray-500">No listings assigned.</div>
@@ -206,4 +247,3 @@ export default function BrokerDashboard() {
     </div>
   );
 }
-
