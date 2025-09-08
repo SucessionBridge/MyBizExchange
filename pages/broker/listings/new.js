@@ -2,7 +2,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
-import supabase from '../../lib/supabaseClient';
+import supabase from '@/lib/supabaseClient';
+
 
 export default function BrokerNewListing() {
   const router = useRouter();
