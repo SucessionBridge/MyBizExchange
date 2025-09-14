@@ -1,31 +1,39 @@
 // pages/admin/index.js
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
-import supabase from '../../lib/supabaseClient';
+import { useEffect, useState } from "react";
+import { useRouter } from "next/router";
+import supabase from "../../lib/supabaseClient";
 
 export default function AdminDashboard() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+
   const [sellers, setSellers] = useState([]);
   const [buyers, setBuyers] = useState([]);
+  const [brokers, setBrokers] = useState([]);
+
+  const [searchSellers, setSearchSellers] = useState("");
+  const [searchBuyers, setSearchBuyers] = useState("");
+  const [searchBrokers, setSearchBrokers] = useState("");
 
   useEffect(() => {
     const checkAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
-        router.replace('/login');
+        router.replace("/login");
         return;
       }
 
       const { data, error } = await supabase
-        .from('admin_users')
-        .select('user_id')
-        .eq('user_id', user.id)
+        .from("admin_users")
+        .select("user_id")
+        .eq("user_id", user.id)
         .maybeSingle();
 
       if (error || !data) {
-        router.replace('/');
+        router.replace("/");
         return;
       }
 
@@ -39,99 +47,143 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchData = async () => {
-    const [{ data: sellerData }, { data: buyerData }] = await Promise.all([
-      supabase.from('sellers').select('*').order('created_at', { ascending: false }),
-      supabase.from('buyers').select('*').order('created_at', { ascending: false })
+    const [
+      { data: sellerData },
+      { data: buyerData },
+      { data: brokerData },
+    ] = await Promise.all([
+      supabase.from("sellers").select("*").order("created_at", { ascending: false }),
+      supabase.from("buyers").select("*").order("created_at", { ascending: false }),
+      supabase.from("brokers").select("*").order("created_at", { ascending: false }),
     ]);
+
     setSellers(sellerData || []);
     setBuyers(buyerData || []);
+    setBrokers(brokerData || []);
   };
 
-  const updateStatus = async (id, status) => {
-    await supabase.from('sellers').update({ status }).eq('id', id);
+  // --- Actions ---
+  const updateSellerStatus = async (id, status) => {
+    await supabase.from("sellers").update({ status }).eq("id", id);
     fetchData();
   };
 
   const deleteSeller = async (id) => {
-    const ok = confirm('Delete this listing permanently? This cannot be undone.');
-    if (!ok) return;
-    await supabase.from('sellers').delete().eq('id', id);
+    if (!confirm("Delete this seller listing permanently?")) return;
+    await supabase.from("sellers").delete().eq("id", id);
     fetchData();
+  };
+
+  const deleteBuyer = async (id) => {
+    if (!confirm("Delete this buyer permanently?")) return;
+    await supabase.from("buyers").delete().eq("id", id);
+    fetchData();
+  };
+
+  const updateBrokerStatus = async (id, status) => {
+    await supabase.from("brokers").update({ status }).eq("id", id);
+    fetchData();
+  };
+
+  const deleteBroker = async (id) => {
+    if (!confirm("Delete this broker permanently?")) return;
+    await supabase.from("brokers").delete().eq("id", id);
+    fetchData();
+  };
+
+  // --- Helpers ---
+  const renderStatusBadge = (status) => {
+    const base = "inline-block px-2 py-0.5 rounded text-xs font-semibold";
+    switch ((status || "").toLowerCase()) {
+      case "active":
+      case "approved":
+      case "verified":
+        return <span className={`${base} bg-green-100 text-green-800`}>{status}</span>;
+      case "rejected":
+        return <span className={`${base} bg-yellow-100 text-yellow-800`}>{status}</span>;
+      case "deleted":
+        return <span className={`${base} bg-red-100 text-red-700`}>{status}</span>;
+      case "pending":
+      default:
+        return <span className={`${base} bg-gray-100 text-gray-800`}>{status || "pending"}</span>;
+    }
+  };
+
+  const filterData = (rows, query) => {
+    if (!query) return rows;
+    return rows.filter((row) =>
+      Object.values(row).some((val) =>
+        String(val).toLowerCase().includes(query.toLowerCase())
+      )
+    );
   };
 
   if (loading) return <p className="p-8">Checking access...</p>;
   if (!isAdmin) return <p className="p-8">Access denied</p>;
-
-  const renderStatusBadge = (status) => {
-    const base = 'inline-block px-2 py-0.5 rounded text-xs font-semibold';
-    switch ((status || '').toLowerCase()) {
-      case 'active':
-        return <span className={`${base} bg-green-100 text-green-800`}>active</span>;
-      case 'rejected':
-        return <span className={`${base} bg-yellow-100 text-yellow-800`}>rejected</span>;
-      case 'pending':
-      default:
-        return <span className={`${base} bg-gray-100 text-gray-800`}>{status || 'pending'}</span>;
-    }
-  };
 
   return (
     <div className="p-8">
       <h1 className="text-2xl font-bold mb-2">Admin Dashboard</h1>
       <p className="mb-8">✅ You are logged in as an Admin.</p>
 
-      {/* Sellers Table */}
+      {/* Sellers */}
       <section className="mb-12">
-        <h2 className="text-xl font-semibold mb-4">Sellers</h2>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-semibold">Sellers</h2>
+          <input
+            type="text"
+            placeholder="Search sellers..."
+            value={searchSellers}
+            onChange={(e) => setSearchSellers(e.target.value)}
+            className="border px-2 py-1 rounded text-sm"
+          />
+        </div>
         <div className="overflow-x-auto shadow rounded-lg border border-gray-200 bg-white">
-          <table className="min-w-full">
+          <table className="min-w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                {sellers[0] && Object.keys(sellers[0]).map((key) => (
-                  <th key={key} className="px-4 py-2 border-b text-left text-sm font-semibold text-gray-700">
-                    {key}
-                  </th>
-                ))}
-                <th className="px-4 py-2 border-b text-sm font-semibold text-gray-700">Actions</th>
+                {sellers[0] &&
+                  Object.keys(sellers[0]).map((key) => (
+                    <th key={key} className="px-4 py-2 border-b text-left">
+                      {key}
+                    </th>
+                  ))}
+                <th className="px-4 py-2 border-b">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {sellers.map((row) => (
+              {filterData(sellers, searchSellers).map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50 align-top">
                   {Object.entries(row).map(([key, val]) => (
-                    <td key={key} className="px-4 py-2 border-b text-sm text-gray-800">
-                      {key === 'status' ? renderStatusBadge(val) : String(val)}
+                    <td key={key} className="px-4 py-2 border-b">
+                      {key === "status" ? renderStatusBadge(val) : String(val)}
                     </td>
                   ))}
-                  <td className="px-4 py-2 border-b space-x-2 whitespace-nowrap">
+                  <td className="px-4 py-2 border-b whitespace-nowrap space-x-2">
                     <button
-                      onClick={() => updateStatus(row.id, 'active')}
+                      onClick={() => updateSellerStatus(row.id, "active")}
                       className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-sm"
-                      title="Make this listing live on the site"
                     >
                       Publish
                     </button>
                     <button
-                      onClick={() => updateStatus(row.id, 'rejected')}
+                      onClick={() => updateSellerStatus(row.id, "rejected")}
                       className="bg-yellow-600 hover:bg-yellow-700 text-white px-2 py-1 rounded text-sm"
-                      title="Mark as rejected / not live"
                     >
                       Reject
                     </button>
                     <button
                       onClick={() => deleteSeller(row.id)}
                       className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm"
-                      title="Delete permanently"
                     >
                       Delete
                     </button>
                   </td>
                 </tr>
               ))}
-
-              {sellers.length === 0 && (
+              {filterData(sellers, searchSellers).length === 0 && (
                 <tr>
-                  <td className="px-4 py-6 text-center text-gray-600" colSpan={sellers[0] ? Object.keys(sellers[0]).length + 1 : 1}>
+                  <td colSpan="100%" className="px-4 py-6 text-center text-gray-600">
                     No seller records found.
                   </td>
                 </tr>
@@ -141,35 +193,118 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      {/* Buyers Table */}
-      <section>
-        <h2 className="text-xl font-semibold mb-4">Buyers</h2>
+      {/* Buyers */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-semibold">Buyers</h2>
+          <input
+            type="text"
+            placeholder="Search buyers..."
+            value={searchBuyers}
+            onChange={(e) => setSearchBuyers(e.target.value)}
+            className="border px-2 py-1 rounded text-sm"
+          />
+        </div>
         <div className="overflow-x-auto shadow rounded-lg border border-gray-200 bg-white">
-          <table className="min-w-full">
+          <table className="min-w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
-                {buyers[0] && Object.keys(buyers[0]).map((key) => (
-                  <th key={key} className="px-4 py-2 border-b text-left text-sm font-semibold text-gray-700">
-                    {key}
-                  </th>
-                ))}
+                {buyers[0] &&
+                  Object.keys(buyers[0]).map((key) => (
+                    <th key={key} className="px-4 py-2 border-b text-left">
+                      {key}
+                    </th>
+                  ))}
+                <th className="px-4 py-2 border-b">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {buyers.map((row) => (
+              {filterData(buyers, searchBuyers).map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50">
                   {Object.values(row).map((val, i) => (
-                    <td key={i} className="px-4 py-2 border-b text-sm text-gray-800">
-                      {String(val)}
-                    </td>
+                    <td key={i} className="px-4 py-2 border-b">{String(val)}</td>
                   ))}
+                  <td className="px-4 py-2 border-b">
+                    <button
+                      onClick={() => deleteBuyer(row.id)}
+                      className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm"
+                    >
+                      Delete
+                    </button>
+                  </td>
                 </tr>
               ))}
-
-              {buyers.length === 0 && (
+              {filterData(buyers, searchBuyers).length === 0 && (
                 <tr>
-                  <td className="px-4 py-6 text-center text-gray-600" colSpan={buyers[0] ? Object.keys(buyers[0]).length : 1}>
+                  <td colSpan="100%" className="px-4 py-6 text-center text-gray-600">
                     No buyer records found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Brokers */}
+      <section>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xl font-semibold">Brokers</h2>
+          <input
+            type="text"
+            placeholder="Search brokers..."
+            value={searchBrokers}
+            onChange={(e) => setSearchBrokers(e.target.value)}
+            className="border px-2 py-1 rounded text-sm"
+          />
+        </div>
+        <div className="overflow-x-auto shadow rounded-lg border border-gray-200 bg-white">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                {brokers[0] &&
+                  Object.keys(brokers[0]).map((key) => (
+                    <th key={key} className="px-4 py-2 border-b text-left">
+                      {key}
+                    </th>
+                  ))}
+                <th className="px-4 py-2 border-b">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filterData(brokers, searchBrokers).map((row) => (
+                <tr key={row.id} className="hover:bg-gray-50">
+                  {Object.entries(row).map(([key, val]) => (
+                    <td key={key} className="px-4 py-2 border-b">
+                      {key === "status" ? renderStatusBadge(val) : String(val)}
+                    </td>
+                  ))}
+                  <td className="px-4 py-2 border-b whitespace-nowrap space-x-2">
+                    <button
+                      onClick={() => updateBrokerStatus(row.id, "verified")}
+                      className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-sm"
+                    >
+                      Verify
+                    </button>
+                    <button
+                      onClick={() => updateBrokerStatus(row.id, "rejected")}
+                      className="bg-yellow-600 hover:bg-yellow-700 text-white px-2 py-1 rounded text-sm"
+                    >
+                      Reject
+                    </button>
+                    <button
+                      onClick={() => deleteBroker(row.id)}
+                      className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {filterData(brokers, searchBrokers).length === 0 && (
+                <tr>
+                  <td colSpan="100%" className="px-4 py-6 text-center text-gray-600">
+                    No broker records found.
                   </td>
                 </tr>
               )}
