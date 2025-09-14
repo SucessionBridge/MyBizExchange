@@ -17,34 +17,31 @@ const merriweather = Merriweather({ subsets: ['latin'], weight: ['400', '700'], 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
 
-  // Handle only the rare case where Supabase lands you on "/" with a URL hash.
-  // Otherwise, let /auth/callback handle the exchange+redirect.
+  // Universal magic-link hash catcher:
+  // If any page loads with a Supabase magic-link hash (#access_token=...),
+  // forward to /auth/callback with the same hash, preserving ?next if present
+  // (or from localStorage 'pendingNext').
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // 🔒 Only run this helper on the site root.
-    if (window.location.pathname !== '/') return;
+    const rawHash = window.location.hash?.startsWith('#') ? window.location.hash.slice(1) : '';
+    if (!rawHash) return;
 
-    const hash = window.location.hash || '';
-    const hasMagicBits =
-      hash.includes('access_token') ||
-      hash.includes('type=magiclink') ||
-      hash.includes('provider_token');
+    const params = new URLSearchParams(rawHash);
+    const access = params.get('access_token');
+    const refresh = params.get('refresh_token');
+    const type = params.get('type'); // e.g., "magiclink"
 
-    if (!hasMagicBits) return;
+    // Only act when it actually looks like a Supabase magic link
+    if (!(access && refresh) && type !== 'magiclink') return;
 
-    (async () => {
-      try {
-        await supabase.auth.getSessionFromUrl({ storeSession: true });
-      } catch (_) {
-        // no-op
-      } finally {
-        const next = localStorage.getItem('pendingNext') || '/';
-        localStorage.removeItem('pendingNext');
-        router.replace(next);
-      }
-    })();
-  }, [router.isReady]); // use router.isReady to avoid double-invoke on route changes
+    const search = new URLSearchParams(window.location.search);
+    const next = search.get('next') || localStorage.getItem('pendingNext') || '/';
+    const nextParam = next && next !== '/' ? `?next=${encodeURIComponent(next)}` : '';
+
+    // Hand off to our callback route to set the session + redirect
+    window.location.replace(`/auth/callback${nextParam}#${rawHash}`);
+  }, []); // run once on mount
 
   return (
     <SessionContextProvider supabaseClient={supabase} initialSession={pageProps.initialSession}>
@@ -67,4 +64,5 @@ export default function App({ Component, pageProps }) {
     </SessionContextProvider>
   );
 }
+
 
