@@ -96,27 +96,25 @@ export default function AdminDashboard() {
   };
 
   // --- Actions: Brokers ---
-  // Your brokers table likely has boolean "verified" (and maybe "rejected") instead of a "status" text column.
+  // Tries boolean "verified" first. If that column doesn't exist, falls back to text "status".
   const updateBrokerStatus = async (id, action) => {
-    let patch = {};
-    if (action === "verify") {
-      patch = { verified: true, rejected: false };
-    } else if (action === "reject") {
-      // If you don't have "rejected", it's fine—Supabase will ignore extra fields if they don't exist.
-      patch = { verified: false, rejected: true };
-    }
+    const desiredVerified = action === "verify";
 
-    // Try the boolean fields first
-    let { error } = await supabase.from("brokers").update(patch).eq("id", id);
+    // Attempt #1: update boolean verified
+    let { error } = await supabase
+      .from("brokers")
+      .update({ verified: desiredVerified })
+      .eq("id", id);
 
-    // If your schema actually DOES have a text "status" column, this fallback sets it.
-    if (error && /column .*status/i.test(error.message)) {
+    // If "verified" column doesn't exist, fall back to a text status column
+    if (error && /column .*verified/i.test(error.message)) {
       const statusVal = action === "verify" ? "verified" : "rejected";
       const res2 = await supabase.from("brokers").update({ status: statusVal }).eq("id", id);
       error = res2.error;
     }
 
     if (error) {
+      console.error("Broker verify/reject error:", error.message);
       alert("Update failed: " + error.message);
       return;
     }
@@ -152,12 +150,10 @@ export default function AdminDashboard() {
   };
 
   const computedBrokerStatus = (row) => {
-    // Prefer explicit status if it exists; otherwise synthesize from booleans.
     if (row.status) return String(row.status);
-    if (row.verified) return "verified";
-    if (row.rejected) return "rejected";
+    if (typeof row.verified === "boolean") return row.verified ? "verified" : "rejected";
     return "pending";
-    };
+  };
 
   const filterData = (rows, query) => {
     if (!query) return rows;
