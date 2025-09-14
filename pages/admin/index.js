@@ -47,47 +47,90 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchData = async () => {
-    const [
-      { data: sellerData },
-      { data: buyerData },
-      { data: brokerData },
-    ] = await Promise.all([
-      supabase.from("sellers").select("*").order("created_at", { ascending: false }),
-      supabase.from("buyers").select("*").order("created_at", { ascending: false }),
-      supabase.from("brokers").select("*").order("created_at", { ascending: false }),
-    ]);
+    try {
+      const [
+        { data: sellerData, error: sellerErr },
+        { data: buyerData, error: buyerErr },
+        { data: brokerData, error: brokerErr },
+      ] = await Promise.all([
+        supabase.from("sellers").select("*").order("created_at", { ascending: false }),
+        supabase.from("buyers").select("*").order("created_at", { ascending: false }),
+        supabase.from("brokers").select("*").order("created_at", { ascending: false }),
+      ]);
 
-    setSellers(sellerData || []);
-    setBuyers(buyerData || []);
-    setBrokers(brokerData || []);
+      if (sellerErr) throw sellerErr;
+      if (buyerErr) throw buyerErr;
+      if (brokerErr) throw brokerErr;
+
+      setSellers(sellerData || []);
+      setBuyers(buyerData || []);
+      setBrokers(brokerData || []);
+    } catch (e) {
+      console.error("Admin fetchData error:", e);
+      alert("Failed to load admin data: " + (e.message || "Unknown error"));
+    }
   };
 
   // --- Actions ---
   const updateSellerStatus = async (id, status) => {
-    await supabase.from("sellers").update({ status }).eq("id", id);
+    const { error } = await supabase.from("sellers").update({ status }).eq("id", id);
+    if (error) {
+      console.error("Update seller status failed:", error);
+      alert("Update failed: " + (error.message || "Unknown error"));
+      return;
+    }
     fetchData();
   };
 
   const deleteSeller = async (id) => {
-    if (!confirm("Delete this seller listing permanently?")) return;
-    await supabase.from("sellers").delete().eq("id", id);
+    if (!confirm("Delete this seller listing permanently? This cannot be undone.")) return;
+
+    const { error } = await supabase.from("sellers").delete().eq("id", id);
+
+    if (error) {
+      console.error("Delete sellers failed:", error);
+      alert("Delete failed: " + (error.message || "Unknown error"));
+      return;
+    }
+
     fetchData();
   };
 
   const deleteBuyer = async (id) => {
-    if (!confirm("Delete this buyer permanently?")) return;
-    await supabase.from("buyers").delete().eq("id", id);
+    if (!confirm("Delete this buyer permanently? This cannot be undone.")) return;
+
+    const { error } = await supabase.from("buyers").delete().eq("id", id);
+
+    if (error) {
+      console.error("Delete buyer failed:", error);
+      alert("Delete failed: " + (error.message || "Unknown error"));
+      return;
+    }
+
     fetchData();
   };
 
   const updateBrokerStatus = async (id, status) => {
-    await supabase.from("brokers").update({ status }).eq("id", id);
+    const { error } = await supabase.from("brokers").update({ status }).eq("id", id);
+    if (error) {
+      console.error("Update broker status failed:", error);
+      alert("Update failed: " + (error.message || "Unknown error"));
+      return;
+    }
     fetchData();
   };
 
   const deleteBroker = async (id) => {
-    if (!confirm("Delete this broker permanently?")) return;
-    await supabase.from("brokers").delete().eq("id", id);
+    if (!confirm("Delete this broker permanently? This cannot be undone.")) return;
+
+    const { error } = await supabase.from("brokers").delete().eq("id", id);
+
+    if (error) {
+      console.error("Delete broker failed:", error);
+      alert("Delete failed: " + (error.message || "Unknown error"));
+      return;
+    }
+
     fetchData();
   };
 
@@ -315,3 +358,5 @@ export default function AdminDashboard() {
     </div>
   );
 }
+
+
