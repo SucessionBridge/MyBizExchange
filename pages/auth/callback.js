@@ -21,6 +21,34 @@ function normalizeNext(p) {
   }
 }
 
+// If nextDest is "/" (or missing), choose a smart destination by role/profile
+async function chooseHomeDestination(nextDest) {
+  if (nextDest && nextDest !== '/') return nextDest;
+
+  const { data: s } = await supabase.auth.getSession();
+  const uid = s?.session?.user?.id;
+  if (!uid) return '/';
+
+  // Prefer broker if they have a broker row
+  const { data: broker } = await supabase
+    .from('brokers')
+    .select('id')
+    .eq('auth_id', uid)
+    .maybeSingle();
+  if (broker?.id) return '/broker-dashboard';
+
+  // Otherwise buyer if they have a buyer row
+  const { data: buyer } = await supabase
+    .from('buyers')
+    .select('id')
+    .eq('auth_id', uid)
+    .maybeSingle();
+  if (buyer?.id) return '/buyer-dashboard';
+
+  // Fallback for brand-new users
+  return '/buyer-onboarding';
+}
+
 export default function AuthCallback() {
   const router = useRouter();
 
@@ -50,7 +78,7 @@ export default function AuthCallback() {
           const { error } = await supabase.auth.setSession({ access_token, refresh_token });
           if (!error) {
             localStorage.removeItem('pendingNext');
-            router.replace(nextDest);
+            router.replace(await chooseHomeDestination(nextDest));
             return;
           }
         }
@@ -61,7 +89,7 @@ export default function AuthCallback() {
           const { error } = await supabase.auth.exchangeCodeForSession(code);
           if (!error) {
             localStorage.removeItem('pendingNext');
-            router.replace(nextDest);
+            router.replace(await chooseHomeDestination(nextDest));
             return;
           }
         }
@@ -70,7 +98,7 @@ export default function AuthCallback() {
         const { data } = supabase.auth.onAuthStateChange((_event, session) => {
           if (session) {
             localStorage.removeItem('pendingNext');
-            router.replace(nextDest);
+            chooseHomeDestination(nextDest).then((dest) => router.replace(dest));
           }
         });
         unsub = data?.subscription;
@@ -79,9 +107,11 @@ export default function AuthCallback() {
           const { data: s } = await supabase.auth.getSession();
           if (s?.session) {
             localStorage.removeItem('pendingNext');
-            router.replace(nextDest);
+            router.replace(await chooseHomeDestination(nextDest));
           } else {
-            router.replace('/login' + (nextDest && nextDest !== '/' ? `?next=${encodeURIComponent(nextDest)}` : ''));
+            router.replace(
+              '/login' + (nextDest && nextDest !== '/' ? `?next=${encodeURIComponent(nextDest)}` : '')
+            );
           }
         }, 1200);
       } catch (err) {
