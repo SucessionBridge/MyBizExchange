@@ -1,8 +1,169 @@
-// pages/buyer-onboarding.js
 import { useRouter } from 'next/router';
 import supabase from "../lib/supabaseClient";
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+
+/* ---------------- Email verification gate (magic link) ---------------- */
+function EmailVerifyGateBuyer() {
+  const [email, setEmail] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [sentTo, setSentTo] = useState('');
+  const [error, setError] = useState('');
+  const [sending, setSending] = useState(false);
+  const [suggestion, setSuggestion] = useState('');
+
+  const COMMON_DOMAINS = [
+    'gmail.com','yahoo.com','outlook.com','hotmail.com','icloud.com',
+    'aol.com','comcast.net','live.com','proton.me'
+  ];
+
+  const suggestDomain = (addr) => {
+    const [local, domainRaw = ''] = String(addr).split('@');
+    const domain = domainRaw.toLowerCase();
+    if (!domain) return '';
+
+    const fixes = {
+      gmai: 'gmail.com',
+      gmial: 'gmail.com',
+      gmal: 'gmail.com',
+      hotmai: 'hotmail.com',
+      yaho: 'yahoo.com',
+      'icloud.co': 'icloud.com',
+    };
+    for (const bad in fixes) {
+      if (domain.startsWith(bad)) return `${local}@${fixes[bad]}`;
+    }
+    if (domain.endsWith('.con')) return `${local}@${domain.replace(/\.con$/, '.com')}`;
+    if (domain.endsWith('.cmo')) return `${local}@${domain.replace(/\.cmo$/, '.com')}`;
+
+    const dist = (a, b) => {
+      if (Math.abs(a.length - b.length) > 2) return 99;
+      let d = 0;
+      const L = Math.max(a.length, b.length);
+      for (let i = 0; i < L; i++) if (a[i] !== b[i]) d++;
+      return d;
+    };
+    let best = ''; let bestD = 99;
+    for (const d of COMMON_DOMAINS) {
+      const dd = dist(domain, d);
+      if (dd < bestD) { bestD = dd; best = d; }
+    }
+    return best && bestD <= 2 ? `${local}@${best}` : '';
+  };
+
+  useEffect(() => {
+    setSuggestion(suggestDomain(email));
+  }, [email]);
+
+  const sendMagicLink = async () => {
+    setError('');
+    const e1 = email.trim();
+    const e2 = confirm.trim();
+
+    if (!e1 || !e2 || e1.toLowerCase() !== e2.toLowerCase()) {
+      setError('Emails do not match.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e1)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    setSending(true);
+    try {
+      const nextDest = '/buyer-onboarding';
+      // persist intended return + any draft for safety
+      try { localStorage.setItem('pendingNext', nextDest); } catch {}
+      try {
+        const draft = {}; // keep empty; your form will still load cleanly
+        localStorage.setItem('buyerOnboardingDraft', JSON.stringify(draft));
+      } catch {}
+
+      const { error } = await supabase.auth.signInWithOtp({
+        email: e1,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextDest)}`,
+        },
+      });
+
+      if (error) throw error;
+      setSentTo(e1);
+    } catch (e) {
+      setError(e.message || 'Could not send verification link.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  if (sentTo) {
+    return (
+      <div className="max-w-lg mx-auto bg-white rounded-xl shadow p-6">
+        <h2 className="text-xl font-semibold mb-2">Verify your email</h2>
+        <p className="text-gray-700">
+          We sent a sign-in link to <strong>{sentTo}</strong>.
+        </p>
+        <p className="text-gray-600 text-sm mt-1">
+          Open that link on this device to continue your buyer sign up.
+        </p>
+        <button
+          className="mt-4 text-sm text-blue-700 underline"
+          onClick={() => { setSentTo(''); setEmail(''); setConfirm(''); }}
+        >
+          Wrong email? Change it
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-lg mx-auto bg-white rounded-xl shadow p-6">
+      <h2 className="text-xl font-semibold mb-2">Start with your email</h2>
+      <p className="text-gray-600 text-sm mb-4">
+        We’ll send a one-click sign-in link. You’ll manage your profile with this email.
+      </p>
+
+      <label className="block text-sm font-medium mb-1">Email</label>
+      <input
+        className="w-full border rounded p-2"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="you@example.com"
+        type="email"
+      />
+      {suggestion && suggestion.toLowerCase() !== email.toLowerCase() && (
+        <div className="text-[12px] text-amber-700 mt-1">
+          Did you mean{' '}
+          <button className="underline" onClick={() => setEmail(suggestion)}>
+            {suggestion}
+          </button>
+          ?
+        </div>
+      )}
+
+      <label className="block text-sm font-medium mt-3 mb-1">Confirm email</label>
+      <input
+        className="w-full border rounded p-2"
+        value={confirm}
+        onChange={(e) => setConfirm(e.target.value)}
+        placeholder="retype your email"
+        type="email"
+        onKeyDown={(e) => { if (e.key === 'Enter') sendMagicLink(); }}
+      />
+
+      {error && <div className="text-sm text-rose-700 mt-2">{error}</div>}
+
+      <button
+        className="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold disabled:opacity-60"
+        onClick={sendMagicLink}
+        disabled={sending}
+      >
+        {sending ? 'Sending…' : 'Send sign-in link'}
+      </button>
+    </div>
+  );
+}
+
+/* ---------------- Existing Buyer Onboarding (unchanged core) ---------------- */
 
 const INDUSTRY_OPTIONS = [
   'Home Services',
@@ -27,7 +188,6 @@ const PRIORITY_OPTIONS = [
   { value: 'financing', label: 'Financing' },
 ];
 
-// Experience scale labels
 const EXPERIENCE_SCALE = {
   1: 'Brand new to ownership',
   2: 'Some management experience',
@@ -53,7 +213,6 @@ function formatCurrency(v) {
   return '$' + Number(d).toLocaleString();
 }
 
-/** Minimal currency input */
 function CurrencyField({ label, value, onValue, placeholder }) {
   const [local, setLocal] = useState(formatCurrency(value));
 
@@ -91,21 +250,18 @@ function CurrencyField({ label, value, onValue, placeholder }) {
   );
 }
 
-const DRAFT_KEY = 'buyerOnboardingDraft';
-
 export default function BuyerOnboarding() {
   const router = useRouter();
 
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
 
-  // base form data (DB-compatible)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     financingType: 'self-financing',
     experience: '3',
-    industryPreference: '',        // stored as CSV in DB
+    industryPreference: '',
     capitalInvestment: '',
     shortIntroduction: '',
     priorIndustryExperience: 'No',
@@ -119,51 +275,32 @@ export default function BuyerOnboarding() {
     priority_three: ''
   });
 
-  // extra UI state
-  const [confirmEmail, setConfirmEmail] = useState('');
-  const [industriesSelected, setIndustriesSelected] = useState([]); // chips
-  const [otherIndustry, setOtherIndustry] = useState('');           // free-text
+  const [industriesSelected, setIndustriesSelected] = useState([]);
+  const [otherIndustry, setOtherIndustry] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [videoPreview, setVideoPreview] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [existingId, setExistingId] = useState(null);
 
- // 1) Load auth + existing profile + draft
-useEffect(() => {
-  let mounted = true;
+  // 1) Load auth + existing profile (prefill)
+  useEffect(() => {
+    let mounted = true;
 
-  const load = async () => {
-    setLoadingUser(true);
+    const load = async () => {
+      setLoadingUser(true);
+      const { data } = await supabase.auth.getUser();
+      const currUser = data?.user || null;
 
-    // 👇 Always override any stale broker redirect
-    try { localStorage.setItem('pendingNext', '/buyer-onboarding'); } catch {}
-
-    const { data } = await supabase.auth.getUser();
-    const currUser = data?.user || null;
-
-    if (!mounted) return;
-
-
-      // Load draft first (for logged-out users or prefill)
-      try {
-        const draftRaw = localStorage.getItem(DRAFT_KEY);
-        if (draftRaw) {
-          const draft = JSON.parse(draftRaw);
-          setFormData(prev => ({ ...prev, ...draft }));
-          if (draft.otherIndustry != null) setOtherIndustry(String(draft.otherIndustry));
-          if (Array.isArray(draft.industriesSelected)) setIndustriesSelected(draft.industriesSelected);
-          if (draft.email) setConfirmEmail(draft.email); // prefill confirm with same value
-        }
-      } catch { /* ignore */ }
+      if (!mounted) return;
 
       if (!currUser) {
         setUser(null);
         setLoadingUser(false);
-        return; // allow filling while logged out; we’ll prompt login on submit
+        return;
       }
 
       setUser(currUser);
-      setFormData(prev => ({ ...prev, email: currUser.email || prev.email || '' }));
+      setFormData(prev => ({ ...prev, email: currUser.email || '' }));
 
       const { data: existingProfile, error: selErr } = await supabase
         .from('buyers')
@@ -180,7 +317,6 @@ useEffect(() => {
       if (mounted && existingProfile) {
         setExistingId(existingProfile.id);
 
-        // hydrate industries (chips + other text)
         const tokens = parseCSV(existingProfile.industry_preference);
         const core = tokens.filter(t => INDUSTRY_OPTIONS.map(s => s.toLowerCase()).includes(t.toLowerCase()));
         const extras = tokens.filter(t => !core.map(c => c.toLowerCase()).includes(t.toLowerCase()));
@@ -189,21 +325,21 @@ useEffect(() => {
 
         setFormData(prev => ({
           ...prev,
-          name: existingProfile.name ?? prev.name ?? '',
-          email: currUser.email ?? prev.email ?? '',
-          financingType: existingProfile.financing_type ?? prev.financingType ?? 'self-financing',
-          experience: existingProfile.experience != null ? String(existingProfile.experience) : (prev.experience ?? '3'),
-          industryPreference: existingProfile.industry_preference ?? prev.industryPreference ?? '',
-          capitalInvestment: existingProfile.capital_investment != null ? String(existingProfile.capital_investment) : (prev.capitalInvestment ?? ''),
-          shortIntroduction: existingProfile.short_introduction ?? prev.shortIntroduction ?? '',
-          priorIndustryExperience: existingProfile.prior_industry_experience ?? prev.priorIndustryExperience ?? 'No',
-          willingToRelocate: existingProfile.willing_to_relocate ?? prev.willingToRelocate ?? 'No',
-          city: existingProfile.city ?? prev.city ?? '',
-          stateOrProvince: existingProfile.state_or_province ?? prev.stateOrProvince ?? '',
-          budgetForPurchase: existingProfile.budget_for_purchase != null ? String(existingProfile.budget_for_purchase) : (prev.budgetForPurchase ?? ''),
-          priority_one: existingProfile.priority_one ?? prev.priority_one ?? '',
-          priority_two: existingProfile.priority_two ?? prev.priority_two ?? '',
-          priority_three: existingProfile.priority_three ?? prev.priority_three ?? ''
+          name: existingProfile.name ?? '',
+          email: currUser.email ?? '',
+          financingType: existingProfile.financing_type ?? 'self-financing',
+          experience: existingProfile.experience != null ? String(existingProfile.experience) : '3',
+          industryPreference: existingProfile.industry_preference ?? '',
+          capitalInvestment: existingProfile.capital_investment != null ? String(existingProfile.capital_investment) : '',
+          shortIntroduction: existingProfile.short_introduction ?? '',
+          priorIndustryExperience: existingProfile.prior_industry_experience ?? 'No',
+          willingToRelocate: existingProfile.willing_to_relocate ?? 'No',
+          city: existingProfile.city ?? '',
+          stateOrProvince: existingProfile.state_or_province ?? '',
+          budgetForPurchase: existingProfile.budget_for_purchase != null ? String(existingProfile.budget_for_purchase) : '',
+          priority_one: existingProfile.priority_one ?? '',
+          priority_two: existingProfile.priority_two ?? '',
+          priority_three: existingProfile.priority_three ?? ''
         }));
       }
 
@@ -213,20 +349,6 @@ useEffect(() => {
     load();
     return () => { mounted = false; };
   }, []);
-
-  // Persist draft as user types (so nothing is lost on login)
-  useEffect(() => {
-    try {
-      const draft = {
-        ...formData,
-        industriesSelected,
-        otherIndustry
-      };
-      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    } catch { /* ignore */ }
-  }, [formData, industriesSelected, otherIndustry]);
-
-  const emailDisabled = !!user;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -255,7 +377,7 @@ useEffect(() => {
     setVideoPreview(URL.createObjectURL(file));
   };
 
-  const validateForm = (requireEmailsMatch) => {
+  const validateForm = () => {
     const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
     for (let field of requiredFields) {
       if ((formData[field] ?? '') === '') {
@@ -263,24 +385,6 @@ useEffect(() => {
         return false;
       }
     }
-    if (requireEmailsMatch) {
-      const email = String(formData.email || '').trim();
-      const confirm = String(confirmEmail || '').trim();
-      if (!email || !confirm) {
-        setErrorMessage('Please enter and confirm your email address.');
-        return false;
-      }
-      if (email.toLowerCase() !== confirm.toLowerCase()) {
-        setErrorMessage('Emails do not match. Please recheck.');
-        return false;
-      }
-      // very light email shape check
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-        setErrorMessage('Please enter a valid email address.');
-        return false;
-      }
-    }
-    // priorities: require three distinct choices
     const picks = [formData.priority_one, formData.priority_two, formData.priority_three].filter(Boolean);
     if (picks.length < 3) {
       setErrorMessage('Please pick all three priorities to help us match businesses.');
@@ -296,7 +400,6 @@ useEffect(() => {
     return true;
   };
 
-  // Upload media to Supabase Storage (if provided)
   const uploadIntroMedia = async (userId) => {
     if (!formData.video) return { url: null, type: null };
 
@@ -332,36 +435,24 @@ useEffect(() => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!validateForm()) return;
 
-    const loggedIn = !!user;
-    if (!validateForm(!loggedIn)) return;
-
-    if (!loggedIn) {
-      // Save draft and bounce to login; return here afterward
-      try { localStorage.setItem('pendingNext', '/buyer-onboarding'); } catch {}
-      try {
-        const draft = {
-          ...formData,
-          industriesSelected,
-          otherIndustry
-        };
-        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-      } catch { /* ignore */ }
-
-      toast('Please sign up / log in to submit your profile.', { icon: '🔐' });
+    const currUser = user;
+    if (!currUser) {
+      toast.error('Please sign in to submit your profile.');
+      // keep them on buyer-onboarding after login
       router.push('/login?next=/buyer-onboarding');
       return;
     }
 
-    // Logged-in path: create/update profile
     const otherTokens = parseCSV(otherIndustry);
     const industryCSV = [...industriesSelected, ...otherTokens].join(', ');
-    const { url: introUrl } = await uploadIntroMedia(user.id);
+    const { url: introUrl } = await uploadIntroMedia(currUser.id);
 
     const payload = {
-      auth_id: user.id,
+      auth_id: currUser.id,
       name: formData.name,
-      email: formData.email || user.email,
+      email: formData.email || currUser.email,
       financing_type: formData.financingType,
       experience: formData.experience === '' ? null : Number(formData.experience),
       industry_preference: industryCSV,
@@ -396,14 +487,13 @@ useEffect(() => {
       toast.success('Your buyer profile was created.');
     }
 
-    // Clear draft now that it's saved
-    try { localStorage.removeItem(DRAFT_KEY); } catch {}
-
-    // Always go to dashboard after submit
     setTimeout(() => {
-      router.replace('/buyer-dashboard');
+      const next = router.query.next ? String(router.query.next) : '/buyer-dashboard';
+      router.replace(next);
     }, 200);
   };
+
+  const emailDisabled = !!user;
 
   if (loadingUser) {
     return (
@@ -415,17 +505,32 @@ useEffect(() => {
     );
   }
 
+  // ⛔ If not verified/logged in, show the email gate (same pattern as Seller)
+  if (!user) {
+    return (
+      <main className="bg-white min-h-screen p-6 font-sans">
+        <div className="max-w-2xl mx-auto">
+          <h1 className="text-3xl font-bold mb-6 text-center">Buyer Sign Up</h1>
+          <EmailVerifyGateBuyer />
+        </div>
+      </main>
+    );
+  }
+
+  // ✅ Logged-in: show the full profile form
   return (
     <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
       <div className="max-w-3xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
         <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center">
-          {existingId ? 'Edit Buyer Profile' : 'Buyer Sign Up'}
+          {existingId ? 'Edit Buyer Profile' : 'Buyer Onboarding'}
         </h1>
-        {!existingId && (
-          <p className="text-sm text-gray-600 text-center mb-6">
-            Complete your buyer profile to access listings, message sellers, and save opportunities.
+
+        <div className="mt-3 mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4">
+          <p className="text-sm text-amber-900">
+            <strong>Optional but recommended:</strong> add a short video or photo introduction.
+            This is <em>only shared with sellers you contact</em>. It’s especially important if you’re requesting <strong>seller financing</strong>.
           </p>
-        )}
+        </div>
 
         {errorMessage && <p className="text-red-600 mb-4">{errorMessage}</p>}
 
@@ -451,28 +556,14 @@ useEffect(() => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                disabled={!!user}
+                disabled={emailDisabled}
                 required
-                className={`w-full border p-3 rounded text-black ${user ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                className={`w-full border p-3 rounded text-black ${emailDisabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 placeholder="you@example.com"
               />
-              {!user && (
-                <>
-                  <label className="block text-sm font-medium mt-3 mb-1">Confirm Email</label>
-                  <input
-                    type="email"
-                    value={confirmEmail}
-                    onChange={(e) => setConfirmEmail(e.target.value)}
-                    required
-                    className="w-full border p-3 rounded text-black"
-                    placeholder="retype your email"
-                  />
-                  <p className="text-[11px] text-gray-500 mt-1">We’ll send a magic link to this address.</p>
-                </>
-              )}
-              {user && (
-                <p className="text-[11px] text-gray-500 mt-1">Email is set from your account.</p>
-              )}
+              <p className="text-[11px] text-gray-500 mt-1">
+                {emailDisabled ? 'Email is set from your account.' : 'No account detected — you can type your email.'}
+              </p>
             </div>
           </div>
 
@@ -687,7 +778,6 @@ useEffect(() => {
             {videoPreview && (
               <div className="mt-3">
                 {formData.video?.type?.startsWith('image') ? (
-                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={videoPreview} alt="Preview" className="w-48 rounded border" />
                 ) : (
                   <video width="240" controls className="rounded border">
@@ -741,5 +831,3 @@ function PrioritySelect({ label, value, onChange }) {
     </div>
   );
 }
-
-
