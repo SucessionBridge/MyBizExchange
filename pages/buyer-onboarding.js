@@ -128,16 +128,21 @@ export default function BuyerOnboarding() {
   const [isUploading, setIsUploading] = useState(false);
   const [existingId, setExistingId] = useState(null);
 
-  // 1) Load auth + existing profile + draft
-  useEffect(() => {
-    let mounted = true;
+ // 1) Load auth + existing profile + draft
+useEffect(() => {
+  let mounted = true;
 
-    const load = async () => {
-      setLoadingUser(true);
-      const { data } = await supabase.auth.getUser();
-      const currUser = data?.user || null;
+  const load = async () => {
+    setLoadingUser(true);
 
-      if (!mounted) return;
+    // 👇 Always override any stale broker redirect
+    try { localStorage.setItem('pendingNext', '/buyer-onboarding'); } catch {}
+
+    const { data } = await supabase.auth.getUser();
+    const currUser = data?.user || null;
+
+    if (!mounted) return;
+
 
       // Load draft first (for logged-out users or prefill)
       try {
