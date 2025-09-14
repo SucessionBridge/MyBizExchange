@@ -18,9 +18,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const checkAdmin = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         router.replace("/login");
         return;
@@ -47,90 +45,91 @@ export default function AdminDashboard() {
   }, []);
 
   const fetchData = async () => {
-    try {
-      const [
-        { data: sellerData, error: sellerErr },
-        { data: buyerData, error: buyerErr },
-        { data: brokerData, error: brokerErr },
-      ] = await Promise.all([
-        supabase.from("sellers").select("*").order("created_at", { ascending: false }),
-        supabase.from("buyers").select("*").order("created_at", { ascending: false }),
-        supabase.from("brokers").select("*").order("created_at", { ascending: false }),
-      ]);
+    const [
+      { data: sellerData, error: sellerErr },
+      { data: buyerData, error: buyerErr },
+      { data: brokerData, error: brokerErr },
+    ] = await Promise.all([
+      supabase.from("sellers").select("*").order("created_at", { ascending: false }),
+      supabase.from("buyers").select("*").order("created_at", { ascending: false }),
+      supabase.from("brokers").select("*").order("created_at", { ascending: false }),
+    ]);
 
-      if (sellerErr) throw sellerErr;
-      if (buyerErr) throw buyerErr;
-      if (brokerErr) throw brokerErr;
+    if (sellerErr) console.error("Sellers fetch error:", sellerErr.message);
+    if (buyerErr) console.error("Buyers fetch error:", buyerErr.message);
+    if (brokerErr) console.error("Brokers fetch error:", brokerErr.message);
 
-      setSellers(sellerData || []);
-      setBuyers(buyerData || []);
-      setBrokers(brokerData || []);
-    } catch (e) {
-      console.error("Admin fetchData error:", e);
-      alert("Failed to load admin data: " + (e.message || "Unknown error"));
-    }
+    setSellers(sellerData || []);
+    setBuyers(buyerData || []);
+    setBrokers(brokerData || []);
   };
 
-  // --- Actions ---
+  // --- Actions: Sellers ---
   const updateSellerStatus = async (id, status) => {
     const { error } = await supabase.from("sellers").update({ status }).eq("id", id);
     if (error) {
-      console.error("Update seller status failed:", error);
-      alert("Update failed: " + (error.message || "Unknown error"));
+      alert("Update failed: " + error.message);
       return;
     }
     fetchData();
   };
 
   const deleteSeller = async (id) => {
-    if (!confirm("Delete this seller listing permanently? This cannot be undone.")) return;
-
+    if (!confirm("Delete this seller listing permanently?")) return;
     const { error } = await supabase.from("sellers").delete().eq("id", id);
-
     if (error) {
-      console.error("Delete sellers failed:", error);
-      alert("Delete failed: " + (error.message || "Unknown error"));
+      alert("Delete failed: " + error.message);
       return;
     }
-
     fetchData();
   };
 
+  // --- Actions: Buyers ---
   const deleteBuyer = async (id) => {
-    if (!confirm("Delete this buyer permanently? This cannot be undone.")) return;
-
+    if (!confirm("Delete this buyer permanently?")) return;
     const { error } = await supabase.from("buyers").delete().eq("id", id);
-
     if (error) {
-      console.error("Delete buyer failed:", error);
-      alert("Delete failed: " + (error.message || "Unknown error"));
+      alert("Delete failed: " + error.message);
       return;
     }
-
     fetchData();
   };
 
-  const updateBrokerStatus = async (id, status) => {
-    const { error } = await supabase.from("brokers").update({ status }).eq("id", id);
+  // --- Actions: Brokers ---
+  // Your brokers table likely has boolean "verified" (and maybe "rejected") instead of a "status" text column.
+  const updateBrokerStatus = async (id, action) => {
+    let patch = {};
+    if (action === "verify") {
+      patch = { verified: true, rejected: false };
+    } else if (action === "reject") {
+      // If you don't have "rejected", it's fine—Supabase will ignore extra fields if they don't exist.
+      patch = { verified: false, rejected: true };
+    }
+
+    // Try the boolean fields first
+    let { error } = await supabase.from("brokers").update(patch).eq("id", id);
+
+    // If your schema actually DOES have a text "status" column, this fallback sets it.
+    if (error && /column .*status/i.test(error.message)) {
+      const statusVal = action === "verify" ? "verified" : "rejected";
+      const res2 = await supabase.from("brokers").update({ status: statusVal }).eq("id", id);
+      error = res2.error;
+    }
+
     if (error) {
-      console.error("Update broker status failed:", error);
-      alert("Update failed: " + (error.message || "Unknown error"));
+      alert("Update failed: " + error.message);
       return;
     }
     fetchData();
   };
 
   const deleteBroker = async (id) => {
-    if (!confirm("Delete this broker permanently? This cannot be undone.")) return;
-
+    if (!confirm("Delete this broker permanently?")) return;
     const { error } = await supabase.from("brokers").delete().eq("id", id);
-
     if (error) {
-      console.error("Delete broker failed:", error);
-      alert("Delete failed: " + (error.message || "Unknown error"));
+      alert("Delete failed: " + error.message);
       return;
     }
-
     fetchData();
   };
 
@@ -151,6 +150,14 @@ export default function AdminDashboard() {
         return <span className={`${base} bg-gray-100 text-gray-800`}>{status || "pending"}</span>;
     }
   };
+
+  const computedBrokerStatus = (row) => {
+    // Prefer explicit status if it exists; otherwise synthesize from booleans.
+    if (row.status) return String(row.status);
+    if (row.verified) return "verified";
+    if (row.rejected) return "rejected";
+    return "pending";
+    };
 
   const filterData = (rows, query) => {
     if (!query) return rows;
@@ -305,12 +312,15 @@ export default function AdminDashboard() {
           <table className="min-w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
+                {/* Show all columns from the record */}
                 {brokers[0] &&
                   Object.keys(brokers[0]).map((key) => (
                     <th key={key} className="px-4 py-2 border-b text-left">
                       {key}
                     </th>
                   ))}
+                {/* Always include a visible Status column for clarity */}
+                <th className="px-4 py-2 border-b text-left">status</th>
                 <th className="px-4 py-2 border-b">Actions</th>
               </tr>
             </thead>
@@ -319,18 +329,22 @@ export default function AdminDashboard() {
                 <tr key={row.id} className="hover:bg-gray-50">
                   {Object.entries(row).map(([key, val]) => (
                     <td key={key} className="px-4 py-2 border-b">
-                      {key === "status" ? renderStatusBadge(val) : String(val)}
+                      {String(val)}
                     </td>
                   ))}
+                  {/* Computed status badge even if the table has no "status" column */}
+                  <td className="px-4 py-2 border-b">
+                    {renderStatusBadge(computedBrokerStatus(row))}
+                  </td>
                   <td className="px-4 py-2 border-b whitespace-nowrap space-x-2">
                     <button
-                      onClick={() => updateBrokerStatus(row.id, "verified")}
+                      onClick={() => updateBrokerStatus(row.id, "verify")}
                       className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-sm"
                     >
                       Verify
                     </button>
                     <button
-                      onClick={() => updateBrokerStatus(row.id, "rejected")}
+                      onClick={() => updateBrokerStatus(row.id, "reject")}
                       className="bg-yellow-600 hover:bg-yellow-700 text-white px-2 py-1 rounded text-sm"
                     >
                       Reject
@@ -358,5 +372,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
 
