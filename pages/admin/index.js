@@ -205,15 +205,40 @@ export default function AdminDashboard() {
     return "pending";
   };
 
-  const deleteBroker = async (id) => {
-    if (!confirm("Delete this broker permanently?")) return;
-    const { error } = await supabase.from("brokers").delete().eq("id", id);
-    if (error) {
-      alert("Delete failed: " + error.message);
-      return;
-    }
-    fetchData();
-  };
+ const deleteBroker = async (id) => {
+  if (!confirm("Delete this broker permanently?")) return;
+
+  console.log("[Admin] deleteBroker starting for id:", id);
+
+  const { data: rowBefore, error: readErr } = await supabase
+    .from("brokers")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+
+  console.log("[Admin] rowBefore:", rowBefore, "readErr:", readErr);
+
+  const { data, error, status } = await supabase
+    .from("brokers")
+    .delete()
+    .eq("id", id)
+    .select(); // return deleted row(s) if allowed
+
+  if (error) {
+    console.error("[Admin] deleteBroker error:", { message: error.message, details: error.details, hint: error.hint, code: error.code, status });
+    alert(
+      "Delete failed:\n" +
+      (error.message || "Unknown error") +
+      (error.details ? `\nDetails: ${error.details}` : "") +
+      (error.hint ? `\nHint: ${error.hint}` : "")
+    );
+    return;
+  }
+
+  console.log("[Admin] deleteBroker success:", { status, data });
+  fetchData();
+};
+
 
   const filterData = (rows, query) => {
     if (!query) return rows;
