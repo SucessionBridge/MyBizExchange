@@ -18,7 +18,9 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const checkAdmin = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) {
         router.replace("/login");
         return;
@@ -95,40 +97,78 @@ export default function AdminDashboard() {
     fetchData();
   };
 
-  // --- Actions: Brokers ---
-  // Tries boolean "verified" first. If that column doesn't exist, falls back to text "status".
-  const updateBrokerStatus = async (id, action) => {
-    const desiredVerified = action === "verify";
+  // ===============================
+  // === Brokers: schema-aware  ====
+  // ===============================
 
-    // Attempt #1: update boolean verified
-    let { error } = await supabase
-      .from("brokers")
-      .update({ verified: desiredVerified })
-      .eq("id", id);
-
-    // If "verified" column doesn't exist, fall back to a text status column
-    if (error && /column .*verified/i.test(error.message)) {
-      const statusVal = action === "verify" ? "verified" : "rejected";
-      const res2 = await supabase.from("brokers").update({ status: statusVal }).eq("id", id);
-      error = res2.error;
-    }
-
+  // 1) Introspect which columns actually exist by reading one row
+  const getBrokerColumns = async (id) => {
+    // Try the target row first (fast path)
+    let { data, error } = await supabase.from("brokers").select("*").eq("id", id).limit(1).maybeSingle();
     if (error) {
-      console.error("Broker verify/reject error:", error.message);
-      alert("Update failed: " + error.message);
-      return;
+      console.error("Broker column introspection (by id) failed:", error.message);
     }
-    fetchData();
+    if (!data) {
+      // Fallback: grab any row to detect columns
+      const fallback = await supabase.from("brokers").select("*").limit(1);
+      if (fallback.error) {
+        console.error("Broker column introspection (fallback) failed:", fallback.error.message);
+        return [];
+      }
+      data = (fallback.data && fallback.data[0]) || {};
+    }
+    return Object.keys(data || {});
   };
 
-  const deleteBroker = async (id) => {
-    if (!confirm("Delete this broker permanently?")) return;
-    const { error } = await supabase.from("brokers").delete().eq("id", id);
-    if (error) {
-      alert("Delete failed: " + error.message);
-      return;
+  // 2) Build an update payload using only the columns that exist
+  const buildVerificationUpdate = (cols, action, reason) => {
+    const isVerify = action === "verify";
+    const now = new Date().toISOString();
+    const update = {};
+
+    // Unified status fields (prefer verification_status, then status)
+    if (cols.includes("verification_status")) {
+      update.verification_status = isVerify ? "verified" : "rejected";
+    } else if (cols.includes("status")) {
+      update.status = isVerify ? "verified" : "rejected";
     }
-    fetchData();
+
+    // Boolean flags (if present)
+    if (cols.includes("verified")) update.verified = isVerify;
+    if (cols.includes("rejected")) update.rejected = !isVerify;
+
+    // Timestamps / reason (optional)
+    if (isVerify && cols.includes("verified_at")) update.verified_at = now;
+    if (!isVerify && cols.includes("rejected_at")) update.rejected_at = now;
+    if (!isVerify && cols.includes("rejected_reason")) update.rejected_reason = reason ?? null;
+
+    if (Object.keys(update).length === 0) {
+      throw new Error(
+        "No verification-related columns found on 'brokers'. Create one of: verification_status (text), status (text), verified (bool), rejected (bool)."
+      );
+    }
+    return update;
+  };
+
+  // 3) Single function to perform the update safely
+  const updateBrokerStatus = async (id, action) => {
+    const reason = action === "reject" ? (prompt("Optional reason for rejection?") ?? "") : undefined;
+
+    try {
+      const cols = await getBrokerColumns(id);
+      console.log("Detected broker columns:", cols);
+
+      const update = buildVerificationUpdate(cols, action, reason);
+
+      const { error } = await supabase.from("brokers").update(update).eq("id", id);
+      if (error) throw error;
+
+      fetchData();
+      alert(action === "verify" ? "Broker verified ✅" : "Broker rejected ❌");
+    } catch (err) {
+      console.error("Broker verify/reject error:", err.message || err);
+      alert("Update failed: " + (err.message || String(err)));
+    }
   };
 
   // --- Helpers ---
@@ -150,17 +190,35 @@ export default function AdminDashboard() {
   };
 
   const computedBrokerStatus = (row) => {
-    if (row.status) return String(row.status);
-    if (typeof row.verified === "boolean") return row.verified ? "verified" : "rejected";
+    // Prefer explicit status fields if present
+    if (typeof row.verification_status === "string") return String(row.verification_status);
+    if (typeof row.status === "string") return String(row.status);
+
+    // Fall back to booleans if they exist
+    if (typeof row.verified === "boolean" || typeof row.rejected === "boolean") {
+      if (row.verified) return "verified";
+      if (row.rejected) return "rejected";
+      return "pending";
+    }
+
+    // Unknown schema: show pending so the badge renders gracefully
     return "pending";
+  };
+
+  const deleteBroker = async (id) => {
+    if (!confirm("Delete this broker permanently?")) return;
+    const { error } = await supabase.from("brokers").delete().eq("id", id);
+    if (error) {
+      alert("Delete failed: " + error.message);
+      return;
+    }
+    fetchData();
   };
 
   const filterData = (rows, query) => {
     if (!query) return rows;
     return rows.filter((row) =>
-      Object.values(row).some((val) =>
-        String(val).toLowerCase().includes(query.toLowerCase())
-      )
+      Object.values(row).some((val) => String(val).toLowerCase().includes(query.toLowerCase()))
     );
   };
 
@@ -268,7 +326,9 @@ export default function AdminDashboard() {
               {filterData(buyers, searchBuyers).map((row) => (
                 <tr key={row.id} className="hover:bg-gray-50">
                   {Object.values(row).map((val, i) => (
-                    <td key={i} className="px-4 py-2 border-b">{String(val)}</td>
+                    <td key={i} className="px-4 py-2 border-b">
+                      {String(val)}
+                    </td>
                   ))}
                   <td className="px-4 py-2 border-b">
                     <button
@@ -329,9 +389,7 @@ export default function AdminDashboard() {
                     </td>
                   ))}
                   {/* Computed status badge even if the table has no "status" column */}
-                  <td className="px-4 py-2 border-b">
-                    {renderStatusBadge(computedBrokerStatus(row))}
-                  </td>
+                  <td className="px-4 py-2 border-b">{renderStatusBadge(computedBrokerStatus(row))}</td>
                   <td className="px-4 py-2 border-b whitespace-nowrap space-x-2">
                     <button
                       onClick={() => updateBrokerStatus(row.id, "verify")}
@@ -368,4 +426,3 @@ export default function AdminDashboard() {
     </div>
   );
 }
-
