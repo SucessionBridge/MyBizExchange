@@ -27,7 +27,7 @@ const PRIORITY_OPTIONS = [
   { value: 'financing', label: 'Financing' },
 ];
 
-// 👇 descriptors for the Experience scale
+// Experience scale labels
 const EXPERIENCE_SCALE = {
   1: 'Brand new to ownership',
   2: 'Some management experience',
@@ -53,21 +53,15 @@ function formatCurrency(v) {
   return '$' + Number(d).toLocaleString();
 }
 
-/** Minimal currency input that:
- * - lets users type digits
- * - formats to $X,XXX on blur
- * - returns raw digits to parent via onValue
- */
+/** Minimal currency input */
 function CurrencyField({ label, value, onValue, placeholder }) {
   const [local, setLocal] = useState(formatCurrency(value));
 
   useEffect(() => {
-    // keep in sync if parent changes (e.g., prefill)
     setLocal(formatCurrency(value));
   }, [value]);
 
-  const handleFocus = (e) => {
-    // show raw digits while editing
+  const handleFocus = () => {
     setLocal(digitsOnly(local));
   };
 
@@ -77,7 +71,6 @@ function CurrencyField({ label, value, onValue, placeholder }) {
   };
 
   const handleBlur = () => {
-    // commit raw digits up to parent, then show formatted
     onValue(digitsOnly(local));
     setLocal(formatCurrency(local));
   };
@@ -97,6 +90,8 @@ function CurrencyField({ label, value, onValue, placeholder }) {
     </div>
   );
 }
+
+const DRAFT_KEY = 'buyerOnboardingDraft';
 
 export default function BuyerOnboarding() {
   const router = useRouter();
@@ -124,7 +119,8 @@ export default function BuyerOnboarding() {
     priority_three: ''
   });
 
-  // UI helpers
+  // extra UI state
+  const [confirmEmail, setConfirmEmail] = useState('');
   const [industriesSelected, setIndustriesSelected] = useState([]); // chips
   const [otherIndustry, setOtherIndustry] = useState('');           // free-text
   const [errorMessage, setErrorMessage] = useState('');
@@ -132,7 +128,7 @@ export default function BuyerOnboarding() {
   const [isUploading, setIsUploading] = useState(false);
   const [existingId, setExistingId] = useState(null);
 
-  // 1) Load auth + profile (prefill)
+  // 1) Load auth + existing profile + draft
   useEffect(() => {
     let mounted = true;
 
@@ -143,14 +139,26 @@ export default function BuyerOnboarding() {
 
       if (!mounted) return;
 
+      // Load draft first (for logged-out users or prefill)
+      try {
+        const draftRaw = localStorage.getItem(DRAFT_KEY);
+        if (draftRaw) {
+          const draft = JSON.parse(draftRaw);
+          setFormData(prev => ({ ...prev, ...draft }));
+          if (draft.otherIndustry != null) setOtherIndustry(String(draft.otherIndustry));
+          if (Array.isArray(draft.industriesSelected)) setIndustriesSelected(draft.industriesSelected);
+          if (draft.email) setConfirmEmail(draft.email); // prefill confirm with same value
+        }
+      } catch { /* ignore */ }
+
       if (!currUser) {
         setUser(null);
         setLoadingUser(false);
-        return;
+        return; // allow filling while logged out; we’ll prompt login on submit
       }
 
       setUser(currUser);
-      setFormData(prev => ({ ...prev, email: currUser.email || '' }));
+      setFormData(prev => ({ ...prev, email: currUser.email || prev.email || '' }));
 
       const { data: existingProfile, error: selErr } = await supabase
         .from('buyers')
@@ -176,21 +184,21 @@ export default function BuyerOnboarding() {
 
         setFormData(prev => ({
           ...prev,
-          name: existingProfile.name ?? '',
-          email: currUser.email ?? '',
-          financingType: existingProfile.financing_type ?? 'self-financing',
-          experience: existingProfile.experience != null ? String(existingProfile.experience) : '3',
-          industryPreference: existingProfile.industry_preference ?? '',
-          capitalInvestment: existingProfile.capital_investment != null ? String(existingProfile.capital_investment) : '',
-          shortIntroduction: existingProfile.short_introduction ?? '',
-          priorIndustryExperience: existingProfile.prior_industry_experience ?? 'No',
-          willingToRelocate: existingProfile.willing_to_relocate ?? 'No',
-          city: existingProfile.city ?? '',
-          stateOrProvince: existingProfile.state_or_province ?? '',
-          budgetForPurchase: existingProfile.budget_for_purchase != null ? String(existingProfile.budget_for_purchase) : '',
-          priority_one: existingProfile.priority_one ?? '',
-          priority_two: existingProfile.priority_two ?? '',
-          priority_three: existingProfile.priority_three ?? ''
+          name: existingProfile.name ?? prev.name ?? '',
+          email: currUser.email ?? prev.email ?? '',
+          financingType: existingProfile.financing_type ?? prev.financingType ?? 'self-financing',
+          experience: existingProfile.experience != null ? String(existingProfile.experience) : (prev.experience ?? '3'),
+          industryPreference: existingProfile.industry_preference ?? prev.industryPreference ?? '',
+          capitalInvestment: existingProfile.capital_investment != null ? String(existingProfile.capital_investment) : (prev.capitalInvestment ?? ''),
+          shortIntroduction: existingProfile.short_introduction ?? prev.shortIntroduction ?? '',
+          priorIndustryExperience: existingProfile.prior_industry_experience ?? prev.priorIndustryExperience ?? 'No',
+          willingToRelocate: existingProfile.willing_to_relocate ?? prev.willingToRelocate ?? 'No',
+          city: existingProfile.city ?? prev.city ?? '',
+          stateOrProvince: existingProfile.state_or_province ?? prev.stateOrProvince ?? '',
+          budgetForPurchase: existingProfile.budget_for_purchase != null ? String(existingProfile.budget_for_purchase) : (prev.budgetForPurchase ?? ''),
+          priority_one: existingProfile.priority_one ?? prev.priority_one ?? '',
+          priority_two: existingProfile.priority_two ?? prev.priority_two ?? '',
+          priority_three: existingProfile.priority_three ?? prev.priority_three ?? ''
         }));
       }
 
@@ -200,6 +208,20 @@ export default function BuyerOnboarding() {
     load();
     return () => { mounted = false; };
   }, []);
+
+  // Persist draft as user types (so nothing is lost on login)
+  useEffect(() => {
+    try {
+      const draft = {
+        ...formData,
+        industriesSelected,
+        otherIndustry
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    } catch { /* ignore */ }
+  }, [formData, industriesSelected, otherIndustry]);
+
+  const emailDisabled = !!user;
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -228,11 +250,28 @@ export default function BuyerOnboarding() {
     setVideoPreview(URL.createObjectURL(file));
   };
 
-  const validateForm = () => {
+  const validateForm = (requireEmailsMatch) => {
     const requiredFields = ['name', 'email', 'city', 'stateOrProvince'];
     for (let field of requiredFields) {
       if ((formData[field] ?? '') === '') {
         setErrorMessage('Please fill in all required fields.');
+        return false;
+      }
+    }
+    if (requireEmailsMatch) {
+      const email = String(formData.email || '').trim();
+      const confirm = String(confirmEmail || '').trim();
+      if (!email || !confirm) {
+        setErrorMessage('Please enter and confirm your email address.');
+        return false;
+      }
+      if (email.toLowerCase() !== confirm.toLowerCase()) {
+        setErrorMessage('Emails do not match. Please recheck.');
+        return false;
+      }
+      // very light email shape check
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+        setErrorMessage('Please enter a valid email address.');
         return false;
       }
     }
@@ -288,25 +327,36 @@ export default function BuyerOnboarding() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
 
-    // Keep your existing sign-in requirement here
-    const currUser = user;
-    if (!currUser) {
-      toast.error('Please sign in to submit your profile.');
+    const loggedIn = !!user;
+    if (!validateForm(!loggedIn)) return;
+
+    if (!loggedIn) {
+      // Save draft and bounce to login; return here afterward
+      try { localStorage.setItem('pendingNext', '/buyer-onboarding'); } catch {}
+      try {
+        const draft = {
+          ...formData,
+          industriesSelected,
+          otherIndustry
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      } catch { /* ignore */ }
+
+      toast('Please sign up / log in to submit your profile.', { icon: '🔐' });
       router.push('/login?next=/buyer-onboarding');
       return;
     }
 
-    // Build industry CSV from chips + "other"
+    // Logged-in path: create/update profile
     const otherTokens = parseCSV(otherIndustry);
     const industryCSV = [...industriesSelected, ...otherTokens].join(', ');
-    const { url: introUrl } = await uploadIntroMedia(currUser.id);
+    const { url: introUrl } = await uploadIntroMedia(user.id);
 
     const payload = {
-      auth_id: currUser.id,
+      auth_id: user.id,
       name: formData.name,
-      email: formData.email || currUser.email,
+      email: formData.email || user.email,
       financing_type: formData.financingType,
       experience: formData.experience === '' ? null : Number(formData.experience),
       industry_preference: industryCSV,
@@ -341,13 +391,14 @@ export default function BuyerOnboarding() {
       toast.success('Your buyer profile was created.');
     }
 
+    // Clear draft now that it's saved
+    try { localStorage.removeItem(DRAFT_KEY); } catch {}
+
+    // Always go to dashboard after submit
     setTimeout(() => {
-      const next = router.query.next ? String(router.query.next) : '/buyer-dashboard';
-      router.replace(next);
+      router.replace('/buyer-dashboard');
     }, 200);
   };
-
-  const emailDisabled = !!user;
 
   if (loadingUser) {
     return (
@@ -363,16 +414,13 @@ export default function BuyerOnboarding() {
     <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
       <div className="max-w-3xl mx-auto bg-white p-6 sm:p-8 rounded-xl shadow">
         <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center">
-          {existingId ? 'Edit Buyer Profile' : 'Buyer Onboarding'}
+          {existingId ? 'Edit Buyer Profile' : 'Buyer Sign Up'}
         </h1>
-
-        {/* Trust banner */}
-        <div className="mt-3 mb-6 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:p-4">
-          <p className="text-sm text-amber-900">
-            <strong>Optional but recommended:</strong> add a short video or photo introduction.
-            This is <em>only shared with sellers you contact</em>. It’s especially important if you’re requesting <strong>seller financing</strong>.
+        {!existingId && (
+          <p className="text-sm text-gray-600 text-center mb-6">
+            Complete your buyer profile to access listings, message sellers, and save opportunities.
           </p>
-        </div>
+        )}
 
         {errorMessage && <p className="text-red-600 mb-4">{errorMessage}</p>}
 
@@ -398,18 +446,32 @@ export default function BuyerOnboarding() {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                disabled={emailDisabled}
+                disabled={!!user}
                 required
-                className={`w-full border p-3 rounded text-black ${emailDisabled ? 'bg-gray-100 cursor-not-allowed' : ''}`}
+                className={`w-full border p-3 rounded text-black ${user ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 placeholder="you@example.com"
               />
-              <p className="text-[11px] text-gray-500 mt-1">
-                {emailDisabled ? 'Email is set from your account.' : 'No account detected — you can type your email.'}
-              </p>
+              {!user && (
+                <>
+                  <label className="block text-sm font-medium mt-3 mb-1">Confirm Email</label>
+                  <input
+                    type="email"
+                    value={confirmEmail}
+                    onChange={(e) => setConfirmEmail(e.target.value)}
+                    required
+                    className="w-full border p-3 rounded text-black"
+                    placeholder="retype your email"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">We’ll send a magic link to this address.</p>
+                </>
+              )}
+              {user && (
+                <p className="text-[11px] text-gray-500 mt-1">Email is set from your account.</p>
+              )}
             </div>
           </div>
 
-          {/* Experience 1–5 (filled highlight) */}
+          {/* Experience 1–5 */}
           <div>
             <label className="block text-sm font-medium mb-1">Experience in Business Ownership (1–5)</label>
             <div className="flex gap-2">
@@ -456,7 +518,7 @@ export default function BuyerOnboarding() {
             </select>
           </div>
 
-          {/* Budget + Capital (currency) */}
+          {/* Budget + Capital */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <CurrencyField
               label="Available Capital"
@@ -576,7 +638,7 @@ export default function BuyerOnboarding() {
             </div>
           </div>
 
-          {/* Priorities with helper text */}
+          {/* Priorities */}
           <div>
             <label className="block text-sm font-medium mb-2">Match Priorities (pick top 3)</label>
             <p className="text-[12px] text-gray-600 mb-3">
