@@ -95,10 +95,19 @@ export default function BrokerOnboarding() {
     setSaving(true);
     setError('');
 
+    // Guard: email in the form should always match the authed user email
+    const formEmail = String(form.email || '').trim().toLowerCase();
+    const userEmail = String(user.email || '').trim().toLowerCase();
+    if (formEmail && userEmail && formEmail !== userEmail) {
+      setSaving(false);
+      setError('Email mismatch: please log out and log back in with the correct address.');
+      return;
+    }
+
     try {
       const payload = {
         auth_id: user.id,
-        email: form.email || user.email,
+        email: user.email, // source of truth
         first_name: form.first_name?.trim() || null,
         last_name: form.last_name?.trim() || null,
         phone: form.phone?.trim() || null,
@@ -151,7 +160,7 @@ export default function BrokerOnboarding() {
             Please sign in to start your broker profile.
           </p>
           <a
-            href="/login?role=broker"
+            href="/broker-login"
             className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
           >
             Broker Login
@@ -200,6 +209,9 @@ export default function BrokerOnboarding() {
                   className="w-full border rounded p-2 bg-gray-50"
                   disabled
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Email comes from your login. To use a different email, log out and log in again.
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium">Phone</label>
