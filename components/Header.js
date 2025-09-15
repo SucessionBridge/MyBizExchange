@@ -124,9 +124,7 @@ export default function Header() {
                 onMouseLeave={() => closeWithDelay(setBuyOpen, buyTimer)}
               >
                 <Link href="/listings"><a className="block px-3 py-2 rounded hover:bg-gray-50">Browse Listings</a></Link>
-                {/* CHANGED: was /broker/listings/new */}
                 <Link href="/buyer-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Your Buyer Profile</a></Link>
-
                 <Link href="/guides/how-buyers-value"><a className="block px-3 py-2 rounded hover:bg-gray-50">How Buyers Value Businesses</a></Link>
                 <Link href="/guides/financing-options"><a className="block px-3 py-2 rounded hover:bg-gray-50">Financing Options</a></Link>
               </div>
@@ -154,9 +152,7 @@ export default function Header() {
                 <Link href="/guides/prep-to-sell"><a className="block px-3 py-2 rounded hover:bg-gray-50">Get Your Business Ready to Sell</a></Link>
                 <Link href="/pricing"><a className="block px-3 py-2 rounded hover:bg-gray-50">Pricing</a></Link>
 
-                {/* NEW: Broker Login shortcut inside Sell menu */}
                 <div className="my-2 border-t" />
-                {/* UPDATED: now points directly to broker-login */}
                 <Link href="/broker-login"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Login</a></Link>
               </div>
             )}
@@ -179,24 +175,20 @@ export default function Header() {
               >
                 {!user && (
                   <>
-                    {/* UPDATED: now points directly to broker-login */}
+                    <Link href="/broker-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Signup</a></Link>
                     <Link href="/broker-login"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Login</a></Link>
-                    {/* FIXED ALIGNMENT: span -> a with same classes */}
-                    <Link href="/broker/listings/new"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Listing</a></Link>
                   </>
                 )}
-                {user && (
+                {user && isBroker && (
                   <>
-                    {isBroker ? (
-                      <>
-                        <Link href="/broker-dashboard"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Dashboard{brokerVerified ? '' : ' (pending)'}</a></Link>
-                        {/* CHANGED: Create Listing now goes to broker listing flow */}
-                        <Link href="/broker/listings/new"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Listing</a></Link>
-                      </>
-                    ) : (
-                      <Link href="/broker-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Onboarding</a></Link>
+                    <Link href="/broker-dashboard"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Dashboard{brokerVerified ? '' : ' (pending)'}</a></Link>
+                    {brokerVerified && (
+                      <Link href="/broker/listings/new"><a className="block px-3 py-2 rounded hover:bg-gray-50">Create Listing</a></Link>
                     )}
                   </>
+                )}
+                {user && !isBroker && (
+                  <Link href="/broker-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Signup</a></Link>
                 )}
                 <Link href="/pricing"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Pricing</a></Link>
               </div>
@@ -259,7 +251,7 @@ export default function Header() {
                       }}
                       className="w-full text-left px-4 py-2 hover:bg-gray-100"
                     >
-                      Broker Onboarding
+                      Broker Signup
                     </button>
                   )}
 
@@ -313,9 +305,7 @@ export default function Header() {
                 <Link href="/guides/prep-to-sell"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Get Ready to Sell</span></Link>
                 <Link href="/pricing"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Pricing</span></Link>
 
-                {/* NEW: Broker Login shortcut in mobile Sell section */}
                 <div className="my-2 border-t" />
-                {/* UPDATED: now points directly to broker-login */}
                 <Link href="/broker-login"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Login</span></Link>
               </div>
             )}
@@ -329,23 +319,20 @@ export default function Header() {
               <div className="pl-3 pb-2 space-y-2">
                 {!user && (
                   <>
-                    {/* UPDATED: now points directly to broker-login */}
+                    <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Signup</span></Link>
                     <Link href="/broker-login"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Login</span></Link>
-                    <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Onboarding</span></Link>
                   </>
                 )}
-                {user && (
+                {user && isBroker && (
                   <>
-                    {isBroker ? (
-                      <>
-                        <Link href="/broker-dashboard"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Dashboard{brokerVerified ? '' : ' (pending)'}</span></Link>
-                        {/* CHANGED: Create Listing now goes to broker listing flow */}
-                        <Link href="/broker/listings/new"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Create Listing</span></Link>
-                      </>
-                    ) : (
-                      <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Onboarding</span></Link>
+                    <Link href="/broker-dashboard"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Dashboard{brokerVerified ? '' : ' (pending)'}</span></Link>
+                    {brokerVerified && (
+                      <Link href="/broker/listings/new"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Create Listing</span></Link>
                     )}
                   </>
+                )}
+                {user && !isBroker && (
+                  <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Signup</span></Link>
                 )}
                 <Link href="/pricing"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Pricing</span></Link>
               </div>
@@ -398,7 +385,7 @@ export default function Header() {
                     }}
                     className="text-left py-2"
                   >
-                    Broker Onboarding
+                    Broker Signup
                   </button>
                 )}
 
