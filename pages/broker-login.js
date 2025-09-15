@@ -32,16 +32,16 @@ export default function BrokerLogin() {
     }
 
     try {
-      // Let /auth/callback decide the final redirect; stash a hint for it
+      // Redirect new brokers to onboarding
       try {
-        localStorage.setItem('pendingNext', '/broker-dashboard');
+        localStorage.setItem('pendingNext', '/broker-onboarding');
       } catch {}
 
       const { error } = await supabase.auth.signInWithOtp({
         email: e1,
         options: {
           emailRedirectTo:
-            'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback?next=/broker-dashboard',
+            'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback?next=/broker-onboarding',
         },
       });
 
