@@ -173,11 +173,15 @@ export default function BrokerDashboard() {
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-semibold mb-1">My Profile</h2>
-            <div className="text-sm text-gray-600 mb-3">
-              {broker?.verification_status
-                ? `Status: ${broker.verification_status}`
-                : (broker?.verified ? 'Status: verified' : 'Status: pending')}
-            </div>
+           <div className="text-sm text-gray-600 mb-3">
+  { (broker?.verification_status?.toLowerCase?.() === 'verified') || broker?.verified
+      ? 'Status: verified'
+      : (broker?.verification_status?.toLowerCase?.() === 'rejected'
+          ? 'Status: rejected'
+          : 'Status: pending')
+  }
+</div>
+
 
             <div className="grid md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
               <div><span className="text-gray-500">Name:</span> {`${broker?.first_name || ''} ${broker?.last_name || ''}`.trim() || '—'}</div>
