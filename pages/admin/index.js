@@ -98,77 +98,43 @@ export default function AdminDashboard() {
   };
 
   // ===============================
-  // === Brokers: schema-aware  ====
+  // === Brokers: verification  ====
   // ===============================
 
-  // 1) Introspect which columns actually exist by reading one row
-  const getBrokerColumns = async (id) => {
-    // Try the target row first (fast path)
-    let { data, error } = await supabase.from("brokers").select("*").eq("id", id).limit(1).maybeSingle();
-    if (error) {
-      console.error("Broker column introspection (by id) failed:", error.message);
-    }
-    if (!data) {
-      // Fallback: grab any row to detect columns
-      const fallback = await supabase.from("brokers").select("*").limit(1);
-      if (fallback.error) {
-        console.error("Broker column introspection (fallback) failed:", fallback.error.message);
-        return [];
-      }
-      data = (fallback.data && fallback.data[0]) || {};
-    }
-    return Object.keys(data || {});
-  };
-
-  // 2) Build an update payload using only the columns that exist
-  const buildVerificationUpdate = (cols, action, reason) => {
-    const isVerify = action === "verify";
-    const now = new Date().toISOString();
-    const update = {};
-
-    // Unified status fields (prefer verification_status, then status)
-    if (cols.includes("verification_status")) {
-      update.verification_status = isVerify ? "verified" : "rejected";
-    } else if (cols.includes("status")) {
-      update.status = isVerify ? "verified" : "rejected";
-    }
-
-    // Boolean flags (if present)
-    if (cols.includes("verified")) update.verified = isVerify;
-    if (cols.includes("rejected")) update.rejected = !isVerify;
-
-    // Timestamps / reason (optional)
-    if (isVerify && cols.includes("verified_at")) update.verified_at = now;
-    if (!isVerify && cols.includes("rejected_at")) update.rejected_at = now;
-    if (!isVerify && cols.includes("rejected_reason")) update.rejected_reason = reason ?? null;
-
-    if (Object.keys(update).length === 0) {
-      throw new Error(
-        "No verification-related columns found on 'brokers'. Create one of: verification_status (text), status (text), verified (bool), rejected (bool)."
-      );
-    }
-    return update;
-  };
-
-  // 3) Single function to perform the update safely
+  // Source of truth: verification_status ('pending' | 'verified' | 'rejected')
+  // Keep booleans/timestamps in sync for compatibility.
   const updateBrokerStatus = async (id, action) => {
-    const reason = action === "reject" ? (prompt("Optional reason for rejection?") ?? "") : undefined;
+    const now = new Date().toISOString();
+    const isVerify = action === "verify";
 
-    try {
-      const cols = await getBrokerColumns(id);
-      console.log("Detected broker columns:", cols);
+    const payload = isVerify
+      ? {
+          verification_status: "verified",
+          verified: true,
+          verified_at: now,
+          rejected: false,
+          rejected_at: null,
+          rejected_reason: null,
+        }
+      : {
+          verification_status: "rejected",
+          verified: false,
+          verified_at: null,
+          rejected: true,
+          rejected_at: now,
+          // If you want to capture a reason, you can prompt here:
+          // rejected_reason: prompt("Optional reason for rejection?") || null,
+          rejected_reason: null,
+        };
 
-      const update = buildVerificationUpdate(cols, action, reason);
-
-      const { error } = await supabase.from("brokers").update(update).eq("id", id);
-      if (error) throw error;
-
-      fetchData();
-      alert(action === "verify" ? "Broker verified ✅" : "Broker rejected ❌");
-    } catch (err) {
-      console.error("Broker verify/reject error:", err.message || err);
-      alert("Update failed: " + (err.message || String(err)));
+    const { error } = await supabase.from("brokers").update(payload).eq("id", id);
+    if (error) {
+      console.error("Broker verify/reject error:", error.message);
+      alert("Update failed: " + error.message);
+      return;
     }
+    await fetchData();
+    alert(isVerify ? "Broker verified ✅" : "Broker rejected ❌");
   };
 
   // --- Helpers ---
@@ -180,7 +146,7 @@ export default function AdminDashboard() {
       case "verified":
         return <span className={`${base} bg-green-100 text-green-800`}>{status}</span>;
       case "rejected":
-        return <span className={`${base} bg-yellow-100 text-yellow-800`}>{status}</span>;
+        return <span className={`${base} bg-red-100 text-red-700`}>{status}</span>;
       case "deleted":
         return <span className={`${base} bg-red-100 text-red-700`}>{status}</span>;
       case "pending":
@@ -190,55 +156,52 @@ export default function AdminDashboard() {
   };
 
   const computedBrokerStatus = (row) => {
-    // Prefer explicit status fields if present
+    // Prefer the unified column
     if (typeof row.verification_status === "string") return String(row.verification_status);
+    // Legacy fallback
     if (typeof row.status === "string") return String(row.status);
-
-    // Fall back to booleans if they exist
+    // Boolean fallback
     if (typeof row.verified === "boolean" || typeof row.rejected === "boolean") {
       if (row.verified) return "verified";
       if (row.rejected) return "rejected";
       return "pending";
     }
-
-    // Unknown schema: show pending so the badge renders gracefully
     return "pending";
   };
 
- const deleteBroker = async (id) => {
-  if (!confirm("Delete this broker permanently?")) return;
+  const deleteBroker = async (id) => {
+    if (!confirm("Delete this broker permanently?")) return;
 
-  console.log("[Admin] deleteBroker starting for id:", id);
+    console.log("[Admin] deleteBroker starting for id:", id);
 
-  const { data: rowBefore, error: readErr } = await supabase
-    .from("brokers")
-    .select("id")
-    .eq("id", id)
-    .maybeSingle();
+    const { data: rowBefore, error: readErr } = await supabase
+      .from("brokers")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
 
-  console.log("[Admin] rowBefore:", rowBefore, "readErr:", readErr);
+    console.log("[Admin] rowBefore:", rowBefore, "readErr:", readErr);
 
-  const { data, error, status } = await supabase
-    .from("brokers")
-    .delete()
-    .eq("id", id)
-    .select(); // return deleted row(s) if allowed
+    const { data, error, status } = await supabase
+      .from("brokers")
+      .delete()
+      .eq("id", id)
+      .select(); // return deleted row(s) if allowed
 
-  if (error) {
-    console.error("[Admin] deleteBroker error:", { message: error.message, details: error.details, hint: error.hint, code: error.code, status });
-    alert(
-      "Delete failed:\n" +
-      (error.message || "Unknown error") +
-      (error.details ? `\nDetails: ${error.details}` : "") +
-      (error.hint ? `\nHint: ${error.hint}` : "")
-    );
-    return;
-  }
+    if (error) {
+      console.error("[Admin] deleteBroker error:", { message: error.message, details: error.details, hint: error.hint, code: error.code, status });
+      alert(
+        "Delete failed:\n" +
+          (error.message || "Unknown error") +
+          (error.details ? `\nDetails: ${error.details}` : "") +
+          (error.hint ? `\nHint: ${error.hint}` : "")
+      );
+      return;
+    }
 
-  console.log("[Admin] deleteBroker success:", { status, data });
-  fetchData();
-};
-
+    console.log("[Admin] deleteBroker success:", { status, data });
+    fetchData();
+  };
 
   const filterData = (rows, query) => {
     if (!query) return rows;
