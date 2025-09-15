@@ -27,7 +27,7 @@ export default function BrokerDashboard() {
         // 2) Load broker row (redirect to onboarding if none)
         const { data: br, error: brErr } = await supabase
           .from('brokers')
-          .select('id, verified, email')
+          .select('id, verified, email, first_name, last_name')
           .eq('auth_id', user.id)
           .maybeSingle();
 
@@ -36,6 +36,12 @@ export default function BrokerDashboard() {
         }
 
         if (!br || !br.id) {
+          router.replace('/broker-onboarding?next=/broker-dashboard');
+          return;
+        }
+
+        // 🔒 NEW GUARD: force onboarding if profile is incomplete
+        if (!br.first_name || !br.last_name) {
           router.replace('/broker-onboarding?next=/broker-dashboard');
           return;
         }
@@ -247,3 +253,4 @@ export default function BrokerDashboard() {
     </div>
   );
 }
+
