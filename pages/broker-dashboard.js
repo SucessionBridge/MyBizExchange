@@ -136,13 +136,18 @@ export default function BrokerDashboard() {
     );
   }
 
+  // ✅ Unified verified flag (checks either column)
+  const isVerified =
+    (broker?.verification_status?.toLowerCase?.() === 'verified') ||
+    !!broker?.verified;
+
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
       <header className="flex items-center gap-3">
         <h1 className="text-2xl font-semibold">
           {broker?.first_name ? `Welcome back, ${broker.first_name}` : 'Broker Dashboard'}
         </h1>
-        {!broker?.verified && (
+        {!isVerified && (
           <span className="px-3 py-1 rounded bg-yellow-100 text-yellow-800">
             Pending verification
           </span>
