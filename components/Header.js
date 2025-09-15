@@ -175,7 +175,8 @@ export default function Header() {
               >
                 {!user && (
                   <>
-                    <Link href="/broker-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Signup</a></Link>
+                    {/* Both routes go to /broker-login; labels differentiate first-time vs returning */}
+                    <Link href="/broker-login"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Signup (Get Email Link)</a></Link>
                     <Link href="/broker-login"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Login</a></Link>
                   </>
                 )}
@@ -188,7 +189,7 @@ export default function Header() {
                   </>
                 )}
                 {user && !isBroker && (
-                  <Link href="/broker-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Signup</a></Link>
+                  <Link href="/broker-onboarding"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Onboarding</a></Link>
                 )}
                 <Link href="/pricing"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Pricing</a></Link>
               </div>
@@ -251,7 +252,7 @@ export default function Header() {
                       }}
                       className="w-full text-left px-4 py-2 hover:bg-gray-100"
                     >
-                      Broker Signup
+                      Broker Onboarding
                     </button>
                   )}
 
@@ -319,7 +320,8 @@ export default function Header() {
               <div className="pl-3 pb-2 space-y-2">
                 {!user && (
                   <>
-                    <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Signup</span></Link>
+                    {/* Both route to /broker-login; labels clarify first-time vs returning */}
+                    <Link href="/broker-login"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Signup (Get Email Link)</span></Link>
                     <Link href="/broker-login"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Login</span></Link>
                   </>
                 )}
@@ -332,7 +334,7 @@ export default function Header() {
                   </>
                 )}
                 {user && !isBroker && (
-                  <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Signup</span></Link>
+                  <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Onboarding</span></Link>
                 )}
                 <Link href="/pricing"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Pricing</span></Link>
               </div>
@@ -385,7 +387,7 @@ export default function Header() {
                     }}
                     className="text-left py-2"
                   >
-                    Broker Signup
+                    Broker Onboarding
                   </button>
                 )}
 
