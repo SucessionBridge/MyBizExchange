@@ -27,7 +27,7 @@ export default function BrokerDashboard() {
         // 2) Load broker row (redirect to onboarding if none)
         const { data: br, error: brErr } = await supabase
           .from('brokers')
-          .select('id, verified, email, first_name, last_name')
+          .select('id, verified, verification_status, email, first_name, last_name, phone, company_name, website, license_number, license_state, license_expiry')
           .eq('auth_id', user.id)
           .maybeSingle();
 
@@ -40,7 +40,7 @@ export default function BrokerDashboard() {
           return;
         }
 
-        // 🔒 NEW GUARD: force onboarding if profile is incomplete
+        // 🔒 Guard: force onboarding if profile is incomplete
         if (!br.first_name || !br.last_name) {
           router.replace('/broker-onboarding?next=/broker-dashboard');
           return;
@@ -139,14 +139,15 @@ export default function BrokerDashboard() {
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
       <header className="flex items-center gap-3">
-        <h1 className="text-2xl font-semibold">Broker Dashboard</h1>
+        <h1 className="text-2xl font-semibold">
+          {broker?.first_name ? `Welcome back, ${broker.first_name}` : 'Broker Dashboard'}
+        </h1>
         {!broker?.verified && (
           <span className="px-3 py-1 rounded bg-yellow-100 text-yellow-800">
             Pending verification
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
-          {/* NEW: Edit Profile link */}
           <Link
             href="/broker/profile"
             className="px-3 py-2 rounded border border-gray-300 text-gray-800"
@@ -161,6 +162,44 @@ export default function BrokerDashboard() {
           </Link>
         </div>
       </header>
+
+      {/* My Profile */}
+      <section className="border rounded p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-lg font-semibold mb-1">My Profile</h2>
+            <div className="text-sm text-gray-600 mb-3">
+              {broker?.verification_status
+                ? `Status: ${broker.verification_status}`
+                : (broker?.verified ? 'Status: verified' : 'Status: pending')}
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+              <div><span className="text-gray-500">Name:</span> {`${broker?.first_name || ''} ${broker?.last_name || ''}`.trim() || '—'}</div>
+              <div><span className="text-gray-500">Email:</span> {broker?.email || '—'}</div>
+              <div><span className="text-gray-500">Phone:</span> {broker?.phone || '—'}</div>
+              <div><span className="text-gray-500">Company:</span> {broker?.company_name || '—'}</div>
+              <div className="truncate">
+                <span className="text-gray-500">Website:</span>{' '}
+                {broker?.website ? <a href={broker.website} target="_blank" rel="noreferrer" className="underline">{broker.website}</a> : '—'}
+              </div>
+              <div><span className="text-gray-500">License #:</span> {broker?.license_number || '—'}</div>
+              <div><span className="text-gray-500">License State/Prov:</span> {broker?.license_state || '—'}</div>
+              <div><span className="text-gray-500">License Expiry:</span> {broker?.license_expiry ? new Date(broker.license_expiry).toLocaleDateString() : '—'}</div>
+            </div>
+          </div>
+
+          <div className="shrink-0">
+            <Link
+              href="/broker/profile"
+              className="inline-flex items-center px-3 py-2 rounded border border-gray-300 text-gray-800 text-sm hover:bg-gray-50"
+              title="Edit profile"
+            >
+              Edit Profile
+            </Link>
+          </div>
+        </div>
+      </section>
 
       {/* Conversations */}
       <section>
@@ -262,4 +301,3 @@ export default function BrokerDashboard() {
     </div>
   );
 }
-
