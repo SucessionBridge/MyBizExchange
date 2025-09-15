@@ -145,12 +145,21 @@ export default function BrokerDashboard() {
             Pending verification
           </span>
         )}
-        <Link
-          href="/broker/listings/new"
-          className="ml-auto px-3 py-2 rounded bg-black text-white"
-        >
-          + New Listing
-        </Link>
+        <div className="ml-auto flex items-center gap-2">
+          {/* NEW: Edit Profile link */}
+          <Link
+            href="/broker/profile"
+            className="px-3 py-2 rounded border border-gray-300 text-gray-800"
+          >
+            Edit Profile
+          </Link>
+          <Link
+            href="/broker/listings/new"
+            className="px-3 py-2 rounded bg-black text-white"
+          >
+            + New Listing
+          </Link>
+        </div>
       </header>
 
       {/* Conversations */}
