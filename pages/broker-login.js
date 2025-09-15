@@ -4,25 +4,44 @@ import supabase from '../lib/supabaseClient';
 
 export default function BrokerLogin() {
   const [email, setEmail] = useState('');
+  const [confirmEmail, setConfirmEmail] = useState('');
   const [status, setStatus] = useState('idle'); // idle | sending | sent | error
   const [errorMsg, setErrorMsg] = useState('');
+
+  function normalize(val) {
+    return String(val || '').trim().toLowerCase();
+  }
 
   async function sendMagicLink(e) {
     e.preventDefault();
     setStatus('sending');
     setErrorMsg('');
 
+    const e1 = normalize(email);
+    const e2 = normalize(confirmEmail);
+
+    if (!e1 || !e2) {
+      setStatus('error');
+      setErrorMsg('Please enter your email in both fields.');
+      return;
+    }
+    if (e1 !== e2) {
+      setStatus('error');
+      setErrorMsg('Emails do not match. Please check and try again.');
+      return;
+    }
+
     try {
-      // Store intended next path so /auth/callback can pick it up if needed
-      localStorage.setItem('pendingNext', '/broker');
+      // Let /auth/callback decide the final redirect; stash a hint for it
+      try {
+        localStorage.setItem('pendingNext', '/broker-dashboard');
+      } catch {}
 
       const { error } = await supabase.auth.signInWithOtp({
-        email,
+        email: e1,
         options: {
-          // This tells Supabase to send users back to our callback,
-          // and our callback will then forward to /broker-dashboard.
           emailRedirectTo:
-            'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback?next=/broker',
+            'https://successionbridge-mvp3-0-clean.vercel.app/auth/callback?next=/broker-dashboard',
         },
       });
 
@@ -42,7 +61,7 @@ export default function BrokerLogin() {
     <div className="min-h-screen flex items-center justify-center p-6">
       <form
         onSubmit={sendMagicLink}
-        className="w-full max-w-sm space-y-4 border p-6 rounded"
+        className="w-full max-w-sm space-y-4 border p-6 rounded bg-white"
       >
         <h1 className="text-xl font-semibold">Broker Login</h1>
 
@@ -55,13 +74,27 @@ export default function BrokerLogin() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@company.com"
+            autoComplete="email"
+          />
+        </label>
+
+        <label className="block">
+          <span className="text-sm">Confirm Email</span>
+          <input
+            className="mt-1 w-full border rounded p-2"
+            type="email"
+            required
+            value={confirmEmail}
+            onChange={(e) => setConfirmEmail(e.target.value)}
+            placeholder="you@company.com"
+            autoComplete="email"
           />
         </label>
 
         <button
           type="submit"
-          disabled={status === 'sending' || !email}
-          className="w-full rounded p-2 border"
+          disabled={status === 'sending' || !email || !confirmEmail}
+          className="w-full rounded p-2 border bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
         >
           {status === 'sending' ? 'Sending…' : 'Send magic link'}
         </button>
