@@ -161,7 +161,7 @@ export default function BuyerDashboard() {
       const idsAsNumber = ids.map(x => {
         const n = Number(x);
         return Number.isFinite(n) ? n : x;
-      });
+        });
 
       const { data: sellers, error: sellersErr } = await supabase
         .from('sellers')
@@ -601,7 +601,7 @@ function financingCompatible(profileFinancing, listing) {
     return sellerConsidered === 'yes' || sellerConsidered === 'maybe' || lf === 'seller-financing';
   }
   if (pf === 'rent-to-own') {
-    return lf === 'rent-to-own' || sellerConsidered === 'yes' || sellerConsidered === 'maybe';
+    return lf === 'rent-to-own' || sellerConsidered === 'yes' || 'maybe';
   }
   if (pf === 'third-party') {
     return lf === 'third-party' || lf === 'buyer-financed' || !lf;
@@ -755,7 +755,7 @@ function RecentConversations({ profileEmail }) {
                   {new Date(last.created_at).toLocaleString()}
                 </div>
               </div>
-              <Link href={`/listings/${lid}`}>
+              <Link href={`/messages?listingId=${lid}&buyerEmail=${encodeURIComponent(profileEmail)}`}>
                 <a className="shrink-0 inline-flex items-center bg-white border border-gray-300 hover:border-gray-400 px-3 py-1.5 rounded-lg text-sm font-medium">
                   Open
                 </a>
@@ -994,5 +994,4 @@ function BuyerDangerZone() {
 export async function getServerSideProps() {
   return { props: {} };
 }
-
 
