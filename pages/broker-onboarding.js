@@ -5,8 +5,11 @@ import supabase from '../lib/supabaseClient';
 
 export default function BrokerOnboarding() {
   const router = useRouter();
+  const { edit } = router.query; // add ?edit=1 to force showing the form
+
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
+  const [redirecting, setRedirecting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -22,12 +25,13 @@ export default function BrokerOnboarding() {
     license_expiry: '',
   });
 
-  // Require auth; prefill from existing brokers row if present
+  // Require auth; if broker row exists and edit != 1 => go to dashboard
   useEffect(() => {
     let mounted = true;
 
     (async () => {
       const { data: uRes, error: userErr } = await supabase.auth.getUser();
+      const currUser = uRes?.user || null;
 
       if (userErr) {
         if (mounted) {
@@ -38,48 +42,64 @@ export default function BrokerOnboarding() {
         return;
       }
 
-      const currUser = uRes?.user || null;
-
       if (mounted) {
         setUser(currUser);
         setLoadingUser(false);
       }
 
-      if (!currUser) return;
+      if (!currUser) {
+        router.replace('/broker-login');
+        return;
+      }
 
-      // Prefill email
+      // Prefill email from auth
       if (mounted) {
         setForm((f) => ({ ...f, email: currUser.email || '' }));
       }
 
+      // Check for an existing broker profile row
       const { data: br, error } = await supabase
         .from('brokers')
         .select(
-          'email, first_name, last_name, phone, company_name, website, license_number, license_state, license_expiry'
+          'id, email, first_name, last_name, phone, company_name, website, license_number, license_state, license_expiry'
         )
         .eq('auth_id', currUser.id)
         .limit(1)
         .maybeSingle();
 
-      if (!error && br && mounted) {
-        setForm({
-          email: br.email || currUser.email || '',
-          first_name: br.first_name || '',
-          last_name: br.last_name || '',
-          phone: br.phone || '',
-          company_name: br.company_name || '',
-          website: br.website || '',
-          license_number: br.license_number || '',
-          license_state: br.license_state || '',
-          license_expiry: br.license_expiry || '',
-        });
+      if (error) {
+        console.warn('Broker fetch error:', error.message);
+      }
+
+      // If a row exists AND user didn't explicitly request edit => redirect to dashboard
+      if (br && !edit) {
+        setRedirecting(true);
+        router.replace('/broker-dashboard');
+        return;
+      }
+
+      // Otherwise (new broker or explicit edit), prefill the form and show onboarding
+      if (mounted) {
+        if (br) {
+          setForm({
+            email: br.email || currUser.email || '',
+            first_name: br.first_name || '',
+            last_name: br.last_name || '',
+            phone: br.phone || '',
+            company_name: br.company_name || '',
+            website: br.website || '',
+            license_number: br.license_number || '',
+            license_state: br.license_state || '',
+            license_expiry: br.license_expiry || '',
+          });
+        }
       }
     })();
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [edit, router]);
 
   const onChange = (e) => {
     const { name, value } = e.target;
@@ -89,13 +109,13 @@ export default function BrokerOnboarding() {
   const saveProfile = async (e) => {
     e.preventDefault();
     if (!user) {
-      router.replace('/login?role=broker');
+      router.replace('/broker-login');
       return;
     }
     setSaving(true);
     setError('');
 
-    // Guard: email in the form should always match the authed user email
+    // Guard: form email must match authed user email
     const formEmail = String(form.email || '').trim().toLowerCase();
     const userEmail = String(user.email || '').trim().toLowerCase();
     if (formEmail && userEmail && formEmail !== userEmail) {
@@ -124,7 +144,7 @@ export default function BrokerOnboarding() {
         .upsert(payload, { onConflict: 'auth_id' });
       if (upErr) throw upErr;
 
-      // Confirm row exists (and warm cache)
+      // Confirm exists (warm cache)
       const { error: checkErr } = await supabase
         .from('brokers')
         .select('id')
@@ -133,7 +153,6 @@ export default function BrokerOnboarding() {
         .maybeSingle();
       if (checkErr) throw checkErr;
 
-      // Done → dashboard
       router.replace('/broker-dashboard');
     } catch (err) {
       setError(err?.message || 'Could not save broker profile.');
@@ -142,10 +161,10 @@ export default function BrokerOnboarding() {
     }
   };
 
-  if (loadingUser) {
+  if (loadingUser || redirecting) {
     return (
       <main className="min-h-screen flex items-center justify-center">
-        <div>Loading…</div>
+        <div>{redirecting ? 'Redirecting to your dashboard…' : 'Loading…'}</div>
       </main>
     );
   }
