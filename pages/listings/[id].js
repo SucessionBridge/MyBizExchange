@@ -261,6 +261,12 @@ export default function ListingDetail() {
     }
   }
 
+  // ✅ NEW: open conversation thread for this listing + this buyer
+  const openConversation = () => {
+    if (!buyer?.email || !listing?.id) return;
+    router.push(`/messages?listingId=${listing.id}&buyerEmail=${encodeURIComponent(buyer.email)}`);
+  };
+
   if (!id || loading) return <div className="p-8 text-center text-gray-600">Loading...</div>;
   if (!listing) return <div className="p-8 text-center text-gray-600">Listing not found.</div>;
 
@@ -305,9 +311,9 @@ export default function ListingDetail() {
             </p>
             <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
 
-            {/* ✅ Save toggle in hero (optional, keeps your old button too) */}
+            {/* ✅ Save + Open Conversation in hero */}
             {buyer && (
-              <div className="mt-3">
+              <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   onClick={toggleSave}
                   disabled={saving}
@@ -316,6 +322,13 @@ export default function ListingDetail() {
                   }`}
                 >
                   {isSaved ? '★ Saved — Click to Unsave' : '☆ Save Listing'}
+                </button>
+
+                <button
+                  onClick={openConversation}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-white/90 text-blue-700 border border-blue-200 hover:bg-white"
+                >
+                  💬 Open Conversation
                 </button>
               </div>
             )}
@@ -587,6 +600,14 @@ export default function ListingDetail() {
                     className="bg-gray-100 hover:bg-gray-200 px-5 py-2 rounded-lg border"
                   >
                     Email Me This Listing
+                  </button>
+                  {/* ✅ NEW: Open Conversation button (same as in Hero) */}
+                  <button
+                    type="button"
+                    onClick={openConversation}
+                    className="bg-white hover:bg-gray-50 text-blue-700 border border-blue-200 px-5 py-2 rounded-lg"
+                  >
+                    💬 Open Conversation
                   </button>
                 </div>
               </form>
