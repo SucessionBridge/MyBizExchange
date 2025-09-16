@@ -4,7 +4,6 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import supabase from '@/lib/supabaseClient';
 
-
 export default function BrokerNewListing() {
   const router = useRouter();
 
@@ -17,7 +16,7 @@ export default function BrokerNewListing() {
   // UI state
   const [mode, setMode] = useState('choose'); // 'choose' | 'manual' | 'import'
 
-  // Minimal manual form state
+  // Minimal manual form state + NEW fields
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
 
@@ -30,6 +29,17 @@ export default function BrokerNewListing() {
     annualRevenue: '',
     sde: '',
     description: '',
+    // NEW (shown on listing detail page)
+    website: '',
+    hideBusinessName: false,
+    sellerFinancing: 'no', // 'no' | 'maybe' | 'yes'
+    inventoryValue: '',
+    equipmentValue: '',
+    employees: '',
+    monthlyLease: '',
+    yearsInBusiness: '',
+    homeBased: false,
+    relocatable: false,
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -85,8 +95,8 @@ export default function BrokerNewListing() {
 
   // ----- Helpers -----
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setForm((f) => ({ ...f, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleImageUpload = (e) => {
@@ -128,6 +138,12 @@ export default function BrokerNewListing() {
     if (!form.industry.trim()) errs.push('Industry is required');
     if (!locationString) errs.push('City or State is required');
     return errs;
+  };
+
+  const toNumOrNull = (v) => {
+    if (v === '' || v === null || v === undefined) return null;
+    const n = Number(String(v).replace(/[^0-9.-]/g, ''));
+    return Number.isFinite(n) ? n : null;
   };
 
   // ----- Submit (manual create) -----
@@ -174,14 +190,33 @@ export default function BrokerNewListing() {
         location: locationString || 'Undisclosed',
         location_city: form.city.trim() || null,
         location_state: form.state.trim() || null,
+
+        // pricing/financials
         financing_type: 'buyer-financed',
-        asking_price: form.askingPrice ? Number(form.askingPrice) : null,
-        annual_revenue: form.annualRevenue ? Number(form.annualRevenue) : null,
-        sde: form.sde ? Number(form.sde) : null,
+        seller_financing_considered: form.sellerFinancing, // 'no' | 'maybe' | 'yes'
+        asking_price: toNumOrNull(form.askingPrice),
+        annual_revenue: toNumOrNull(form.annualRevenue),
+        sde: toNumOrNull(form.sde),
+
+        // NEW extra details your detail page reads
+        inventory_value: toNumOrNull(form.inventoryValue),
+        equipment_value: toNumOrNull(form.equipmentValue),
+        employees: toNumOrNull(form.employees),
+        monthly_lease: toNumOrNull(form.monthlyLease),
+        years_in_business: toNumOrNull(form.yearsInBusiness),
+        home_based: !!form.homeBased,
+        relocatable: !!form.relocatable,
+
+        // description
         business_description: form.description.trim() || '',
         description_choice: 'manual',
         ai_description: '',
+
+        // media + ownership
         image_urls: uploadedImageUrls,
+        website: (form.website || '').trim() || null,
+        hide_business_name: !!form.hideBusinessName,
+
         auth_id: authUser.id,
         broker_id: brokerId,
         status: 'active',
@@ -194,7 +229,6 @@ export default function BrokerNewListing() {
       });
 
       if (!res.ok) {
-        // Safely attempt to read JSON; fall back to text
         let msg = 'Create failed';
         try {
           const ct = res.headers.get('content-type') || '';
@@ -231,7 +265,7 @@ export default function BrokerNewListing() {
     return Number.isFinite(n) ? String(n) : '';
   }
 
-  // NEW: robust client-side parser for pasted text (works without scraping)
+  // robust client-side parser for pasted text (works without scraping)
   function parseListingText(raw) {
     if (!raw) return {};
     const text = String(raw).replace(/\r/g, '').trim();
@@ -411,7 +445,6 @@ export default function BrokerNewListing() {
         if (p) next.askingPrice = p;
       }
       if (ex?.location) {
-        // Try to split "City, ST" or "City, State"
         const m = ex.location.match(/^\s*([^,]+)\s*,\s*([A-Za-z]{2})\s*$/);
         if (m) {
           next.city = m[1];
@@ -424,7 +457,6 @@ export default function BrokerNewListing() {
       return next;
     });
 
-    // Remote preview only — do not upload here
     if (ex?.image && imagePreviews.length < 8) {
       setImagePreviews((prev) => [...prev, ex.image]);
     }
@@ -445,7 +477,6 @@ export default function BrokerNewListing() {
 
       let extracted = null;
 
-      // 1) If URL provided, ask the server to scrape it
       if (importUrl.trim()) {
         const res = await fetch('/api/scrape-listing', {
           method: 'POST',
@@ -469,7 +500,6 @@ export default function BrokerNewListing() {
           const code = data?.code || 'UNKNOWN';
           let handledByProxy = false;
 
-          // 2) If server timed out / blocked / upstream error → browser proxy fallback
           if (code === 'TIMEOUT' || code === 'FETCH_ERROR' || code === 'UPSTREAM') {
             try {
               const proxied = PROXY_BASE + importUrl.trim();
@@ -481,9 +511,7 @@ export default function BrokerNewListing() {
                 handledByProxy = true;
                 setImportInfo('Imported via proxy. Please review the fields below.');
               }
-            } catch (e) {
-              // fall through to show error below
-            }
+            } catch (e) {}
           }
 
           if (!handledByProxy && !extracted) {
@@ -498,10 +526,8 @@ export default function BrokerNewListing() {
         }
       }
 
-      // Apply extracted fields from URL/proxy if any
       if (extracted) applyExtracted(extracted);
 
-      // 3) If extra text provided, parse it locally (no network) and merge without overwriting
       if (importText.trim()) {
         const ex = parseListingText(importText.trim());
         setForm((prev) => ({
@@ -520,7 +546,6 @@ export default function BrokerNewListing() {
         }));
       }
 
-      // 4) Switch to the manual form so the broker can finish & publish
       setMode('manual');
     } catch (e) {
       console.error(e);
@@ -528,7 +553,7 @@ export default function BrokerNewListing() {
         ? 'Timed out fetching that URL.'
         : (e?.message || 'Import failed.');
       setImportError(msg);
-      setMode('import'); // remain in Import mode on failure
+      setMode('import');
     } finally {
       setImportLoading(false);
     }
@@ -645,6 +670,7 @@ export default function BrokerNewListing() {
 
         {mode === 'manual' && (
           <div className="space-y-5 border rounded-lg p-4">
+            {/* Basics */}
             <div className="grid md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Business name</label>
@@ -655,6 +681,15 @@ export default function BrokerNewListing() {
                   onChange={handleChange}
                   placeholder="e.g., Acme HVAC Services"
                 />
+                <label className="flex items-center gap-2 mt-2 text-sm">
+                  <input
+                    type="checkbox"
+                    name="hideBusinessName"
+                    checked={form.hideBusinessName}
+                    onChange={handleChange}
+                  />
+                  <span>Confidential listing (hide business name)</span>
+                </label>
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Industry</label>
@@ -691,6 +726,7 @@ export default function BrokerNewListing() {
               </div>
             </div>
 
+            {/* Pricing / key numbers */}
             <div className="grid md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1">Asking price (USD)</label>
@@ -727,6 +763,117 @@ export default function BrokerNewListing() {
               </div>
             </div>
 
+            {/* NEW: extra financial/details the detail page shows */}
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Inventory value (USD)</label>
+                <input
+                  name="inventoryValue"
+                  type="number"
+                  className="w-full border rounded p-2"
+                  value={form.inventoryValue}
+                  onChange={handleChange}
+                  placeholder="e.g., 25000"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Equipment value (USD)</label>
+                <input
+                  name="equipmentValue"
+                  type="number"
+                  className="w-full border rounded p-2"
+                  value={form.equipmentValue}
+                  onChange={handleChange}
+                  placeholder="e.g., 80000"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Employees</label>
+                <input
+                  name="employees"
+                  type="number"
+                  className="w-full border rounded p-2"
+                  value={form.employees}
+                  onChange={handleChange}
+                  placeholder="e.g., 7"
+                />
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Monthly lease (USD)</label>
+                <input
+                  name="monthlyLease"
+                  type="number"
+                  className="w-full border rounded p-2"
+                  value={form.monthlyLease}
+                  onChange={handleChange}
+                  placeholder="e.g., 3200"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Years in business</label>
+                <input
+                  name="yearsInBusiness"
+                  type="number"
+                  className="w-full border rounded p-2"
+                  value={form.yearsInBusiness}
+                  onChange={handleChange}
+                  placeholder="e.g., 12"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Seller financing considered</label>
+                <select
+                  name="sellerFinancing"
+                  className="w-full border rounded p-2"
+                  value={form.sellerFinancing}
+                  onChange={handleChange}
+                >
+                  <option value="no">No</option>
+                  <option value="maybe">Maybe</option>
+                  <option value="yes">Yes</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="homeBased"
+                  checked={form.homeBased}
+                  onChange={handleChange}
+                />
+                <span className="text-sm">Home-based</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="relocatable"
+                  checked={form.relocatable}
+                  onChange={handleChange}
+                />
+                <span className="text-sm">Relocatable</span>
+              </label>
+            </div>
+
+            {/* Website (only shows to logged-in buyers on detail page) */}
+            <div>
+              <label className="block text-sm font-medium mb-1">Website (optional)</label>
+              <input
+                name="website"
+                className="w-full border rounded p-2"
+                value={form.website}
+                onChange={handleChange}
+                placeholder="https://example.com"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                This URL is only revealed to logged-in buyers on the listing page.
+              </p>
+            </div>
+
             <div>
               <label className="block text-sm font-medium mb-1">Description</label>
               <textarea
@@ -741,6 +888,7 @@ export default function BrokerNewListing() {
               </p>
             </div>
 
+            {/* Photos */}
             <div>
               <label className="block text-sm font-medium mb-1">
                 Photos (up to 8)
@@ -797,3 +945,4 @@ export default function BrokerNewListing() {
     </main>
   );
 }
+
