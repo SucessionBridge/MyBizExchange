@@ -19,6 +19,9 @@ export default function ListingDetail() {
   const [isSaved, setIsSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // 🔹 NEW: broker info for this listing
+  const [broker, setBroker] = useState(null);
+
   const toTitleCase = (str) =>
     str
       ? str
@@ -102,6 +105,22 @@ export default function ListingDetail() {
       }
     })();
   }, [id, buyer]);
+
+  // 🔹 NEW: load the listing's broker profile (if present)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const bId = listing?.broker_id;
+      if (!bId) return;
+      const { data, error } = await supabase
+        .from('brokers')
+        .select('first_name,last_name,company_name,website,phone,verified,license_number,license_state')
+        .eq('id', bId)
+        .maybeSingle();
+      if (!cancelled) setBroker(error ? null : (data || null));
+    })();
+    return () => { cancelled = true; };
+  }, [listing?.broker_id]);
 
   // Parse AI description into titled sections
   function parseDescriptionSections(description) {
@@ -302,6 +321,44 @@ export default function ListingDetail() {
             )}
           </div>
         </div>
+
+        {/* 🔹 NEW: Broker card */}
+        {broker && (
+          <aside className="mt-6 p-4 border rounded-lg bg-white shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-500">Listed by</p>
+                <p className="text-base font-medium">
+                  {[broker.first_name, broker.last_name].filter(Boolean).join(' ') || 'Broker'}
+                  {broker.verified && (
+                    <span className="ml-2 text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Verified
+                    </span>
+                  )}
+                </p>
+                <p className="text-sm text-gray-600">{broker.company_name || '—'}</p>
+                <p className="text-xs text-gray-500">
+                  {broker.license_number
+                    ? `Lic # ${broker.license_number}${broker.license_state ? ` (${broker.license_state})` : ''}`
+                    : ''}
+                </p>
+              </div>
+              <div className="text-right">
+                {broker.phone && <div className="text-sm">{broker.phone}</div>}
+                {broker.website && (
+                  <a
+                    href={broker.website}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm text-blue-600 hover:underline"
+                  >
+                    Website
+                  </a>
+                )}
+              </div>
+            </div>
+          </aside>
+        )}
 
         {/* Financial Highlights */}
         <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
