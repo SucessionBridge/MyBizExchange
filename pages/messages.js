@@ -10,6 +10,7 @@ export default function MessagesPage() {
   const [authUser, setAuthUser] = useState(null);
   const [listingId, setListingId] = useState(null);
   const [buyerEmail, setBuyerEmail] = useState(null);
+  const [buyerName, setBuyerName] = useState(''); // ✅ NEW
 
   const [resolving, setResolving] = useState(true);
   const [resolveError, setResolveError] = useState('');
@@ -31,7 +32,7 @@ export default function MessagesPage() {
     })();
   }, []);
 
-  // 2) resolve listing + buyer
+  // 2) resolve listing id
   useEffect(() => {
     const lid =
       typeof qListingId === 'string' && qListingId.trim() !== ''
@@ -39,28 +40,51 @@ export default function MessagesPage() {
           ? Number(qListingId)
           : qListingId
         : null;
-
     setListingId(lid || null);
   }, [qListingId]);
 
+  // 2b) resolve buyer (email + name)
   useEffect(() => {
     if (!listingId) return;
     (async () => {
       setResolving(true);
       setResolveError('');
-
       try {
-        // If buyerEmail already provided, use it
+        // If buyerEmail provided in query, use it and try to get a name
         if (qBuyerEmail && String(qBuyerEmail).trim()) {
-          setBuyerEmail(String(qBuyerEmail).trim());
+          const email = String(qBuyerEmail).trim();
+          setBuyerEmail(email);
+
+          // try to find a name from prior messages for this listing/email
+          const { data: nameMsg } = await supabase
+            .from('messages')
+            .select('buyer_name')
+            .eq('listing_id', listingId)
+            .eq('buyer_email', email)
+            .not('buyer_name', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (nameMsg && nameMsg.length && nameMsg[0].buyer_name) {
+            setBuyerName(nameMsg[0].buyer_name);
+          } else {
+            // fallback: look up buyers table for a display name
+            const { data: b } = await supabase
+              .from('buyers')
+              .select('full_name,name')
+              .eq('email', email)
+              .maybeSingle();
+            setBuyerName(b?.full_name || b?.name || '');
+          }
+
           setResolving(false);
           return;
         }
 
-        // Otherwise: pick the most recent buyer_email for this listing
+        // Otherwise: pick the most recent buyer_email for this listing (and its name)
         const { data, error } = await supabase
           .from('messages')
-          .select('buyer_email, created_at')
+          .select('buyer_email, buyer_name, created_at')
           .eq('listing_id', listingId)
           .not('buyer_email', 'is', null)
           .order('created_at', { ascending: false })
@@ -70,6 +94,7 @@ export default function MessagesPage() {
 
         if (data && data.length) {
           setBuyerEmail(data[0].buyer_email);
+          setBuyerName(data[0].buyer_name || '');
         } else {
           setResolveError('No conversation found yet for this listing.');
         }
@@ -98,7 +123,12 @@ export default function MessagesPage() {
           .order('created_at', { ascending: true });
 
         if (error) throw error;
-        if (!cancelled) setMessages(data || []);
+        if (!cancelled) {
+          setMessages(data || []);
+          // if any message has a name and we don't, capture it
+          const named = (data || []).find(m => m.buyer_name);
+          if (named && !buyerName) setBuyerName(named.buyer_name);
+        }
       } catch (e) {
         if (!cancelled) setLoadError(e?.message || 'Could not load messages.');
       } finally {
@@ -109,7 +139,7 @@ export default function MessagesPage() {
     return () => {
       cancelled = true;
     };
-  }, [listingId, buyerEmail]);
+  }, [listingId, buyerEmail]); // buyerName not needed here
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -118,7 +148,6 @@ export default function MessagesPage() {
   const title = useMemo(() => {
     if (!listingId) return 'Conversation';
     return `Conversation · Listing #${listingId}`;
-    // (Optional: you could look up listing name here if you want)
   }, [listingId]);
 
   async function sendReply(e) {
@@ -128,18 +157,16 @@ export default function MessagesPage() {
     try {
       setSending(true);
 
-      // We call your existing API with JSON (no files here)
       const res = await fetch('/api/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           listing_id: listingId,
           buyer_email: buyerEmail,
-          buyer_name: null,
+          buyer_name: buyerName || buyerEmail, // ✅ never null
           message: text.trim(),
           topic: 'business-inquiry',
-          from_seller: true,          // ✅ this marks it as broker/seller side
-          // seller_id will be resolved server-side from listing_id
+          from_seller: true, // marks it as seller/broker side
         }),
       });
 
@@ -148,7 +175,7 @@ export default function MessagesPage() {
         throw new Error(data?.error || 'Send failed.');
       }
 
-      // append optimistically
+      // optimistic append
       setMessages((m) => [
         ...m,
         {
@@ -157,7 +184,7 @@ export default function MessagesPage() {
           created_at: new Date().toISOString(),
           from_seller: true,
           buyer_email: buyerEmail,
-          buyer_name: null,
+          buyer_name: buyerName || buyerEmail, // ✅ keep consistent
           attachments: [],
         },
       ]);
@@ -176,7 +203,13 @@ export default function MessagesPage() {
 
         {/* Status line */}
         <div className="text-xs text-gray-500 mb-4">
-          {resolving ? 'Resolving…' : resolveError ? resolveError : buyerEmail ? `Buyer: ${buyerEmail}` : ''}
+          {resolving
+            ? 'Resolving…'
+            : resolveError
+            ? resolveError
+            : buyerEmail
+            ? `Buyer: ${buyerName ? `${buyerName} · ` : ''}${buyerEmail}`
+            : ''}
         </div>
 
         {/* Errors */}
