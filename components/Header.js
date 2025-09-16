@@ -321,4 +321,81 @@ export default function Header() {
                 )}
                 {user && isBroker && (
                   <>
-                    <Link href="/broker-dashboard"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Dashboard{brok
+                    <Link href="/broker-dashboard"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Dashboard{brokerVerified ? '' : ' (pending)'}</span></Link>
+                    {brokerVerified && (
+                      <Link href="/broker/listings/new"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Create Listing</span></Link>
+                    )}
+                  </>
+                )}
+                {user && !isBroker && (
+                  <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Onboarding</span></Link>
+                )}
+                <Link href="/pricing"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Pricing</span></Link>
+              </div>
+            )}
+
+            {/* quick links */}
+            <Link href="/business-valuation"><span className="py-2" onClick={() => setIsOpen(false)}>Valuation</span></Link>
+            <Link href="/scorecard"><span className="py-2" onClick={() => setIsOpen(false)}>Sellability Scorecard</span></Link>
+            <Link href="/pricing"><span className="py-2" onClick={() => setIsOpen(false)}>Pricing</span></Link>
+
+            {user ? (
+              <>
+                <button
+                  onClick={() => {
+                    toast.success('Opening Buyer Dashboard');
+                    router.push('/buyer-dashboard');
+                    setIsOpen(false);
+                  }}
+                  className="text-left py-2"
+                >
+                  Buyer Dashboard
+                </button>
+                <button
+                  onClick={() => {
+                    toast.success('Opening Seller Dashboard');
+                    router.push('/seller-dashboard');
+                    setIsOpen(false);
+                  }}
+                  className="text-left py-2"
+                >
+                  Seller Dashboard
+                </button>
+
+                {isBroker ? (
+                  <button
+                    onClick={() => {
+                      toast.success(brokerVerified ? 'Opening Broker Dashboard' : 'Broker pending verification');
+                      router.push('/broker-dashboard');
+                      setIsOpen(false);
+                    }}
+                    className="text-left py-2"
+                  >
+                    Broker Dashboard{brokerVerified ? '' : ' (pending)'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      router.push('/broker-onboarding');
+                      setIsOpen(false);
+                    }}
+                    className="text-left py-2"
+                  >
+                    Broker Onboarding
+                  </button>
+                )}
+
+                <button onClick={handleLogout} className="text-left text-red-600 py-2">
+                  Log Out
+                </button>
+              </>
+            ) : (
+              <Link href="/login"><span className="py-2" onClick={() => setIsOpen(false)}>Login</span></Link>
+            )}
+          </nav>
+        </div>
+      )}
+    </header>
+  );
+}
+
