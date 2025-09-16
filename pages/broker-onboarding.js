@@ -3,6 +3,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
 
+// Create a public bucket named `broker-media` in Supabase Storage once.
+const BUCKET = 'broker-media';
+
 export default function BrokerOnboarding() {
   const router = useRouter();
   const { edit } = router.query; // add ?edit=1 to force showing the form
@@ -23,7 +26,17 @@ export default function BrokerOnboarding() {
     license_number: '',
     license_state: '',
     license_expiry: '',
+
+    // NEW: persisted URLs on the broker row
+    avatar_url: '',
+    logo_url: '',
+    card_url: '',
   });
+
+  // NEW: local file inputs (optional)
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [logoFile, setLogoFile] = useState(null);
+  const [cardFile, setCardFile] = useState(null);
 
   // Require auth; if broker row exists and edit != 1 => go to dashboard
   useEffect(() => {
@@ -61,7 +74,7 @@ export default function BrokerOnboarding() {
       const { data: br, error } = await supabase
         .from('brokers')
         .select(
-          'id, email, first_name, last_name, phone, company_name, website, license_number, license_state, license_expiry'
+          'id, email, first_name, last_name, phone, company_name, website, license_number, license_state, license_expiry, avatar_url, logo_url, card_url'
         )
         .eq('auth_id', currUser.id)
         .limit(1)
@@ -91,6 +104,9 @@ export default function BrokerOnboarding() {
             license_number: br.license_number || '',
             license_state: br.license_state || '',
             license_expiry: br.license_expiry || '',
+            avatar_url: br.avatar_url || '',
+            logo_url: br.logo_url || '',
+            card_url: br.card_url || '',
           });
         }
       }
@@ -105,6 +121,17 @@ export default function BrokerOnboarding() {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
   };
+
+  // NEW: upload helper (only uploads when a new file is chosen)
+  async function uploadIfNeeded(file, keyPrefix) {
+    if (!file || !user) return null;
+    const clean = String(file.name || 'upload').replace(/[^\w.\-]+/g, '_').slice(-120);
+    const path = `broker-${user.id}/${Date.now()}_${keyPrefix}_${clean}`;
+    const { error, data } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false });
+    if (error) throw new Error(error.message);
+    const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(data.path);
+    return pub?.publicUrl || null;
+  }
 
   const saveProfile = async (e) => {
     e.preventDefault();
@@ -125,6 +152,13 @@ export default function BrokerOnboarding() {
     }
 
     try {
+      // Upload any newly selected files
+      const [avatarUrl, logoUrl, cardUrl] = await Promise.all([
+        uploadIfNeeded(avatarFile, 'avatar'),
+        uploadIfNeeded(logoFile, 'logo'),
+        uploadIfNeeded(cardFile, 'card'),
+      ]);
+
       const payload = {
         auth_id: user.id,
         email: user.email, // source of truth
@@ -136,6 +170,11 @@ export default function BrokerOnboarding() {
         license_number: form.license_number?.trim() || null,
         license_state: form.license_state?.trim() || null,
         license_expiry: form.license_expiry || null, // YYYY-MM-DD
+
+        // Persist URLs (new uploads override existing)
+        avatar_url: avatarUrl || form.avatar_url || null,
+        logo_url:   logoUrl   || form.logo_url   || null,
+        card_url:   cardUrl   || form.card_url   || null,
       };
 
       // Upsert by auth_id (RLS allows only own row)
@@ -306,6 +345,38 @@ export default function BrokerOnboarding() {
             <p className="text-xs text-gray-500 mt-2">
               You can leave these blank if licensing isn’t required in your region.
             </p>
+          </section>
+
+          {/* NEW: Branding & Media */}
+          <section className="bg-gray-50 rounded border p-4">
+            <h2 className="text-lg font-semibold mb-3">Branding & Media (optional)</h2>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium">Headshot</label>
+                <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} />
+                {form.avatar_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={form.avatar_url} alt="avatar" className="mt-2 h-20 w-20 object-cover rounded-full border" />
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Company logo</label>
+                <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
+                {form.logo_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={form.logo_url} alt="logo" className="mt-2 h-12 object-contain border bg-white p-1" />
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium">Business card</label>
+                <input type="file" accept="image/*" onChange={(e) => setCardFile(e.target.files?.[0] || null)} />
+                {form.card_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={form.card_url} alt="card" className="mt-2 h-20 object-contain border bg-white p-1" />
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">Supported: PNG/JPG. We’ll store them and show on your listings.</p>
           </section>
 
           {/* Actions */}
