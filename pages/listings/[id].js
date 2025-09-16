@@ -1,7 +1,7 @@
 // pages/listings/[id].js
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
-import supabase from '../../lib/supabaseClient'; // ✅ Fixed path
+import { useEffect, useMemo, useState, useRef } from 'react';
+import supabase from '../../lib/supabaseClient';
 import GrowthSimulator from '../../components/GrowthSimulator';
 
 export default function ListingDetail() {
@@ -13,13 +13,13 @@ export default function ListingDetail() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
-  const [attachment, setAttachment] = useState(null); // Add attachment state
+  const [attachment, setAttachment] = useState(null);
 
-  // ✅ NEW: saved state + guard against double-clicks
+  // Save state
   const [isSaved, setIsSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // 🔹 NEW: broker info for this listing
+  // Broker info
   const [broker, setBroker] = useState(null);
 
   const toTitleCase = (str) =>
@@ -31,6 +31,7 @@ export default function ListingDetail() {
           .join(' ')
       : '';
 
+  // Initial fetches
   useEffect(() => {
     if (!id) return;
     fetchListing();
@@ -81,7 +82,7 @@ export default function ListingDetail() {
     setLoading(false);
   }
 
-  // ✅ NEW: once we know buyer + id, check if already saved
+  // Check saved
   useEffect(() => {
     if (!id || !buyer) return;
 
@@ -97,7 +98,6 @@ export default function ListingDetail() {
         .maybeSingle();
 
       if (error) {
-        // Not fatal; just means we can’t pre-mark it
         console.debug('Check saved failed:', error.message);
         setIsSaved(false);
       } else {
@@ -106,7 +106,7 @@ export default function ListingDetail() {
     })();
   }, [id, buyer]);
 
-  // 🔹 NEW: load the listing's broker profile (if present)
+  // Load broker (use * so we don't break if new columns aren't there yet)
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -114,7 +114,7 @@ export default function ListingDetail() {
       if (!bId) return;
       const { data, error } = await supabase
         .from('brokers')
-        .select('first_name,last_name,company_name,website,phone,verified,license_number,license_state')
+        .select('*')
         .eq('id', bId)
         .maybeSingle();
       if (!cancelled) setBroker(error ? null : (data || null));
@@ -125,7 +125,6 @@ export default function ListingDetail() {
   // Parse AI description into titled sections
   function parseDescriptionSections(description) {
     if (!description) return [];
-
     const lines = description
       .split('\n')
       .map((line) => line.trim())
@@ -154,16 +153,12 @@ export default function ListingDetail() {
 
     const formData = new FormData();
     formData.append('message', message);
-
-    // ✅ Do NOT send seller_id; let API resolve by email if you have it
     if (listing.email) formData.append('seller_email', listing.email);
-
     formData.append('listing_id', listing.id);
     formData.append('buyer_name', buyer.name || buyer.full_name || buyer.email);
     formData.append('buyer_email', buyer.email);
     formData.append('topic', 'business-inquiry');
     formData.append('extension', 'successionbridge');
-
     if (attachment) formData.append('attachment', attachment);
 
     try {
@@ -171,7 +166,6 @@ export default function ListingDetail() {
         method: 'POST',
         body: formData,
       });
-
       const result = await response.json();
 
       if (!response.ok) {
@@ -189,12 +183,10 @@ export default function ListingDetail() {
     }
   }
 
-  // ✅ REPLACED: toggle save/unsave with upsert + delete (legacy-safe)
   async function toggleSave() {
     if (saving) return;
     setSaving(true);
 
-    // Need current auth to set buyer_auth_id or allow delete via RLS
     const { data: authData } = await supabase.auth.getUser();
     const authUser = authData?.user || null;
 
@@ -209,18 +201,15 @@ export default function ListingDetail() {
 
     try {
       if (isSaved) {
-        // Unsave: allow delete by auth_id OR (legacy) email
         const { error } = await supabase
           .from('saved_listings')
           .delete()
           .eq('listing_id', listingValue)
           .or(`buyer_auth_id.eq.${authUser.id},buyer_email.eq.${buyer.email}`);
-
         if (error) throw error;
         setIsSaved(false);
         alert('✅ Listing removed from your saved items.');
       } else {
-        // Save: upsert + onConflict to dedupe
         const payload = {
           listing_id: listingValue,
           buyer_email: buyer.email,
@@ -230,7 +219,6 @@ export default function ListingDetail() {
         const { error } = await supabase
           .from('saved_listings')
           .upsert([payload], { onConflict: 'buyer_auth_id,listing_id' });
-
         if (error) throw error;
         setIsSaved(true);
         alert('✅ Listing saved to your profile.');
@@ -261,7 +249,7 @@ export default function ListingDetail() {
     }
   }
 
-  // ✅ NEW: open conversation thread for this listing + this buyer
+  // Open conversation thread for this listing + this buyer
   const openConversation = () => {
     if (!buyer?.email || !listing?.id) return;
     router.push(`/messages?listingId=${listing.id}&buyerEmail=${encodeURIComponent(buyer.email)}`);
@@ -274,7 +262,6 @@ export default function ListingDetail() {
     listing.image_urls?.length > 0 ? listing.image_urls[0] : '/placeholder-listing.jpg';
   const otherImages = listing.image_urls?.slice(1) || [];
 
-  // 🔢 Helper to sanitize numbers coming from DB (handles "267,630" or "$267,630")
   const toNum = (v) => {
     if (v === null || v === undefined) return 0;
     if (typeof v === 'number' && isFinite(v)) return v;
@@ -284,6 +271,29 @@ export default function ListingDetail() {
     }
     return 0;
   };
+
+  // ---------- Broker card helpers (safe fallbacks) ----------
+  const brokerFullName = broker
+    ? [broker.first_name, broker.last_name].filter(Boolean).join(' ')
+    : '';
+
+  const brokerAvatar =
+    broker?.avatar_url || broker?.photo_url || null; // any headshot column you create
+
+  const brokerLogo =
+    broker?.company_logo_url || broker?.logo_url || null; // any logo column you create
+
+  const brokerCardImg =
+    broker?.card_image_url || broker?.business_card_url || null; // business card image if stored
+
+  const initials = (name) =>
+    String(name || '')
+      .split(' ')
+      .map((s) => s.trim()[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
 
   return (
     <main className="bg-gray-50 min-h-screen pb-16 font-sans">
@@ -311,7 +321,7 @@ export default function ListingDetail() {
             </p>
             <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
 
-            {/* ✅ Save + Open Conversation in hero */}
+            {/* Save + Open Conversation in hero */}
             {buyer && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -335,41 +345,85 @@ export default function ListingDetail() {
           </div>
         </div>
 
-        {/* 🔹 NEW: Broker card */}
+        {/* Broker card (with avatar / logo / business card if available) */}
         {broker && (
-          <aside className="mt-6 p-4 border rounded-lg bg-white shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500">Listed by</p>
-                <p className="text-base font-medium">
-                  {[broker.first_name, broker.last_name].filter(Boolean).join(' ') || 'Broker'}
-                  {broker.verified && (
-                    <span className="ml-2 text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                      Verified
-                    </span>
-                  )}
-                </p>
-                <p className="text-sm text-gray-600">{broker.company_name || '—'}</p>
-                <p className="text-xs text-gray-500">
-                  {broker.license_number
-                    ? `Lic # ${broker.license_number}${broker.license_state ? ` (${broker.license_state})` : ''}`
-                    : ''}
-                </p>
-              </div>
-              <div className="text-right">
-                {broker.phone && <div className="text-sm">{broker.phone}</div>}
-                {broker.website && (
-                  <a
-                    href={broker.website}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-sm text-blue-600 hover:underline"
-                  >
-                    Website
-                  </a>
+          <aside className="mt-6 p-4 border rounded-xl bg-white shadow-sm">
+            <div className="flex items-center justify-between gap-4">
+              {/* Left: avatar + name + meta */}
+              <div className="flex items-center gap-3">
+                {/* Avatar */}
+                {brokerAvatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={brokerAvatar}
+                    alt={brokerFullName || 'Broker'}
+                    className="h-12 w-12 rounded-full object-cover border"
+                    onError={(e) => (e.currentTarget.style.display = 'none')}
+                  />
+                ) : (
+                  <div className="h-12 w-12 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-semibold border">
+                    {initials(brokerFullName || broker?.company_name || 'BR')}
+                  </div>
                 )}
+
+                <div>
+                  <p className="text-sm text-gray-500">Listed by</p>
+                  <p className="text-base font-medium">
+                    {brokerFullName || 'Broker'}
+                    {broker?.verified && (
+                      <span className="ml-2 text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Verified
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-sm text-gray-600">{broker?.company_name || '—'}</p>
+                  <p className="text-xs text-gray-500">
+                    {broker?.license_number
+                      ? `Lic # ${broker.license_number}${broker.license_state ? ` (${broker.license_state})` : ''}`
+                      : ''}
+                  </p>
+                </div>
+              </div>
+
+              {/* Right: contact + logo */}
+              <div className="flex items-center gap-4">
+                {brokerLogo && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={brokerLogo}
+                    alt="Company logo"
+                    className="h-10 w-auto object-contain border rounded bg-white p-1"
+                    onError={(e) => (e.currentTarget.style.display = 'none')}
+                  />
+                )}
+                <div className="text-right">
+                  {broker?.phone && <div className="text-sm">{broker.phone}</div>}
+                  {broker?.website && (
+                    <a
+                      href={broker.website}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm text-blue-600 hover:underline"
+                    >
+                      Website
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Business card image preview (optional) */}
+            {brokerCardImg && (
+              <div className="mt-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={brokerCardImg}
+                  alt="Business card"
+                  className="w-full max-h-48 object-contain rounded border"
+                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                />
+              </div>
+            )}
           </aside>
         )}
 
@@ -601,7 +655,6 @@ export default function ListingDetail() {
                   >
                     Email Me This Listing
                   </button>
-                  {/* ✅ NEW: Open Conversation button (same as in Hero) */}
                   <button
                     type="button"
                     onClick={openConversation}
@@ -631,3 +684,5 @@ export default function ListingDetail() {
     </main>
   );
 }
+
+
