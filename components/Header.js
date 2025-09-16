@@ -151,9 +151,6 @@ export default function Header() {
                 <Link href="/guides/how-to-sell"><a className="block px-3 py-2 rounded hover:bg-gray-50">How to Sell Your Business</a></Link>
                 <Link href="/guides/prep-to-sell"><a className="block px-3 py-2 rounded hover:bg-gray-50">Get Your Business Ready to Sell</a></Link>
                 <Link href="/pricing"><a className="block px-3 py-2 rounded hover:bg-gray-50">Pricing</a></Link>
-
-                <div className="my-2 border-t" />
-                <Link href="/broker-login"><a className="block px-3 py-2 rounded hover:bg-gray-50">Broker Login</a></Link>
               </div>
             )}
           </div>
@@ -195,9 +192,6 @@ export default function Header() {
               </div>
             )}
           </div>
-
-          {/* NEW: simple Brokers link (separate from dropdown) */}
-          <Link href="/brokers"><span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Brokers</span></Link>
 
           {/* quick links */}
           <Link href="/business-valuation"><span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Valuation</span></Link>
@@ -308,9 +302,6 @@ export default function Header() {
                 <Link href="/guides/how-to-sell"><span className="block py-1.5" onClick={() => setIsOpen(false)}>How to Sell</span></Link>
                 <Link href="/guides/prep-to-sell"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Get Ready to Sell</span></Link>
                 <Link href="/pricing"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Pricing</span></Link>
-
-                <div className="my-2 border-t" />
-                <Link href="/broker-login"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Login</span></Link>
               </div>
             )}
 
@@ -330,81 +321,4 @@ export default function Header() {
                 )}
                 {user && isBroker && (
                   <>
-                    <Link href="/broker-dashboard"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Dashboard{brokerVerified ? '' : ' (pending)'}</span></Link>
-                    {brokerVerified && (
-                      <Link href="/broker/listings/new"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Create Listing</span></Link>
-                    )}
-                  </>
-                )}
-                {user && !isBroker && (
-                  <Link href="/broker-onboarding"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Onboarding</span></Link>
-                )}
-                <Link href="/pricing"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Pricing</span></Link>
-              </div>
-            )}
-
-            {/* quick links */}
-            <Link href="/business-valuation"><span className="py-2" onClick={() => setIsOpen(false)}>Valuation</span></Link>
-            <Link href="/scorecard"><span className="py-2" onClick={() => setIsOpen(false)}>Sellability Scorecard</span></Link>
-            <Link href="/pricing"><span className="py-2" onClick={() => setIsOpen(false)}>Pricing</span></Link>
-
-            {user ? (
-              <>
-                <button
-                  onClick={() => {
-                    toast.success('Opening Buyer Dashboard');
-                    router.push('/buyer-dashboard');
-                    setIsOpen(false);
-                  }}
-                  className="text-left py-2"
-                >
-                  Buyer Dashboard
-                </button>
-                <button
-                  onClick={() => {
-                    toast.success('Opening Seller Dashboard');
-                    router.push('/seller-dashboard');
-                    setIsOpen(false);
-                  }}
-                  className="text-left py-2"
-                >
-                  Seller Dashboard
-                </button>
-
-                {isBroker ? (
-                  <button
-                    onClick={() => {
-                      toast.success(brokerVerified ? 'Opening Broker Dashboard' : 'Broker pending verification');
-                      router.push('/broker-dashboard');
-                      setIsOpen(false);
-                    }}
-                    className="text-left py-2"
-                  >
-                    Broker Dashboard{brokerVerified ? '' : ' (pending)'}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      router.push('/broker-onboarding');
-                      setIsOpen(false);
-                    }}
-                    className="text-left py-2"
-                  >
-                    Broker Onboarding
-                  </button>
-                )}
-
-                <button onClick={handleLogout} className="text-left text-red-600 py-2">
-                  Log Out
-                </button>
-              </>
-            ) : (
-              <Link href="/login"><span className="py-2" onClick={() => setIsOpen(false)}>Login</span></Link>
-            )}
-          </nav>
-        </div>
-      )}
-    </header>
-  );
-}
-
+                    <Link href="/broker-dashboard"><span className="block py-1.5" onClick={() => setIsOpen(false)}>Broker Dashboard{brok
