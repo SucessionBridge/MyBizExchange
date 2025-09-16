@@ -196,6 +196,9 @@ export default function Header() {
             )}
           </div>
 
+          {/* NEW: simple Brokers link (separate from dropdown) */}
+          <Link href="/brokers"><span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Brokers</span></Link>
+
           {/* quick links */}
           <Link href="/business-valuation"><span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Valuation</span></Link>
           <Link href="/scorecard"><span className="px-2 py-1.5 rounded hover:text-blue-600 cursor-pointer">Sellability Scorecard</span></Link>
