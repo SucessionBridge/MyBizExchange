@@ -1,7 +1,26 @@
 // pages/api/generate-deal.js
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
+  }
+
+  // --- Auth: require a logged-in user ---
+  try {
+    const authHeader = req.headers.authorization || '';
+    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { data: userRes, error: userErr } = await supabase.auth.getUser(token);
+    if (userErr || !userRes?.user) return res.status(401).json({ error: 'Unauthorized' });
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const { listing, buyer, allowSellerCarry } = req.body || {};
@@ -43,11 +62,9 @@ export default async function handler(req, res) {
     null;
 
   // ---------------- Seller financing stance (robust) ----------------
-  // 1) Respect explicit client override if provided
   const clientOverride =
     typeof allowSellerCarry === "boolean" ? allowSellerCarry : null;
 
-  // 2) Detect from listing fields/synonyms
   const sfRaw = String(
     listing.seller_financing_considered ?? listing.sellerFinancingConsidered ?? ""
   ).toLowerCase().trim();
@@ -55,7 +72,7 @@ export default async function handler(req, res) {
   const ftRaw = String(
     listing.financing_type ?? listing.financingType ?? ""
   ).toLowerCase();
-  const ftNorm = ftRaw.replace(/\s+/g, "-"); // "Seller Financed" -> "seller-financed"
+  const ftNorm = ftRaw.replace(/\s+/g, "-");
 
   const hasTerms =
     n(listing.down_payment) > 0 ||
@@ -67,28 +84,25 @@ export default async function handler(req, res) {
   const inferredCarry =
     ["yes", "maybe", "true", "1"].includes(sfRaw) ||
     /seller|owner|carry|note/.test(ftNorm) ||
-    /rent/.test(ftNorm) || // rent-to-own style
+    /rent/.test(ftNorm) ||
     hasTerms;
 
   const sellerCarryAllowed = clientOverride !== null ? clientOverride : inferredCarry;
 
-  // Simple context lines the model can use
   const fitLines = [
     `Asking Price: ${money(ask)}`,
     `Buyer Available Capital: ${money(buyerCapital)}`,
     `Buyer Budget/Target Price: ${money(buyerBudget)}`
   ].join("\n");
 
-  // Constraint block when seller said NO
   const noCarryConstraints = sellerCarryAllowed
     ? ""
     : `
 CONSTRAINTS (seller said NO to seller financing)
 • Do NOT include any seller note, earnout, rent-to-own/lease-to-own, deferred payments to seller, or “payments credited toward down.”
 • Each structure must pay the seller 100% of the price at close (e.g., bank/SBA/conventional loan + buyer equity and/or outside investor equity).
-• You may vary loan types (SBA vs. conventional), LTV, and equity mixes, but seller receives full cash at close.`;
+• You may vary loan types (SBA vs. conventional), LTV, and equity mixes, but seller receives full cash at close.`.trim();
 
-  // Require strict headings so the frontend splitter never misses Deal 1
   const headingRule = `Start each deal with a heading exactly: "Deal 1:", "Deal 2:", "Deal 3:" (on its own line).`;
 
   const prompt = `
@@ -136,7 +150,7 @@ ${sellerCarryAllowed
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4",
+        model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         max_tokens: 700,
         temperature: 0.3,
