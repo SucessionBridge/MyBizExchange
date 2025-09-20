@@ -108,7 +108,6 @@ export default function SellerDashboard() {
   const [sellerEmail, setSellerEmail] = useState(null);
 
   const [sellerListings, setSellerListings] = useState([]);
-  the
   const [loadingListings, setLoadingListings] = useState(true);
 
   const [messages, setMessages] = useState([]);
@@ -159,7 +158,7 @@ export default function SellerDashboard() {
         .eq('email', sellerEmail)
         .order('created_at', { ascending: false });
 
-    if (error) {
+      if (error) {
         console.error('Failed to fetch seller listings:', error.message);
         setSellerListings([]);
       } else {
@@ -614,31 +613,20 @@ export default function SellerDashboard() {
                         return (
                           <div
                             key={`${lid}-${buyerKey}`}
-                            className="bg-white border rounded-lg p-3"
+                            className="bg-white border rounded-lg"
                             onDragOver={allowDrop}
                             onDrop={(e) => handleDrop(lid, canonicalEmail, e)}
                           >
-                            {/* ← Back to Dashboard button (smooth scroll to top) */}
-                            <div className="mb-2">
+                            {/* Sticky header with Back button + actions */}
+                            <div className="sticky top-0 z-10 -m-px px-3 py-2 bg-white/90 backdrop-blur border-b rounded-t-lg flex items-center justify-between">
                               <button
                                 type="button"
                                 onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                                // If you prefer a hard return instead:
-                                // onClick={() => router.push('/seller-dashboard')}
                                 className="text-xs text-gray-600 hover:underline"
                               >
                                 ← Back to dashboard
                               </button>
-                            </div>
-
-                            <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
-                                <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-900 px-2 py-0.5 text-xs font-semibold">
-                                  {buyerName || canonicalEmail || 'Unknown buyer'}
-                                </span>
-                                {canonicalEmail && canonicalEmail !== 'Unknown' && (
-                                  <span className="text-[11px] text-gray-500">{canonicalEmail}</span>
-                                )}
                                 {newCount > 0 && !isArchived && (
                                   <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
                                     {newCount} new
@@ -654,14 +642,12 @@ export default function SellerDashboard() {
                                     archived
                                   </span>
                                 )}
-                              </div>
-                              <div className="flex items-center gap-2">
                                 <button
                                   className="text-xs border rounded px-2 py-1 hover:bg-gray-50"
                                   onClick={() => {
                                     const nowArchived = archiveStorage.toggle(key);
-                                    if (!nowArchived) seenStorage.markNow(key); // unarchive -> mark seen
-                                    setReplyText(r => ({ ...r })); // refresh
+                                    if (!nowArchived) seenStorage.markNow(key);
+                                    setReplyText(r => ({ ...r })); // force refresh
                                   }}
                                   title={isArchived ? 'Unarchive' : 'Archive'}
                                 >
@@ -680,8 +666,20 @@ export default function SellerDashboard() {
                               </div>
                             </div>
 
+                            {/* Buyer label */}
+                            <div className="px-3 pt-3">
+                              <div className="flex items-center gap-2 mb-2">
+                                <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-900 px-2 py-0.5 text-xs font-semibold">
+                                  {buyerName || canonicalEmail || 'Unknown buyer'}
+                                </span>
+                                {canonicalEmail && canonicalEmail !== 'Unknown' && (
+                                  <span className="text-[11px] text-gray-500">{canonicalEmail}</span>
+                                )}
+                              </div>
+                            </div>
+
                             {/* Thread bubbles */}
-                            <div className="space-y-2">
+                            <div className="px-3 pb-3 space-y-2">
                               {thread.map((msg) => {
                                 const { who, color } = whoAndColorForSeller(msg, user?.id);
                                 const isNew = !msg.from_seller && (!lastSeen || new Date(msg.created_at) > new Date(lastSeen));
@@ -708,7 +706,7 @@ export default function SellerDashboard() {
                             </div>
 
                             {/* Composer */}
-                            <div className="mt-3 border-t pt-3">
+                            <div className="border-t px-3 py-3 rounded-b-lg bg-white">
                               <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                                 <input
                                   type="file"
