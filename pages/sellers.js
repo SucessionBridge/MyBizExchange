@@ -13,7 +13,7 @@ function EmailVerifyGate() {
   const [error, setError] = useState('');
   const [sending, setSending] = useState(false);
   const [suggestion, setSuggestion] = useState('');
-  const [asBroker, setAsBroker] = useState(false); // 👈 NEW
+  const [asBroker, setAsBroker] = useState(false); // 👈 preserves ?as=broker
 
   useEffect(() => {
     // detect broker context from URL (?as=broker)
@@ -205,6 +205,11 @@ export default function SellerWizard() {
   const [currentEditType, setCurrentEditType] = useState('manual');
   const [tempDescription, setTempDescription] = useState('');
   const [tempAIDescription, setTempAIDescription] = useState('');
+
+  // ----- UI-only additions (no schema changes) -----
+  const [currencySymbol, setCurrencySymbol] = useState('$'); // presentation only
+  const [isGenerating, setIsGenerating] = useState(false);
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -245,9 +250,11 @@ export default function SellerWizard() {
     proudOf: '',
     adviceToBuyer: '',
     annualProfit: '',
+    // seller_financing_considered, down_payment, interest_rate, term_length
     images: []
   });
 
+  // If they switch to preview and there's no AI text yet, generate once
   useEffect(() => {
     if (previewMode && !formData.aiDescription) {
       const fetchDescription = async () => {
@@ -274,8 +281,8 @@ export default function SellerWizard() {
           });
 
           if (!res.ok) {
-            const err = await res.json();
-            console.error('AI description error:', err.message);
+            const err = await res.json().catch(() => ({}));
+            console.error('AI description error:', err?.message);
             return;
           }
 
@@ -320,7 +327,7 @@ export default function SellerWizard() {
     closeModal();
   };
 
-  // ✅ Image upload + live previews + delete
+  // ✅ Safer image upload + live previews + delete (UI-only guards)
   const handleImageUpload = (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
@@ -328,9 +335,23 @@ export default function SellerWizard() {
     const remaining = Math.max(0, 8 - (formData.images?.length || 0));
     const selected = files.slice(0, remaining);
 
-    const newPreviews = selected.map(file => URL.createObjectURL(file));
+    const filtered = [];
+    for (const f of selected) {
+      if (!f.type?.startsWith('image/')) {
+        alert(`"${f.name}" is not an image.`);
+        continue;
+      }
+      if (f.size > 8 * 1024 * 1024) {
+        alert(`"${f.name}" is larger than 8MB.`);
+        continue;
+      }
+      filtered.push(f);
+    }
+    if (!filtered.length) return;
 
-    setFormData(prev => ({ ...prev, images: [...prev.images, ...selected] }));
+    const newPreviews = filtered.map(file => URL.createObjectURL(file));
+
+    setFormData(prev => ({ ...prev, images: [...prev.images, ...filtered] }));
     setImagePreviews(prev => [...prev, ...newPreviews]);
   };
 
@@ -348,6 +369,58 @@ export default function SellerWizard() {
     };
   }, [imagePreviews]);
 
+  // UI-only currency helpers
+  const formatCurrency = (val) => {
+    const num = Number(val);
+    if (!isFinite(num) || num === 0) return '';
+    return `${currencySymbol}${num.toLocaleString()}`;
+  };
+  const fmtMoney = (n, digits = 0) =>
+    `${currencySymbol}${Number(n || 0).toLocaleString(undefined, { maximumFractionDigits: digits })}`;
+
+  // Explicit AI generation button (Step 3)
+  async function generateAIFromAnswers() {
+    setIsGenerating(true);
+    try {
+      const res = await fetch('/api/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sentenceSummary: formData.sentenceSummary,
+          customerProfile: formData.customerProfile,
+          bestSellers: formData.bestSellers,
+          ownerInvolvement: formData.ownerInvolvement,
+          opportunity: formData.growthPotential,
+          proudOf: formData.proudOf,
+          adviceToBuyer: formData.adviceToBuyer,
+          businessName: formData.businessName,
+          industry: formData.industry,
+          location: formData.location || `${formData.location_city}, ${formData.location_state}`,
+          annualRevenue: formData.annualRevenue,
+          annualProfit: formData.annualProfit,
+          includesInventory: formData.includesInventory,
+          includesBuilding: formData.includesBuilding
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err?.message || 'Could not generate AI description.');
+        return;
+      }
+      const data = await res.json();
+      setFormData(prev => ({
+        ...prev,
+        aiDescription: data.description || prev.aiDescription || '',
+        descriptionChoice: prev.descriptionChoice || 'ai'
+      }));
+    } catch (e) {
+      console.error('AI generation failed', e);
+      alert('AI generation failed. Try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
   const handleSubmit = async () => {
     try {
       if (!authUser) {
@@ -356,7 +429,7 @@ export default function SellerWizard() {
       }
       setIsSubmitting(true);
 
-      // 👇 NEW: detect broker mode and fetch broker id if verified
+      // 👇 detect broker mode and fetch broker id if verified
       const asBroker = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('as') === 'broker';
       let brokerId = null;
       if (asBroker) {
@@ -461,7 +534,7 @@ export default function SellerWizard() {
         interest_rate: Number(formData.interestRate) || 0,
         image_urls: uploadedImageUrls,
 
-        broker_id: brokerId, // 👈 NEW: ties listing to the verified broker when in broker mode
+        broker_id: brokerId, // 👈 ties listing to verified broker when in broker mode
       };
 
       const res = await fetch('/api/submit-seller-listing', {
@@ -471,7 +544,7 @@ export default function SellerWizard() {
       });
 
       if (!res.ok) {
-        const errData = await res.json();
+        const errData = await res.json().catch(() => ({}));
         console.error("❌ Submission failed:", errData);
         setSubmitError(errData.error || 'Unknown error');
         setIsSubmitting(false);
@@ -489,7 +562,6 @@ export default function SellerWizard() {
     }
   };
 
-  const formatCurrency = (val) => val ? `$${parseFloat(val).toLocaleString()}` : '';
   const renderBackButton = () => (
     <button onClick={() => setStep(s => Math.max(1, s - 1))} className="text-sm text-blue-600 underline mt-2">Back</button>
   );
@@ -504,6 +576,7 @@ export default function SellerWizard() {
         accept="image/*"
         className="w-full border rounded p-2"
       />
+      <p className="text-xs text-gray-500">Up to 8 photos • JPG/PNG • max 8MB each</p>
       {imagePreviews.length > 0 && (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-2">
           {imagePreviews.map((src, i) => (
@@ -611,13 +684,62 @@ export default function SellerWizard() {
             <p><strong>Monthly Lease:</strong> {formatCurrency(formData.monthly_lease)}</p>
             <p><strong>Home-Based:</strong> {formData.home_based ? 'Yes' : 'No'}</p>
             <p><strong>Relocatable:</strong> {formData.relocatable ? 'Yes' : 'No'}</p>
-            <p><strong>Financing Type:</strong> {formData.financingType.replace('-', ' ')}</p>
+            <p><strong>Financing Type:</strong> {formData.financingType?.replace('-', ' ')}</p>
             <p><strong>Customer Type:</strong> {formData.customerType}</p>
             <p><strong>Owner Involvement:</strong> {formData.ownerInvolvement}</p>
             <p><strong>Reason for Selling:</strong> {formData.reasonForSelling}</p>
             <p><strong>Training Offered:</strong> {formData.trainingOffered}</p>
           </div>
         </div>
+
+        {/* Seller Financing Snapshot (UI-only) */}
+        {(['yes','maybe'].includes(String(formData.seller_financing_considered || '').toLowerCase())
+          && Number(formData.askingPrice) > 0) && (
+          <div className="mt-6 bg-emerald-50 border border-emerald-200 rounded p-4">
+            <h4 className="font-semibold text-emerald-800 mb-2">Seller Financing Snapshot</h4>
+            {(() => {
+              const price = Number(formData.askingPrice) || 0;
+              const dpPct = Number(formData.down_payment) || 0;
+              const rate = Number(formData.interest_rate) || 0;
+              const years = Number(formData.term_length) || 0;
+
+              const down = Math.max(0, price * (dpPct / 100));
+              const financed = Math.max(0, price - down);
+              const n = Math.max(0, years * 12);
+              const r = rate > 0 ? rate / 100 / 12 : 0;
+              const monthly = n > 0
+                ? (r > 0 ? financed * (r / (1 - Math.pow(1 + r, -n))) : financed / n)
+                : 0;
+
+              return (
+                <div className="grid sm:grid-cols-4 gap-3 text-sm">
+                  <div className="bg-white rounded border p-3">
+                    <div className="text-gray-500">Asking Price</div>
+                    <div className="font-semibold">{fmtMoney(price)}</div>
+                  </div>
+                  <div className="bg-white rounded border p-3">
+                    <div className="text-gray-500">Down Payment</div>
+                    <div className="font-semibold">{fmtMoney(down)} ({dpPct || 0}%)</div>
+                  </div>
+                  <div className="bg-white rounded border p-3">
+                    <div className="text-gray-500">Amount Financed</div>
+                    <div className="font-semibold">{fmtMoney(financed)}</div>
+                  </div>
+                  <div className="bg-white rounded border p-3">
+                    <div className="text-gray-500">Est. Monthly Payment</div>
+                    <div className="font-semibold">{fmtMoney(monthly, 0)}</div>
+                    <div className="text-gray-500 mt-1">
+                      {rate || 0}% • {years || 0} yrs
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+            <p className="text-xs text-emerald-800 mt-2">
+              This is an estimate based on your entries. Actual terms are negotiated with the buyer.
+            </p>
+          </div>
+        )}
 
         {/* Description Section */}
         {(formData.aiDescription || formData.businessDescription) && (
@@ -900,23 +1022,18 @@ export default function SellerWizard() {
                 <option value="Wyoming">Wyoming</option>
               </select>
 
-              <input
-                type="number"
-                name="years_in_business"
-                placeholder="Years in Business"
-                value={formData.years_in_business}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
-
-              <input
-                type="number"
-                name="owner_hours_per_week"
-                placeholder="Owner Hours per Week"
-                value={formData.owner_hours_per_week}
-                onChange={handleChange}
-                className="w-full border p-3 rounded"
-              />
+              {/* Currency selector (UI only) */}
+              <label className="block font-semibold">Currency (display only)</label>
+              <select
+                value={currencySymbol}
+                onChange={(e) => setCurrencySymbol(e.target.value)}
+                className="w-full border p-3 rounded mb-2"
+              >
+                <option value="$">USD ($)</option>
+                <option value="C$">CAD (C$)</option>
+                <option value="€">EUR (€)</option>
+                <option value="£">GBP (£)</option>
+              </select>
 
               <input
                 type="text"
@@ -929,6 +1046,7 @@ export default function SellerWizard() {
               <p className="text-xs text-gray-500 mt-1">
                 Your website URL helps buyers learn more about your business. For privacy and security, it will only be visible to logged-in users on SuccessionBridge. This helps protect your contact details and ensures only serious buyers can reach you.
               </p>
+
               <input
                 type="number"
                 name="annualRevenue"
@@ -991,6 +1109,7 @@ export default function SellerWizard() {
                 For leased premises only. Please enter how much rent you pay monthly for your business location.
                 (Exclude equipment or vehicle leases.)
               </p>
+
               <input
                 type="number"
                 name="inventory_value"
@@ -1020,11 +1139,12 @@ export default function SellerWizard() {
                 Includes Inventory
               </label>
 
+              {/* 🔧 Fix name to match payload key so it's actually saved */}
               <label className="flex items-center">
                 <input
-                  name="real_estate_included"
+                  name="includesBuilding"
                   type="checkbox"
-                  checked={formData.real_estate_included}
+                  checked={formData.includesBuilding}
                   onChange={handleChange}
                   className="mr-2"
                 />
@@ -1128,6 +1248,7 @@ export default function SellerWizard() {
               </div>
 
               {renderImages()}
+
               <button onClick={() => setStep(3)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
               {renderBackButton()}
             </div>
@@ -1155,7 +1276,25 @@ export default function SellerWizard() {
               <input name="keepsThemComing" placeholder="Why do they return?" value={formData.keepsThemComing} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="proudOf" placeholder="Something you're proud of?" value={formData.proudOf} onChange={handleChange} className="w-full border p-3 rounded" />
               <input name="adviceToBuyer" placeholder="Advice for future owner?" value={formData.adviceToBuyer} onChange={handleChange} className="w-full border p-3 rounded" />
-              <button onClick={() => setPreviewMode(true)} className="w-full bg-yellow-500 text-white py-3 rounded">Preview My Listing</button>
+
+              {/* AI generate + Preview controls */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <button
+                  type="button"
+                  onClick={generateAIFromAnswers}
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded disabled:opacity-60"
+                  disabled={isGenerating}
+                >
+                  {isGenerating ? 'Generating…' : 'Generate AI Description'}
+                </button>
+                <button
+                  onClick={() => setPreviewMode(true)}
+                  className="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded"
+                >
+                  Preview My Listing
+                </button>
+              </div>
+
               {renderBackButton()}
             </div>
           )
@@ -1164,4 +1303,3 @@ export default function SellerWizard() {
     </main>
   );
 }
-
