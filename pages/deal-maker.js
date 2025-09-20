@@ -1,6 +1,7 @@
 // pages/deal-maker.js
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import supabase from '../lib/supabaseClient';
 
 export default function DealMaker() {
@@ -49,23 +50,27 @@ export default function DealMaker() {
 
   const generateDeals = async () => {
     if (!listing || !buyer) return;
-
     setLoading(true);
     setError(null);
     setDeals([]);
 
     try {
-      // 👇 robust flag + passed to API
+      // Robust carry flag + pass to API
       const allowSellerCarry = computeAllowSellerCarry(listing);
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || null;
 
       const res = await fetch('/api/generate-deal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
         body: JSON.stringify({ listing, buyer, allowSellerCarry }),
       });
 
       if (!res.ok) {
-        const errData = await res.json();
+        const errData = await res.json().catch(() => ({}));
         setError(errData.error || 'Failed to generate deals.');
         setLoading(false);
         return;
@@ -92,77 +97,85 @@ export default function DealMaker() {
     setAckEquity(false);
     setReviewOpen(true);
   };
-const sendDealToSeller = async (dealText) => {
-  if (!buyer || !listing) return;
 
-  try {
-    // Try to give the API *either* seller_email or seller_id (UUID).
-    const sellerEmail =
-      listing.email ||
-      listing.seller_email ||
-      listing.contact_email ||
-      null;
+  const sendDealToSeller = async (dealText) => {
+    if (!buyer || !listing) return;
 
-    const possibleSellerId = listing.auth_id; // if your sellers row has it
-    const isUUID = (s) =>
-      typeof s === 'string' &&
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
+    try {
+      const sellerEmail =
+        listing.email ||
+        listing.seller_email ||
+        listing.contact_email ||
+        null;
 
-    const body = {
-      listing_id: Number(listing.id),
-      buyer_email: buyer.email,
-      buyer_name: buyer.name || buyer.full_name || buyer.email,
-      message: dealText,
-      topic: 'deal-proposal',
-      is_deal_proposal: true,
-      from_seller: false,          // buyer → seller
-    };
+      const possibleSellerId = listing.auth_id;
+      const isUUID = (s) =>
+        typeof s === 'string' &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
 
-    // Help the API resolve the seller
-    if (sellerEmail) body.seller_email = sellerEmail;
-    if (isUUID(possibleSellerId)) body.seller_id = possibleSellerId;
+      const body = {
+        listing_id: Number(listing.id),
+        buyer_email: buyer.email,
+        buyer_name: buyer.name || buyer.full_name || buyer.email,
+        message: dealText,
+        topic: 'deal-proposal',
+        is_deal_proposal: true,
+        from_seller: false,
+      };
 
-    const res = await fetch('/api/send-message', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
+      if (sellerEmail) body.seller_email = sellerEmail;
+      if (isUUID(possibleSellerId)) body.seller_id = possibleSellerId;
 
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok || json.ok === false) {
-      throw new Error(json?.error || 'Failed to send message');
+      const res = await fetch('/api/send-message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.ok === false) {
+        throw new Error(json?.error || 'Failed to send message');
+      }
+
+      alert('✅ Deal proposal sent to seller!');
+      router.push(`/listings/${listing.id}`);
+    } catch (err) {
+      console.error('sendDealToSeller failed:', err);
+      alert(err.message || 'Sending failed. Please try again.');
     }
-
-    alert('✅ Deal proposal sent to seller!');
-    router.push(`/listings/${listing.id}`);
-  } catch (err) {
-    console.error('sendDealToSeller failed:', err);
-    alert(err.message || 'Sending failed. Please try again.');
-  }
-};
-
-
+  };
 
   if (!listing || !buyer) {
     return <div className="p-8 text-center text-gray-600">Loading deal maker...</div>;
   }
 
-  // ✅ use the same robust rule in UI + recap
   const allowSellerCarry = computeAllowSellerCarry(listing);
-
-  // Recap numbers so the buyer understands what they're sending
   const recap = computeRecap(listing, buyer, allowSellerCarry);
 
   return (
-    <main className="bg-gray-50 min-h-screen py-8 px-4">
-      <div className="max-w-6xl mx-auto">
-        <button
-          onClick={() => router.push(`/listings/${listing.id}`)}
-          className="text-blue-600 hover:underline mb-6 inline-block"
-        >
-          ← Back to Listing
-        </button>
+    <main className="bg-gray-50 min-h-screen">
+      {/* Sticky top bar */}
+      <div className="sticky top-0 z-40 bg-gray-50/90 backdrop-blur border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push(`/listings/${listing.id}`)}
+              className="text-blue-600 hover:underline"
+            >
+              ← Back to Listing
+            </button>
+            <span className="hidden sm:inline-block text-gray-400">•</span>
+            <Link href="/buyer-dashboard">
+              <a className="text-blue-600 hover:underline">← Back to Dashboard</a>
+            </Link>
+          </div>
+          <div className="text-sm text-gray-600">
+            Review before sending. No auto-messages.
+          </div>
+        </div>
+      </div>
 
+      <div className="max-w-6xl mx-auto py-8 px-4">
         <h1 className="text-3xl md:text-4xl font-bold text-center text-blue-900 mb-8">
           AI Deal Maker
         </h1>
@@ -349,22 +362,18 @@ const sendDealToSeller = async (dealText) => {
   );
 }
 
-/** ------- robust deal parser so "Deal 1" never disappears ------- */
+/** ------- robust deal parser ------- */
 function parseDeals(text) {
   if (!text) return [];
   const t = String(text).replace(/\r/g, '');
 
-  // Primary: match headings like "Deal 1:", "**Deal 1:**", "### Deal 1:", etc.
+  // Primary: "Deal 1:" / "**Deal 1:**" / "### Deal 1:"
   const headerRe = /(^|\n)\s*(?:\*\*|__|###?\s*)?\s*Deal\s*(\d+)\s*(?:[:：.\-)]\s*)/gi;
   const matches = [];
   let m;
   while ((m = headerRe.exec(t)) !== null) {
     const headingIndex = m.index + (m[1] ? m[1].length : 0);
-    matches.push({
-      num: Number(m[2]),
-      headingIndex,
-      contentStart: headerRe.lastIndex,
-    });
+    matches.push({ num: Number(m[2]), headingIndex, contentStart: headerRe.lastIndex });
   }
   if (matches.length) {
     const out = [];
@@ -377,17 +386,13 @@ function parseDeals(text) {
     return out;
   }
 
-  // Fallback: "Option 1:" or "1)"/"1." style
+  // Fallback: "Option 1:" or "1)"/"1." styles
   const altRe = /(^|\n)\s*(?:\*\*|__|###?\s*)?\s*(?:Deal|Option)?\s*(\d+)\s*[\):：.\-]\s*/gi;
   const altMatches = [];
   let a;
   while ((a = altRe.exec(t)) !== null) {
     const headingIndex = a.index + (a[1] ? a[1].length : 0);
-    altMatches.push({
-      num: Number(a[2]),
-      headingIndex,
-      contentStart: altRe.lastIndex,
-    });
+    altMatches.push({ num: Number(a[2]), headingIndex, contentStart: altRe.lastIndex });
   }
   if (altMatches.length) {
     const out = [];
@@ -400,7 +405,6 @@ function parseDeals(text) {
     return out;
   }
 
-  // Last resort: one big deal
   const clean = t.trim();
   return clean ? [`Deal 1:${clean}`] : [];
 }
@@ -415,10 +419,9 @@ function computeAllowSellerCarry(listing) {
   const ftRaw = String(
     listing?.financing_type ?? listing?.financingType ?? ''
   ).toLowerCase();
-  const ftNorm = ftRaw.replace(/\s+/g, '-'); // "Seller Financed" -> "seller-financed"
+  const ftNorm = ftRaw.replace(/\s+/g, '-');
   const byType = /seller/.test(ftNorm) || /owner/.test(ftNorm) || /rent/.test(ftNorm);
 
-  // If seller entered note terms, assume carry is acceptable
   const hasTerms =
     Number(listing?.down_payment) > 0 ||
     Number(listing?.term_length) > 0 ||
@@ -428,7 +431,7 @@ function computeAllowSellerCarry(listing) {
   return byFlag || byType || hasTerms;
 }
 
-/** ------- helpers for recap (minimal, client-side) ------- */
+/** ------- recap helper ------- */
 function computeRecap(listing, buyer, allowSellerCarry) {
   const num = (v) => (v === 0 || v) ? (Number.isFinite(Number(v)) ? Number(v) : null) : null;
   const money = (n) => (n == null ? 'N/A' : `$${Number(n).toLocaleString()}`);
@@ -457,7 +460,7 @@ function computeRecap(listing, buyer, allowSellerCarry) {
 
   let gapPct = null;
   if (ask && offer) {
-    gapPct = Math.round(((ask - offer) / ask) * 100); // + = buyer under ask
+    gapPct = Math.round(((ask - offer) / ask) * 100);
   }
 
   const NEAR_GAP_PCT = 10, MOD_GAP_PCT = 25;
@@ -469,7 +472,6 @@ function computeRecap(listing, buyer, allowSellerCarry) {
     else gapBucket = 'far';
   }
 
-  // Respect allowSellerCarry in all suggestions
   let useBridge = (allowSellerCarry && ((downOk === false) || gapBucket === 'moderate' || gapBucket === 'far'));
   let bridgeMonths = 18;
   if (useBridge && ask && downShort != null) {
@@ -478,14 +480,13 @@ function computeRecap(listing, buyer, allowSellerCarry) {
     else if (shortPct <= 5 && gapBucket === 'near') bridgeMonths = 12;
   }
 
-  // Equity-credit suggestion if shortfall is modest (≤12% of price) AND carry is allowed
   let equityCreditMonthly = 0;
   let equityCreditCap = 0;
   if (allowSellerCarry && useBridge && ask && requiredDown != null && capital != null) {
     const shortNow = Math.max(0, requiredDown - capital);
     const shortPctOfPrice = ask ? (shortNow / ask) * 100 : 0;
     if (shortNow > 0 && shortPctOfPrice <= 12) {
-      equityCreditCap = shortNow; // cap to remaining shortfall
+      equityCreditCap = shortNow;
       equityCreditMonthly = bridgeMonths > 0 ? Math.ceil(shortNow / bridgeMonths) : 0;
     }
   }
@@ -505,5 +506,3 @@ function computeRecap(listing, buyer, allowSellerCarry) {
     money,
   };
 }
-
-
