@@ -161,7 +161,7 @@ export default function BuyerDashboard() {
       const idsAsNumber = ids.map(x => {
         const n = Number(x);
         return Number.isFinite(n) ? n : x;
-        });
+      });
 
       const { data: sellers, error: sellersErr } = await supabase
         .from('sellers')
@@ -422,40 +422,51 @@ export default function BuyerDashboard() {
               {matches.map(({ listing, score, reasons }) => {
                 const cover = Array.isArray(listing.image_urls) && listing.image_urls.length > 0 ? listing.image_urls[0] : placeholder;
                 return (
-                  <Link key={listing.id} href={`/listings/${listing.id}`}>
-                    <a className="group block rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-lg">
-                      <div className="bg-gray-100 overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={cover}
-                          alt={listing.business_name || 'Business listing'}
-                          className="w-full h-auto aspect-[4/3] object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
-                          loading="lazy"
-                          onError={(e) => { e.currentTarget.src = '/images/placeholders/listing-placeholder.jpg'; }}
-                        />
-                      </div>
-                      <div className="p-3">
-                        <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
-                          {listing.business_name || 'Unnamed Business'}
-                        </h3>
-                        <div className="mt-1.5 flex items-center justify-between">
-                          <p className="text-[14px] font-semibold text-gray-900">
-                            {listing.asking_price ? `$${toNum(listing.asking_price).toLocaleString()}` : 'Inquire'}
-                          </p>
-                          <p className="text-[13px] text-gray-600 truncate max-w-[60%] text-right">
-                            {listing.location || composeLocation(listing)}
-                          </p>
+                  <div key={listing.id} className="group block rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-lg">
+                    <Link href={`/listings/${listing.id}`}>
+                      <a>
+                        <div className="bg-gray-100 overflow-hidden">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={cover}
+                            alt={listing.business_name || 'Business listing'}
+                            className="w-full h-auto aspect-[4/3] object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
+                            loading="lazy"
+                            onError={(e) => { e.currentTarget.src = '/images/placeholders/listing-placeholder.jpg'; }}
+                          />
                         </div>
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {reasons.map((r, i) => (
-                            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full border bg-gray-50 text-gray-700">
-                              {r}
-                            </span>
-                          ))}
+                        <div className="p-3">
+                          <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
+                            {listing.business_name || 'Unnamed Business'}
+                          </h3>
+                          <div className="mt-1.5 flex items-center justify-between">
+                            <p className="text-[14px] font-semibold text-gray-900">
+                              {listing.asking_price ? `$${toNum(listing.asking_price).toLocaleString()}` : 'Inquire'}
+                            </p>
+                            <p className="text-[13px] text-gray-600 truncate max-w-[60%] text-right">
+                              {listing.location || composeLocation(listing)}
+                            </p>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {reasons.map((r, i) => (
+                              <span key={i} className="text-[11px] px-2 py-0.5 rounded-full border bg-gray-50 text-gray-700">
+                                {r}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    </a>
-                  </Link>
+                      </a>
+                    </Link>
+
+                    {/* Propose Deal CTA */}
+                    <div className="p-3 pt-0">
+                      <Link href={`/deal-maker?listingId=${listing.id}`}>
+                        <a className="inline-flex w-full items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-sm font-semibold">
+                          🤝 Propose a Deal
+                        </a>
+                      </Link>
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -486,50 +497,61 @@ export default function BuyerDashboard() {
                 const isWorking = !!unsaving[idStr];
 
                 return (
-                  <Link key={lst.id} href={`/listings/${lst.id}`}>
-                    <a className="group block relative rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-lg">
-                      {/* UNSAVE button */}
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleUnsave(lst.id);
-                        }}
-                        disabled={isWorking}
-                        className={`absolute top-2 right-2 z-10 text-xs px-2 py-1 rounded-md border shadow-sm ${
-                          isWorking
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-white/90 hover:bg-white text-gray-700'
-                        }`}
-                      >
-                        {isWorking ? 'Removing…' : 'Unsave'}
-                      </button>
+                  <div key={lst.id} className="group relative rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-lg">
+                    {/* UNSAVE button */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleUnsave(lst.id);
+                      }}
+                      disabled={isWorking}
+                      className={`absolute top-2 right-2 z-10 text-xs px-2 py-1 rounded-md border shadow-sm ${
+                        isWorking
+                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                          : 'bg-white/90 hover:bg-white text-gray-700'
+                      }`}
+                    >
+                      {isWorking ? 'Removing…' : 'Unsave'}
+                    </button>
 
-                      <div className="bg-gray-100 overflow-hidden">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={cover}
-                          alt={lst.business_name || 'Business listing'}
-                          className="w-full h-auto aspect-[4/3] object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
-                          loading="lazy"
-                          onError={(e) => { e.currentTarget.src = '/images/placeholders/listing-placeholder.jpg'; }}
-                        />
-                      </div>
-                      <div className="p-3">
-                        <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
-                          {lst.business_name || 'Unnamed Business'}
-                        </h3>
-                        <div className="mt-1.5 flex items-center justify-between">
-                          <p className="text-[14px] font-semibold text-gray-900">
-                            {lst.asking_price ? `$${Number(lst.asking_price).toLocaleString()}` : 'Inquire'}
-                          </p>
-                          <p className="text-[13px] text-gray-600 truncate max-w-[60%] text-right">
-                            {lst.location || 'Location undisclosed'}
-                          </p>
+                    <Link href={`/listings/${lst.id}`}>
+                      <a>
+                        <div className="bg-gray-100 overflow-hidden">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={cover}
+                            alt={lst.business_name || 'Business listing'}
+                            className="w-full h-auto aspect-[4/3] object-cover object-center group-hover:scale-[1.01] transition-transform duration-300"
+                            loading="lazy"
+                            onError={(e) => { e.currentTarget.src = '/images/placeholders/listing-placeholder.jpg'; }}
+                          />
                         </div>
-                      </div>
-                    </a>
-                  </Link>
+                        <div className="p-3">
+                          <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
+                            {lst.business_name || 'Unnamed Business'}
+                          </h3>
+                          <div className="mt-1.5 flex items-center justify-between">
+                            <p className="text-[14px] font-semibold text-gray-900">
+                              {lst.asking_price ? `$${Number(lst.asking_price).toLocaleString()}` : 'Inquire'}
+                            </p>
+                            <p className="text-[13px] text-gray-600 truncate max-w-[60%] text-right">
+                              {lst.location || 'Location undisclosed'}
+                            </p>
+                          </div>
+                        </div>
+                      </a>
+                    </Link>
+
+                    {/* Propose Deal CTA */}
+                    <div className="p-3 pt-0">
+                      <Link href={`/deal-maker?listingId=${lst.id}`}>
+                        <a className="inline-flex w-full items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 text-sm font-semibold">
+                          🤝 Propose a Deal
+                        </a>
+                      </Link>
+                    </div>
+                  </div>
                 );
               })}
             </div>
@@ -601,7 +623,8 @@ function financingCompatible(profileFinancing, listing) {
     return sellerConsidered === 'yes' || sellerConsidered === 'maybe' || lf === 'seller-financing';
   }
   if (pf === 'rent-to-own') {
-    return lf === 'rent-to-own' || sellerConsidered === 'yes' || 'maybe';
+    // ✅ FIX: don’t always return truthy
+    return lf === 'rent-to-own' || sellerConsidered === 'yes' || sellerConsidered === 'maybe';
   }
   if (pf === 'third-party') {
     return lf === 'third-party' || lf === 'buyer-financed' || !lf;
@@ -994,4 +1017,3 @@ function BuyerDangerZone() {
 export async function getServerSideProps() {
   return { props: {} };
 }
-
