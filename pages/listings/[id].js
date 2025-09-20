@@ -1,6 +1,6 @@
 // pages/listings/[id].js
 import { useRouter } from 'next/router';
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import supabase from '../../lib/supabaseClient';
 import GrowthSimulator from '../../components/GrowthSimulator';
 
@@ -10,8 +10,11 @@ export default function ListingDetail() {
 
   const [listing, setListing] = useState(null);
   const [buyer, setBuyer] = useState(null);
+
+  const [loadingListing, setLoadingListing] = useState(true);
+  const [loadingBuyer, setLoadingBuyer] = useState(true);
+
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(true);
   const [success, setSuccess] = useState(false);
   const [attachment, setAttachment] = useState(null);
 
@@ -31,58 +34,59 @@ export default function ListingDetail() {
           .join(' ')
       : '';
 
-  // Initial fetches
+  // --------- Load listing ----------
   useEffect(() => {
     if (!id) return;
-    fetchListing();
-    fetchBuyerProfile();
+    (async () => {
+      setLoadingListing(true);
+      const { data, error } = await supabase
+        .from('sellers')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (error) {
+        console.error('Error loading listing:', error);
+        setListing(null);
+      } else {
+        setListing(data);
+      }
+      setLoadingListing(false);
+    })();
   }, [id]);
 
-  async function fetchListing() {
-    const { data, error } = await supabase
-      .from('sellers')
-      .select('*')
-      .eq('id', id)
-      .single();
+  // --------- Load buyer profile ----------
+  useEffect(() => {
+    (async () => {
+      setLoadingBuyer(true);
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        setBuyer(null);
+        setLoadingBuyer(false);
+        return;
+      }
 
-    if (error) {
-      console.error('Error loading listing:', error);
-    } else {
-      setListing(data);
-    }
-  }
-
-  async function fetchBuyerProfile() {
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      setLoading(false);
-      return;
-    }
-
-    let { data: buyerData } = await supabase
-      .from('buyers')
-      .select('*')
-      .eq('auth_id', user.id)
-      .maybeSingle();
-
-    if (!buyerData) {
-      const { data: emailMatch } = await supabase
+      // Prefer auth_id, fallback to email
+      let { data: buyerData } = await supabase
         .from('buyers')
         .select('*')
-        .eq('email', user.email)
+        .eq('auth_id', user.id)
         .maybeSingle();
-      buyerData = emailMatch;
-    }
 
-    if (buyerData) setBuyer(buyerData);
-    setLoading(false);
-  }
+      if (!buyerData) {
+        const { data: emailMatch } = await supabase
+          .from('buyers')
+          .select('*')
+          .eq('email', user.email)
+          .maybeSingle();
+        buyerData = emailMatch || null;
+      }
 
-  // Check saved
+      setBuyer(buyerData || null);
+      setLoadingBuyer(false);
+    })();
+  }, []);
+
+  // --------- Check if saved ----------
   useEffect(() => {
     if (!id || !buyer) return;
 
@@ -106,7 +110,7 @@ export default function ListingDetail() {
     })();
   }, [id, buyer]);
 
-  // Load broker (use * so we don't break if new columns aren't there yet)
+  // --------- Load broker (if listing references one) ----------
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -122,7 +126,7 @@ export default function ListingDetail() {
     return () => { cancelled = true; };
   }, [listing?.broker_id]);
 
-  // Parse AI description into titled sections
+  // --------- Helpers ----------
   function parseDescriptionSections(description) {
     if (!description) return [];
     const lines = description
@@ -147,6 +151,17 @@ export default function ListingDetail() {
     return sections;
   }
 
+  const toNum = (v) => {
+    if (v === null || v === undefined) return 0;
+    if (typeof v === 'number' && isFinite(v)) return v;
+    if (typeof v === 'string') {
+      const n = Number(v.replace(/[^0-9.-]/g, ''));
+      return Number.isFinite(n) ? n : 0;
+    }
+    return 0;
+  };
+
+  // --------- Actions ----------
   async function handleSubmit(e) {
     e.preventDefault();
     if (!message || !buyer || !listing) return;
@@ -249,28 +264,23 @@ export default function ListingDetail() {
     }
   }
 
-  // Open conversation thread for this listing + this buyer
   const openConversation = () => {
     if (!buyer?.email || !listing?.id) return;
     router.push(`/messages?listingId=${listing.id}&buyerEmail=${encodeURIComponent(buyer.email)}`);
   };
 
-  if (!id || loading) return <div className="p-8 text-center text-gray-600">Loading...</div>;
-  if (!listing) return <div className="p-8 text-center text-gray-600">Listing not found.</div>;
+  // --------- Render guards ----------
+  const stillLoading = loadingListing || loadingBuyer;
+  if (!id || stillLoading) {
+    return <div className="p-8 text-center text-gray-600">Loading…</div>;
+  }
+  if (!listing) {
+    return <div className="p-8 text-center text-gray-600">Listing not found.</div>;
+  }
 
   const mainImage =
     listing.image_urls?.length > 0 ? listing.image_urls[0] : '/placeholder-listing.jpg';
   const otherImages = listing.image_urls?.slice(1) || [];
-
-  const toNum = (v) => {
-    if (v === null || v === undefined) return 0;
-    if (typeof v === 'number' && isFinite(v)) return v;
-    if (typeof v === 'string') {
-      const n = Number(v.replace(/[^0-9.-]/g, ''));
-      return Number.isFinite(n) ? n : 0;
-    }
-    return 0;
-  };
 
   // ---------- Broker card helpers (safe fallbacks) ----------
   const brokerFullName = broker
@@ -278,13 +288,13 @@ export default function ListingDetail() {
     : '';
 
   const brokerAvatar =
-    broker?.avatar_url || broker?.photo_url || null; // any headshot column you create
+    broker?.avatar_url || broker?.photo_url || null;
 
   const brokerLogo =
-    broker?.company_logo_url || broker?.logo_url || null; // any logo column you create
+    broker?.company_logo_url || broker?.logo_url || null;
 
   const brokerCardImg =
-    broker?.card_image_url || broker?.business_card_url || null; // business card image if stored
+    broker?.card_image_url || broker?.business_card_url || null;
 
   const initials = (name) =>
     String(name || '')
@@ -294,6 +304,12 @@ export default function ListingDetail() {
       .slice(0, 2)
       .join('')
       .toUpperCase();
+
+  // Case-insensitive finance badge check
+  const sellerFinancingFlag = (() => {
+    const raw = String(listing.seller_financing_considered || '').toLowerCase();
+    return raw === 'yes' || raw === 'maybe';
+  })();
 
   return (
     <main className="bg-gray-50 min-h-screen pb-16 font-sans">
@@ -307,6 +323,7 @@ export default function ListingDetail() {
 
         {/* Hero */}
         <div className="relative w-full h-72 md:h-96 rounded-2xl overflow-hidden shadow-lg">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={mainImage} alt="Business" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-end p-8">
             <h1 className="text-4xl md:text-5xl font-serif font-bold text-white drop-shadow-lg">
@@ -321,7 +338,7 @@ export default function ListingDetail() {
             </p>
             <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
 
-            {/* Save + Open Conversation in hero */}
+            {/* Save + Propose Deal + Open Conversation (hero actions) */}
             {buyer && (
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
@@ -332,6 +349,14 @@ export default function ListingDetail() {
                   }`}
                 >
                   {isSaved ? '★ Saved — Click to Unsave' : '☆ Save Listing'}
+                </button>
+
+                {/* ✅ NEW: Propose Deal CTA */}
+                <button
+                  onClick={() => router.push(`/deal-maker?listingId=${id}`)}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700"
+                >
+                  🤝 Propose Deal
                 </button>
 
                 <button
@@ -345,11 +370,10 @@ export default function ListingDetail() {
           </div>
         </div>
 
-        {/* Broker card (with avatar / logo / business card if available) */}
+        {/* Broker card */}
         {broker && (
           <aside className="mt-6 p-4 border rounded-xl bg-white shadow-sm">
             <div className="flex items-center justify-between gap-4">
-              {/* Left: avatar + name + meta */}
               <div className="flex items-center gap-3">
                 {/* Avatar */}
                 {brokerAvatar ? (
@@ -385,7 +409,6 @@ export default function ListingDetail() {
                 </div>
               </div>
 
-              {/* Right: contact + logo */}
               <div className="flex items-center gap-4">
                 {brokerLogo && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -412,7 +435,6 @@ export default function ListingDetail() {
               </div>
             </div>
 
-            {/* Business card image preview (optional) */}
             {brokerCardImg && (
               <div className="mt-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -438,16 +460,10 @@ export default function ListingDetail() {
               Asking Price: {listing.asking_price ? `$${toNum(listing.asking_price).toLocaleString()}` : 'Inquire'}
             </div>
 
-            {(listing.seller_financing_considered === 'yes' || listing.seller_financing_considered === 'maybe') && (
-              <span className="mt-4 md:mt-0 inline-block bg-green-100 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
-                💰 Seller Financing Terms Available on Request
+            {sellerFinancingFlag && (
+              <span className="mt-4 md:mt-0 inline-block bg-green-50 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
+                Seller Financing Possible
               </span>
-            )}
-            {listing.seller_financing_considered &&
-              ['yes', 'maybe'].includes(String(listing.seller_financing_considered).toLowerCase()) && (
-                <span className="mt-4 md:mt-0 inline-block bg-green-50 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
-                  Seller Financing Possible
-                </span>
             )}
           </div>
 
@@ -578,13 +594,14 @@ export default function ListingDetail() {
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {otherImages.map((url, idx) => (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={idx}
                   src={url}
                   alt={`Business ${idx + 2}`}
                   className="w-full h-44 object-cover rounded-lg"
                   onError={(e) => {
-                    e.target.src = '/placeholder-listing.jpg';
+                    e.currentTarget.src = '/placeholder-listing.jpg';
                   }}
                 />
               ))}
@@ -592,7 +609,7 @@ export default function ListingDetail() {
           </section>
         )}
 
-        {/* AI Enhanced Deal Maker */}
+        {/* AI Enhanced Deal Maker (keep for visibility even with hero CTA) */}
         {buyer && (
           <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
             <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4">
@@ -630,7 +647,7 @@ export default function ListingDetail() {
                 <input
                   type="file"
                   accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png"
-                  onChange={(e) => setAttachment(e.target.files[0])}
+                  onChange={(e) => setAttachment(e.target.files[0] || null)}
                   className="block mt-2"
                 />
                 <div className="flex flex-wrap gap-3">
@@ -640,6 +657,16 @@ export default function ListingDetail() {
                   >
                     Send Message
                   </button>
+
+                  {/* ✅ NEW: Propose Deal (secondary placement) */}
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/deal-maker?listingId=${id}`)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg"
+                  >
+                    🤝 Propose Deal
+                  </button>
+
                   <button
                     onClick={toggleSave}
                     type="button"
@@ -684,5 +711,4 @@ export default function ListingDetail() {
     </main>
   );
 }
-
 
