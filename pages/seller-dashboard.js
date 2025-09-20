@@ -108,6 +108,7 @@ export default function SellerDashboard() {
   const [sellerEmail, setSellerEmail] = useState(null);
 
   const [sellerListings, setSellerListings] = useState([]);
+  the
   const [loadingListings, setLoadingListings] = useState(true);
 
   const [messages, setMessages] = useState([]);
@@ -158,7 +159,7 @@ export default function SellerDashboard() {
         .eq('email', sellerEmail)
         .order('created_at', { ascending: false });
 
-      if (error) {
+    if (error) {
         console.error('Failed to fetch seller listings:', error.message);
         setSellerListings([]);
       } else {
@@ -617,6 +618,19 @@ export default function SellerDashboard() {
                             onDragOver={allowDrop}
                             onDrop={(e) => handleDrop(lid, canonicalEmail, e)}
                           >
+                            {/* ← Back to Dashboard button (smooth scroll to top) */}
+                            <div className="mb-2">
+                              <button
+                                type="button"
+                                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                                // If you prefer a hard return instead:
+                                // onClick={() => router.push('/seller-dashboard')}
+                                className="text-xs text-gray-600 hover:underline"
+                              >
+                                ← Back to dashboard
+                              </button>
+                            </div>
+
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-900 px-2 py-0.5 text-xs font-semibold">
@@ -647,8 +661,7 @@ export default function SellerDashboard() {
                                   onClick={() => {
                                     const nowArchived = archiveStorage.toggle(key);
                                     if (!nowArchived) seenStorage.markNow(key); // unarchive -> mark seen
-                                    // force a refresh by setting state (no-op trick)
-                                    setReplyText(r => ({ ...r }));
+                                    setReplyText(r => ({ ...r })); // refresh
                                   }}
                                   title={isArchived ? 'Unarchive' : 'Archive'}
                                 >
