@@ -1,20 +1,36 @@
 // pages/broker-onboarding.js
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
 
-// Create a public bucket named `broker-media` in Supabase Storage once.
+// Must exist once in Supabase Storage (public)
 const BUCKET = 'broker-media';
+
+function safeName(n = 'upload') {
+  return String(n).replace(/[^\w.\-]+/g, '_').slice(-120);
+}
+function relPathFromPublicUrl(url) {
+  // Public URLs look like: https://.../storage/v1/object/public/<bucket>/<path>
+  try {
+    const u = new URL(url);
+    const ix = u.pathname.indexOf(`/storage/v1/object/public/${BUCKET}/`);
+    if (ix === -1) return null;
+    return u.pathname.slice(ix + `/storage/v1/object/public/${BUCKET}/`.length);
+  } catch {
+    return null;
+  }
+}
 
 export default function BrokerOnboarding() {
   const router = useRouter();
-  const { edit } = router.query; // add ?edit=1 to force showing the form
+  const { edit } = router.query;
 
   const [user, setUser] = useState(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [redirecting, setRedirecting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [bucketHint, setBucketHint] = useState('');
 
   const [form, setForm] = useState({
     email: '',
@@ -26,19 +42,29 @@ export default function BrokerOnboarding() {
     license_number: '',
     license_state: '',
     license_expiry: '',
-
-    // NEW: persisted URLs on the broker row
+    // persisted URLs
     avatar_url: '',
     logo_url: '',
     card_url: '',
   });
 
-  // NEW: local file inputs (optional)
+  // Local chosen files (uploaded on Save)
   const [avatarFile, setAvatarFile] = useState(null);
   const [logoFile, setLogoFile] = useState(null);
   const [cardFile, setCardFile] = useState(null);
 
-  // Require auth; if broker row exists and edit != 1 => go to dashboard
+  // Live previews (ObjectURL or existing URL)
+  const [preview, setPreview] = useState({ avatar: '', logo: '', card: '' });
+
+  // Per-item busy (for Remove button)
+  const [brandBusy, setBrandBusy] = useState({ avatar: false, logo: false, card: false });
+
+  // hidden file inputs (for nicer “Replace” buttons, optional)
+  const avatarInputRef = useRef(null);
+  const logoInputRef = useRef(null);
+  const cardInputRef = useRef(null);
+
+  // ---------- Auth + broker row ----------
   useEffect(() => {
     let mounted = true;
 
@@ -65,12 +91,8 @@ export default function BrokerOnboarding() {
         return;
       }
 
-      // Prefill email from auth
-      if (mounted) {
-        setForm((f) => ({ ...f, email: currUser.email || '' }));
-      }
+      setForm((f) => ({ ...f, email: currUser.email || '' }));
 
-      // Check for an existing broker profile row
       const { data: br, error } = await supabase
         .from('brokers')
         .select(
@@ -84,31 +106,34 @@ export default function BrokerOnboarding() {
         console.warn('Broker fetch error:', error.message);
       }
 
-      // If a row exists AND user didn't explicitly request edit => redirect to dashboard
+      // If row exists and no ?edit=1 => go straight to dashboard
       if (br && !edit) {
         setRedirecting(true);
         router.replace('/broker-dashboard');
         return;
       }
 
-      // Otherwise (new broker or explicit edit), prefill the form and show onboarding
-      if (mounted) {
-        if (br) {
-          setForm({
-            email: br.email || currUser.email || '',
-            first_name: br.first_name || '',
-            last_name: br.last_name || '',
-            phone: br.phone || '',
-            company_name: br.company_name || '',
-            website: br.website || '',
-            license_number: br.license_number || '',
-            license_state: br.license_state || '',
-            license_expiry: br.license_expiry || '',
-            avatar_url: br.avatar_url || '',
-            logo_url: br.logo_url || '',
-            card_url: br.card_url || '',
-          });
-        }
+      if (mounted && br) {
+        setForm({
+          email: br.email || currUser.email || '',
+          first_name: br.first_name || '',
+          last_name: br.last_name || '',
+          phone: br.phone || '',
+          company_name: br.company_name || '',
+          website: br.website || '',
+          license_number: br.license_number || '',
+          license_state: br.license_state || '',
+          license_expiry: br.license_expiry || '',
+          avatar_url: br.avatar_url || '',
+          logo_url: br.logo_url || '',
+          card_url: br.card_url || '',
+        });
+
+        setPreview({
+          avatar: br.avatar_url || '',
+          logo: br.logo_url || '',
+          card: br.card_url || '',
+        });
       }
     })();
 
@@ -122,17 +147,83 @@ export default function BrokerOnboarding() {
     setForm((f) => ({ ...f, [name]: value }));
   };
 
-  // NEW: upload helper (only uploads when a new file is chosen)
+  // ---------- File pickers with live preview ----------
+  const onPick = (kind) => (e) => {
+    const f = e.target.files?.[0] || null;
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    if (kind === 'avatar') {
+      setAvatarFile(f);
+    } else if (kind === 'logo') {
+      setLogoFile(f);
+    } else {
+      setCardFile(f);
+    }
+    setPreview((p) => ({ ...p, [kind]: url }));
+  };
+
+  // ---------- Upload helper (called on Save) ----------
   async function uploadIfNeeded(file, keyPrefix) {
     if (!file || !user) return null;
-    const clean = String(file.name || 'upload').replace(/[^\w.\-]+/g, '_').slice(-120);
+    const clean = safeName(file.name || 'upload');
     const path = `broker-${user.id}/${Date.now()}_${keyPrefix}_${clean}`;
-    const { error, data } = await supabase.storage.from(BUCKET).upload(path, file, { upsert: false });
-    if (error) throw new Error(error.message);
-    const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(data.path);
+
+    const up = await supabase.storage.from(BUCKET).upload(path, file, {
+      upsert: false,
+      contentType: file.type || 'application/octet-stream',
+    });
+
+    if (up.error) {
+      const msg = up.error.message || '';
+      if (/bucket/i.test(msg) && /not.*found/i.test(msg)) {
+        setBucketHint(
+          `Storage bucket "${BUCKET}" not found. Create a PUBLIC bucket named "${BUCKET}" in Supabase → Storage.`
+        );
+      }
+      throw new Error(up.error.message);
+    }
+
+    const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(up.data.path);
     return pub?.publicUrl || null;
   }
 
+  // ---------- Remove one media (immediate DB update) ----------
+  async function removeOne(kind) {
+    if (!user) return;
+    setBrandBusy((b) => ({ ...b, [kind]: true }));
+    try {
+      // Figure out which column + current URL
+      const map = { avatar: 'avatar_url', logo: 'logo_url', card: 'card_url' };
+      const col = map[kind];
+      const currentUrl = form[col];
+
+      // Try to delete the underlying storage object (best-effort)
+      const rel = currentUrl ? relPathFromPublicUrl(currentUrl) : null;
+      if (rel) {
+        await supabase.storage.from(BUCKET).remove([rel]);
+      }
+
+      // Null the column
+      const { error: upErr } = await supabase
+        .from('brokers')
+        .update({ [col]: null })
+        .eq('auth_id', user.id);
+      if (upErr) throw new Error(upErr.message);
+
+      // Clear local form + preview + file
+      setForm((f) => ({ ...f, [col]: '' }));
+      setPreview((p) => ({ ...p, [kind]: '' }));
+      if (kind === 'avatar') setAvatarFile(null);
+      if (kind === 'logo') setLogoFile(null);
+      if (kind === 'card') setCardFile(null);
+    } catch (e) {
+      alert(e.message || 'Remove failed.');
+    } finally {
+      setBrandBusy((b) => ({ ...b, [kind]: false }));
+    }
+  }
+
+  // ---------- Save profile ----------
   const saveProfile = async (e) => {
     e.preventDefault();
     if (!user) {
@@ -141,8 +232,9 @@ export default function BrokerOnboarding() {
     }
     setSaving(true);
     setError('');
+    setBucketHint('');
 
-    // Guard: form email must match authed user email
+    // Guard: email in form must match authed email
     const formEmail = String(form.email || '').trim().toLowerCase();
     const userEmail = String(user.email || '').trim().toLowerCase();
     if (formEmail && userEmail && formEmail !== userEmail) {
@@ -152,7 +244,7 @@ export default function BrokerOnboarding() {
     }
 
     try {
-      // Upload any newly selected files
+      // Upload any newly chosen files
       const [avatarUrl, logoUrl, cardUrl] = await Promise.all([
         uploadIfNeeded(avatarFile, 'avatar'),
         uploadIfNeeded(logoFile, 'logo'),
@@ -161,7 +253,7 @@ export default function BrokerOnboarding() {
 
       const payload = {
         auth_id: user.id,
-        email: user.email, // source of truth
+        email: user.email,
         first_name: form.first_name?.trim() || null,
         last_name: form.last_name?.trim() || null,
         phone: form.phone?.trim() || null,
@@ -169,21 +261,19 @@ export default function BrokerOnboarding() {
         website: form.website?.trim() || null,
         license_number: form.license_number?.trim() || null,
         license_state: form.license_state?.trim() || null,
-        license_expiry: form.license_expiry || null, // YYYY-MM-DD
-
-        // Persist URLs (new uploads override existing)
-        avatar_url: avatarUrl || form.avatar_url || null,
-        logo_url:   logoUrl   || form.logo_url   || null,
-        card_url:   cardUrl   || form.card_url   || null,
+        license_expiry: form.license_expiry || null,
+        // Overwrite URLs only if new upload exists; otherwise keep current (or null)
+        avatar_url: avatarUrl ?? (form.avatar_url || null),
+        logo_url: logoUrl ?? (form.logo_url || null),
+        card_url: cardUrl ?? (form.card_url || null),
       };
 
-      // Upsert by auth_id (RLS allows only own row)
       const { error: upErr } = await supabase
         .from('brokers')
         .upsert(payload, { onConflict: 'auth_id' });
       if (upErr) throw upErr;
 
-      // Confirm exists (warm cache)
+      // Warm cache / confirm
       const { error: checkErr } = await supabase
         .from('brokers')
         .select('id')
@@ -208,15 +298,12 @@ export default function BrokerOnboarding() {
     );
   }
 
-  // Not signed in → send to broker login
   if (!user) {
     return (
       <main className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="bg-white p-6 rounded shadow max-w-md w-full text-center">
           <h1 className="text-2xl font-bold mb-2">Broker Onboarding</h1>
-          <p className="text-gray-600 mb-4">
-            Please sign in to start your broker profile.
-          </p>
+          <p className="text-gray-600 mb-4">Please sign in to start your broker profile.</p>
           <a
             href="/broker-login"
             className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
@@ -347,40 +434,168 @@ export default function BrokerOnboarding() {
             </p>
           </section>
 
-          {/* NEW: Branding & Media */}
+          {/* Branding & Media */}
           <section className="bg-gray-50 rounded border p-4">
-            <h2 className="text-lg font-semibold mb-3">Branding & Media (optional)</h2>
+            <h2 className="text-lg font-semibold mb-3">Branding &amp; Media (optional)</h2>
+
+            {bucketHint && (
+              <div className="mb-3 p-3 rounded border border-amber-200 bg-amber-50 text-amber-900 text-sm">
+                {bucketHint}
+              </div>
+            )}
+
             <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium">Headshot</label>
-                <input type="file" accept="image/*" onChange={(e) => setAvatarFile(e.target.files?.[0] || null)} />
-                {form.avatar_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.avatar_url} alt="avatar" className="mt-2 h-20 w-20 object-cover rounded-full border" />
-                )}
+              {/* Avatar */}
+              <div className="border rounded-xl p-4 bg-white flex flex-col gap-3">
+                <div>
+                  <div className="text-sm font-medium text-gray-800">Headshot</div>
+                  <div className="text-xs text-gray-500">Professional photo (JPG/PNG).</div>
+                </div>
+                <div className="aspect-[1/1] bg-gray-50 border rounded-lg overflow-hidden flex items-center justify-center">
+                  {preview.avatar || form.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={preview.avatar || form.avatar_url}
+                      alt="Headshot"
+                      className="object-cover w-full h-full"
+                    />
+                  ) : (
+                    <span className="text-xs text-gray-400">No headshot yet</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={onPick('avatar')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-50"
+                  >
+                    {form.avatar_url || preview.avatar ? 'Replace' : 'Upload'}
+                  </button>
+                  {(form.avatar_url || preview.avatar) && (
+                    <button
+                      type="button"
+                      disabled={brandBusy.avatar}
+                      onClick={() => removeOne('avatar')}
+                      className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-50"
+                    >
+                      {brandBusy.avatar ? 'Removing…' : 'Remove'}
+                    </button>
+                  )}
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium">Company logo</label>
-                <input type="file" accept="image/*" onChange={(e) => setLogoFile(e.target.files?.[0] || null)} />
-                {form.logo_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.logo_url} alt="logo" className="mt-2 h-12 object-contain border bg-white p-1" />
-                )}
+
+              {/* Logo */}
+              <div className="border rounded-xl p-4 bg-white flex flex-col gap-3">
+                <div>
+                  <div className="text-sm font-medium text-gray-800">Company logo</div>
+                  <div className="text-xs text-gray-500">Square works best (PNG/JPG).</div>
+                </div>
+                <div className="aspect-[4/3] bg-gray-50 border rounded-lg overflow-hidden flex items-center justify-center">
+                  {preview.logo || form.logo_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={preview.logo || form.logo_url}
+                      alt="Logo"
+                      className="object-contain w-full h-full bg-white"
+                    />
+                  ) : (
+                    <span className="text-xs text-gray-400">No logo yet</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={onPick('logo')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => logoInputRef.current?.click()}
+                    className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-50"
+                  >
+                    {form.logo_url || preview.logo ? 'Replace' : 'Upload'}
+                  </button>
+                  {(form.logo_url || preview.logo) && (
+                    <button
+                      type="button"
+                      disabled={brandBusy.logo}
+                      onClick={() => removeOne('logo')}
+                      className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-50"
+                    >
+                      {brandBusy.logo ? 'Removing…' : 'Remove'}
+                    </button>
+                  )}
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium">Business card</label>
-                <input type="file" accept="image/*" onChange={(e) => setCardFile(e.target.files?.[0] || null)} />
-                {form.card_url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={form.card_url} alt="card" className="mt-2 h-20 object-contain border bg-white p-1" />
-                )}
+
+              {/* Business card */}
+              <div className="border rounded-xl p-4 bg-white flex flex-col gap-3">
+                <div>
+                  <div className="text-sm font-medium text-gray-800">Business card</div>
+                  <div className="text-xs text-gray-500">PNG/JPG; crop if needed.</div>
+                </div>
+                <div className="aspect-[4/3] bg-gray-50 border rounded-lg overflow-hidden flex items-center justify-center">
+                  {preview.card || form.card_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={preview.card || form.card_url}
+                      alt="Business card"
+                      className="object-contain w-full h-full bg-white"
+                    />
+                  ) : (
+                    <span className="text-xs text-gray-400">No card yet</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    ref={cardInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={onPick('card')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => cardInputRef.current?.click()}
+                    className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-50"
+                  >
+                    {form.card_url || preview.card ? 'Replace' : 'Upload'}
+                  </button>
+                  {(form.card_url || preview.card) && (
+                    <button
+                      type="button"
+                      disabled={brandBusy.card}
+                      onClick={() => removeOne('card')}
+                      className="px-3 py-1.5 text-sm border rounded-lg bg-white hover:bg-gray-50"
+                    >
+                      {brandBusy.card ? 'Removing…' : 'Remove'}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">Supported: PNG/JPG. We’ll store them and show on your listings.</p>
+
+            <p className="text-xs text-gray-500 mt-3">
+              Files are uploaded when you click <strong>Save &amp; Continue</strong>.
+              Use <em>Remove</em> to clear an existing image immediately.
+            </p>
           </section>
 
           {/* Actions */}
-          {error && <div className="text-sm text-red-600">{error}</div>}
+          {error && (
+            <div className="p-3 rounded border border-red-200 bg-red-50 text-red-700 text-sm">
+              {error}
+            </div>
+          )}
           <div className="flex items-center gap-3">
             <button
               type="submit"
