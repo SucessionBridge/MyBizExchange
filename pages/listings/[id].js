@@ -1,714 +1,733 @@
 // pages/listings/[id].js
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import supabase from '../../lib/supabaseClient';
 import GrowthSimulator from '../../components/GrowthSimulator';
+
+const currency = (n) =>
+  typeof n === 'number'
+    ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
+    : n;
+
+const toNum = (val) => {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  const cleaned = String(val).replace(/[^\d.-]/g, '');
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? 0 : n;
+};
+
+const ts = (iso) => {
+  try {
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  } catch {
+    return '';
+  }
+};
 
 export default function ListingDetail() {
   const router = useRouter();
   const { id } = router.query;
 
   const [listing, setListing] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  const [user, setUser] = useState(null);
   const [buyer, setBuyer] = useState(null);
+  const [buyerLoading, setBuyerLoading] = useState(true);
 
-  const [loadingListing, setLoadingListing] = useState(true);
-  const [loadingBuyer, setLoadingBuyer] = useState(true);
+  const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [hasThread, setHasThread] = useState(false);
+  const [messageCount, setMessageCount] = useState(0);
+  const lastMessage = useMemo(() => (messages && messages.length ? messages[0] : null), [messages]);
 
-  const [message, setMessage] = useState('');
-  const [success, setSuccess] = useState(false);
-  const [attachment, setAttachment] = useState(null);
+  const [composerMsg, setComposerMsg] = useState('');
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [files, setFiles] = useState([]);
+  const fileInputRef = useRef(null);
+  const [sending, setSending] = useState(false);
 
-  // Save state
-  const [isSaved, setIsSaved] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Broker info
-  const [broker, setBroker] = useState(null);
+  const [emailing, setEmailing] = useState(false);
 
-  const toTitleCase = (str) =>
-    str
-      ? str
-          .toLowerCase()
-          .split(' ')
-          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ')
-      : '';
-
-  // --------- Load listing ----------
+  // Fetch listing
   useEffect(() => {
     if (!id) return;
+    let active = true;
     (async () => {
-      setLoadingListing(true);
-      const { data, error } = await supabase
-        .from('sellers')
-        .select('*')
-        .eq('id', id)
-        .single();
-      if (error) {
-        console.error('Error loading listing:', error);
-        setListing(null);
-      } else {
-        setListing(data);
+      setLoading(true);
+      const { data, error } = await supabase.from('sellers').select('*').eq('id', id).single();
+      if (active) {
+        if (error) {
+          console.error('Error loading listing', error);
+          setListing(null);
+        } else {
+          setListing(data);
+        }
+        setLoading(false);
       }
-      setLoadingListing(false);
     })();
+    return () => {
+      active = false;
+    };
   }, [id]);
 
-  // --------- Load buyer profile ----------
+  // Fetch user & buyer row
   useEffect(() => {
+    let active = true;
     (async () => {
-      setLoadingBuyer(true);
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
+      setBuyerLoading(true);
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      if (userErr) console.error('auth.getUser error', userErr);
+      const authUser = userData?.user || null;
+      if (!active) return;
+
+      setUser(authUser);
+
+      if (!authUser) {
         setBuyer(null);
-        setLoadingBuyer(false);
+        setBuyerLoading(false);
         return;
       }
 
-      // Prefer auth_id, fallback to email
-      let { data: buyerData } = await supabase
-        .from('buyers')
-        .select('*')
-        .eq('auth_id', user.id)
-        .maybeSingle();
-
-      if (!buyerData) {
-        const { data: emailMatch } = await supabase
+      // Try by auth_id then fallback by email
+      let buyerRow = null;
+      if (authUser?.id) {
+        const { data: byAuth, error: buyerErr1 } = await supabase
           .from('buyers')
           .select('*')
-          .eq('email', user.email)
+          .eq('auth_id', authUser.id)
           .maybeSingle();
-        buyerData = emailMatch || null;
+        if (buyerErr1) console.error('buyers by auth_id error', buyerErr1);
+        if (byAuth) buyerRow = byAuth;
       }
-
-      setBuyer(buyerData || null);
-      setLoadingBuyer(false);
+      if (!buyerRow && authUser?.email) {
+        const { data: byEmail, error: buyerErr2 } = await supabase
+          .from('buyers')
+          .select('*')
+          .eq('email', authUser.email)
+          .maybeSingle();
+        if (buyerErr2) console.error('buyers by email error', buyerErr2);
+        if (byEmail) buyerRow = byEmail;
+      }
+      setBuyer(buyerRow || null);
+      setBuyerLoading(false);
     })();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  // --------- Check if saved ----------
-  useEffect(() => {
-    if (!id || !buyer) return;
-
-    const listingId = Number(id);
-    const listingFilter = Number.isFinite(listingId) ? listingId : id;
-
-    (async () => {
-      const { data, error } = await supabase
-        .from('saved_listings')
-        .select('id')
-        .eq('listing_id', listingFilter)
-        .or(`buyer_auth_id.eq.${buyer.auth_id},buyer_email.eq.${buyer.email}`)
-        .maybeSingle();
-
-      if (error) {
-        console.debug('Check saved failed:', error.message);
-        setIsSaved(false);
-      } else {
-        setIsSaved(!!data);
-      }
-    })();
-  }, [id, buyer]);
-
-  // --------- Load broker (if listing references one) ----------
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const bId = listing?.broker_id;
-      if (!bId) return;
-      const { data, error } = await supabase
-        .from('brokers')
-        .select('*')
-        .eq('id', bId)
-        .maybeSingle();
-      if (!cancelled) setBroker(error ? null : (data || null));
-    })();
-    return () => { cancelled = true; };
-  }, [listing?.broker_id]);
-
-  // --------- Helpers ----------
-  function parseDescriptionSections(description) {
-    if (!description) return [];
-    const lines = description
-      .split('\n')
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-    const sections = [];
-    let currentSection = { title: '', content: '' };
-
-    lines.forEach((line) => {
-      if (line.endsWith(':')) {
-        if (currentSection.title) sections.push(currentSection);
-        currentSection = { title: line.slice(0, -1), content: '' };
-      } else {
-        currentSection.content += (currentSection.content ? '\n' : '') + line;
-      }
-    });
-
-    if (currentSection.title) sections.push(currentSection);
-
-    return sections;
-  }
-
-  const toNum = (v) => {
-    if (v === null || v === undefined) return 0;
-    if (typeof v === 'number' && isFinite(v)) return v;
-    if (typeof v === 'string') {
-      const n = Number(v.replace(/[^0-9.-]/g, ''));
-      return Number.isFinite(n) ? n : 0;
-    }
-    return 0;
-  };
-
-  // --------- Actions ----------
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!message || !buyer || !listing) return;
-
-    const formData = new FormData();
-    formData.append('message', message);
-    if (listing.email) formData.append('seller_email', listing.email);
-    formData.append('listing_id', listing.id);
-    formData.append('buyer_name', buyer.name || buyer.full_name || buyer.email);
-    formData.append('buyer_email', buyer.email);
-    formData.append('topic', 'business-inquiry');
-    formData.append('extension', 'successionbridge');
-    if (attachment) formData.append('attachment', attachment);
-
-    try {
-      const response = await fetch('/api/send-message', {
-        method: 'POST',
-        body: formData,
-      });
-      const result = await response.json();
-
-      if (!response.ok) {
-        console.error('❌ send-message failed:', result);
-        alert(result?.error || 'Message failed to send.');
-      } else {
-        alert('✅ Message sent to the seller!');
-        setMessage('');
-        setAttachment(null);
-        setSuccess(true);
-      }
-    } catch (err) {
-      console.error('❌ Error sending message:', err);
-      alert('Something went wrong.');
-    }
-  }
-
-  async function toggleSave() {
-    if (saving) return;
-    setSaving(true);
-
-    const { data: authData } = await supabase.auth.getUser();
-    const authUser = authData?.user || null;
-
-    if (!authUser || !buyer) {
-      alert('You must be logged in as a buyer to save listings.');
-      setSaving(false);
+  // Fetch thread messages for this buyer+listing
+  const fetchMessages = async (b, listingId) => {
+    if (!b?.email || !listingId) {
+      setMessages([]);
+      setHasThread(false);
+      setMessageCount(0);
       return;
     }
-
-    const listingId = Number(id);
-    const listingValue = Number.isFinite(listingId) ? listingId : id;
-
+    setMessagesLoading(true);
     try {
-      if (isSaved) {
-        const { error } = await supabase
-          .from('saved_listings')
-          .delete()
-          .eq('listing_id', listingValue)
-          .or(`buyer_auth_id.eq.${authUser.id},buyer_email.eq.${buyer.email}`);
-        if (error) throw error;
-        setIsSaved(false);
-        alert('✅ Listing removed from your saved items.');
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('buyer_email', b.email)
+        .eq('listing_id', listingId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) {
+        console.error('load messages error', error);
+        setMessages([]);
+        setHasThread(false);
+        setMessageCount(0);
       } else {
-        const payload = {
-          listing_id: listingValue,
-          buyer_email: buyer.email,
-          buyer_auth_id: authUser.id,
-        };
-
-        const { error } = await supabase
-          .from('saved_listings')
-          .upsert([payload], { onConflict: 'buyer_auth_id,listing_id' });
-        if (error) throw error;
-        setIsSaved(true);
-        alert('✅ Listing saved to your profile.');
+        setMessages(data || []);
+        setHasThread((data || []).length > 0);
+        setMessageCount((data || []).length);
       }
-    } catch (error) {
-      console.error(isSaved ? 'Unsave failed:' : 'Save failed:', error);
-      alert(isSaved ? "Couldn't remove this listing." : "Couldn't save this listing.");
+    } catch (e) {
+      console.error('load messages exception', e);
+      setMessages([]);
+      setHasThread(false);
+      setMessageCount(0);
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!buyerLoading && !loading) {
+      fetchMessages(buyer, id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buyerLoading, loading, id]);
+
+  // Saved listing state
+  const checkSaved = async () => {
+    if (!listing || (!user && !buyer)) return;
+    setSaving(true);
+    try {
+      const q = supabase.from('saved_listings').select('*').eq('listing_id', listing.id);
+      let resp;
+      if (user?.id) {
+        resp = await q.eq('buyer_auth_id', user.id).maybeSingle();
+      } else if (buyer?.email) {
+        resp = await q.eq('buyer_email', buyer.email).maybeSingle();
+      } else {
+        setSaved(false);
+        setSaving(false);
+        return;
+      }
+      const { data, error } = resp;
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 = No rows found
+        console.error('checkSaved error', error);
+      }
+      setSaved(!!data);
+    } catch (e) {
+      console.error('checkSaved exception', e);
+      setSaved(false);
     } finally {
       setSaving(false);
     }
-  }
-
-  async function handleEmailMe() {
-    if (!buyer || !buyer.email) {
-      alert('You must be logged in to receive listings by email.');
-      return;
-    }
-
-    const { error } = await supabase.from('email_requests').insert([
-      { buyer_email: buyer.email, listing_id: id }
-    ]);
-
-    if (error) {
-      console.error('Email request failed:', error);
-      alert('There was a problem sending this listing by email.');
-    } else {
-      alert('✅ This listing will be emailed to you.');
-    }
-  }
-
-  const openConversation = () => {
-    if (!buyer?.email || !listing?.id) return;
-    router.push(`/messages?listingId=${listing.id}&buyerEmail=${encodeURIComponent(buyer.email)}`);
   };
 
-  // --------- Render guards ----------
-  const stillLoading = loadingListing || loadingBuyer;
-  if (!id || stillLoading) {
-    return <div className="p-8 text-center text-gray-600">Loading…</div>;
+  useEffect(() => {
+    if (!loading && !buyerLoading) {
+      checkSaved();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, buyerLoading]);
+
+  const toggleSave = async () => {
+    if (!listing) return;
+    if (!user && !buyer) {
+      alert('Please log in and complete your buyer profile to save listings.');
+      return;
+    }
+    setSaving(true);
+    try {
+      if (!saved) {
+        // Insert
+        const payload = { listing_id: listing.id };
+        if (user?.id) payload.buyer_auth_id = user.id;
+        if (buyer?.email) payload.buyer_email = buyer.email;
+        const { error } = await supabase.from('saved_listings').insert(payload);
+        if (error) throw error;
+        setSaved(true);
+      } else {
+        // Delete by composite
+        let del = supabase.from('saved_listings').delete().eq('listing_id', listing.id);
+        if (user?.id) del = del.eq('buyer_auth_id', user.id);
+        else if (buyer?.email) del = del.eq('buyer_email', buyer.email);
+        const { error } = await del;
+        if (error) throw error;
+        setSaved(false);
+      }
+    } catch (e) {
+      console.error('toggleSave error', e);
+      alert('Sorry, there was a problem updating your saved listings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleEmailMe = async () => {
+    if (!listing) return;
+    if (!buyer?.email) {
+      alert('Please log in and complete your buyer profile so we can email this listing to you.');
+      return;
+    }
+    setEmailing(true);
+    try {
+      const { error } = await supabase.from('email_requests').insert({
+        buyer_email: buyer.email,
+        listing_id: listing.id,
+      });
+      if (error) throw error;
+      alert('We will email this listing to you shortly!');
+    } catch (e) {
+      console.error('email_me error', e);
+      alert('Sorry, could not queue the email. Please try again.');
+    } finally {
+      setEmailing(false);
+    }
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!buyer || !buyer.email) {
+      alert('Please complete your buyer profile before contacting the seller.');
+      return;
+    }
+    if (!composerMsg.trim()) {
+      alert('Please enter a message.');
+      return;
+    }
+    setSending(true);
+    try {
+      // Seller email heuristic
+      const sellerEmail =
+        listing?.seller_email ||
+        listing?.contact_email ||
+        listing?.email ||
+        null;
+
+      const fd = new FormData();
+      fd.append('message', composerMsg);
+      fd.append('topic', 'business-inquiry');
+      fd.append('extension', 'successionbridge');
+      fd.append('listing_id', String(listing.id));
+      fd.append('buyer_name', buyer?.name || '');
+      fd.append('buyer_email', buyer?.email || '');
+      if (sellerEmail) fd.append('seller_email', sellerEmail);
+
+      // Include first file if any (support multi by appending all)
+      if (files && files.length > 0) {
+        // append all, but at least first works with existing API
+        Array.from(files).forEach((file, idx) => {
+          fd.append(idx === 0 ? 'file' : `file_${idx + 1}`, file);
+        });
+      }
+
+      const res = await fetch('/api/send-message', {
+        method: 'POST',
+        body: fd,
+      });
+
+      if (!res.ok) {
+        const t = await res.text();
+        console.error('send-message failed', t);
+        throw new Error('Failed to send message');
+      }
+
+      alert('Message sent!');
+      setComposerMsg('');
+      setFiles([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      // Refresh thread state
+      await fetchMessages(buyer, id);
+    } catch (err) {
+      console.error('handleSendMessage error', err);
+      alert('Sorry, there was a problem sending your message.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const heroImage = useMemo(() => {
+    const arr = listing?.image_urls || [];
+    return Array.isArray(arr) && arr.length ? arr[0] : null;
+  }, [listing]);
+
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-10">
+        <div className="h-8 w-48 bg-gray-200 animate-pulse rounded mb-6" />
+        <div className="h-64 w-full bg-gray-200 animate-pulse rounded" />
+      </div>
+    );
   }
+
   if (!listing) {
-    return <div className="p-8 text-center text-gray-600">Listing not found.</div>;
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-10">
+        <Link href="/listings" className="text-blue-600 hover:underline">
+          ← Back to listings
+        </Link>
+        <h1 className="text-2xl font-semibold mt-6">Listing not found.</h1>
+      </div>
+    );
   }
 
-  const mainImage =
-    listing.image_urls?.length > 0 ? listing.image_urls[0] : '/placeholder-listing.jpg';
-  const otherImages = listing.image_urls?.slice(1) || [];
+  const locationText =
+    listing?.location ||
+    [listing?.city, listing?.state_or_province].filter(Boolean).join(', ') ||
+    '';
 
-  // ---------- Broker card helpers (safe fallbacks) ----------
-  const brokerFullName = broker
-    ? [broker.first_name, broker.last_name].filter(Boolean).join(' ')
-    : '';
-
-  const brokerAvatar =
-    broker?.avatar_url || broker?.photo_url || null;
-
-  const brokerLogo =
-    broker?.company_logo_url || broker?.logo_url || null;
-
-  const brokerCardImg =
-    broker?.card_image_url || broker?.business_card_url || null;
-
-  const initials = (name) =>
-    String(name || '')
-      .split(' ')
-      .map((s) => s.trim()[0])
-      .filter(Boolean)
-      .slice(0, 2)
-      .join('')
-      .toUpperCase();
-
-  // Case-insensitive finance badge check
-  const sellerFinancingFlag = (() => {
-    const raw = String(listing.seller_financing_considered || '').toLowerCase();
-    return raw === 'yes' || raw === 'maybe';
-  })();
+  const aiDescription = listing?.ai_description || '';
+  const businessDescription = listing?.business_description || '';
 
   return (
-    <main className="bg-gray-50 min-h-screen pb-16 font-sans">
-      <div className="max-w-5xl mx-auto px-4">
-        <a
-          href="/listings"
-          className="inline-block mt-6 mb-8 text-sm text-blue-600 hover:underline"
-        >
-          ← Back to Marketplace
-        </a>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <Link href="/listings" className="text-blue-600 hover:underline">
+        ← Back to listings
+      </Link>
 
-        {/* Hero */}
-        <div className="relative w-full h-72 md:h-96 rounded-2xl overflow-hidden shadow-lg">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={mainImage} alt="Business" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black bg-opacity-30 flex flex-col justify-end p-8">
-            <h1 className="text-4xl md:text-5xl font-serif font-bold text-white drop-shadow-lg">
-              {toTitleCase(
-                listing.hide_business_name
-                  ? 'Confidential Business Listing'
-                  : listing.business_name || `${listing.industry} Business`
-              )}
-            </h1>
-            <p className="bg-black bg-opacity-60 text-white px-3 py-1 rounded text-sm font-mono inline-block mt-2">
-              Ad ID: {listing.ad_id}
-            </p>
-            <p className="text-gray-100 text-lg mt-1">{toTitleCase(listing.location)}</p>
+      {/* Hero */}
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2">
+          {heroImage ? (
+            <img
+              src={heroImage}
+              alt={listing.business_name || 'Business'}
+              className="w-full h-72 object-cover rounded-xl border"
+            />
+          ) : (
+            <div className="w-full h-72 bg-gray-100 rounded-xl border flex items-center justify-center text-gray-500">
+              No image available
+            </div>
+          )}
+        </div>
+        <div className="md:col-span-1">
+          <div className="p-5 border rounded-xl shadow-sm bg-white">
+            <h1 className="text-xl font-semibold">{listing.business_name || 'Business for Sale'}</h1>
+            {locationText ? <p className="text-gray-600 mt-1">{locationText}</p> : null}
+            <div className="mt-4 space-y-2">
+              {listing.asking_price != null ? (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Asking Price</span>
+                  <span className="font-medium">{currency(toNum(listing.asking_price))}</span>
+                </div>
+              ) : null}
+              {listing.annual_revenue != null ? (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Annual Revenue</span>
+                  <span className="font-medium">{currency(toNum(listing.annual_revenue))}</span>
+                </div>
+              ) : null}
+              {listing.annual_profit != null || listing.sde != null ? (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">{listing.sde != null ? 'SDE' : 'Annual Profit'}</span>
+                  <span className="font-medium">
+                    {currency(toNum(listing.sde != null ? listing.sde : listing.annual_profit))}
+                  </span>
+                </div>
+              ) : null}
+              {listing.financing_type ? (
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Financing</span>
+                  <span className="font-medium">{listing.financing_type}</span>
+                </div>
+              ) : null}
+              {listing.seller_financing_considered ? (
+                <div className="text-sm text-green-700 bg-green-50 border border-green-100 rounded px-2 py-1 inline-block">
+                  Seller financing considered
+                </div>
+              ) : null}
+            </div>
+          </div>
 
-            {/* Save + Propose Deal + Open Conversation (hero actions) */}
-            {buyer && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  onClick={toggleSave}
-                  disabled={saving}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium ${
-                    isSaved ? 'bg-white text-blue-700' : 'bg-blue-600 text-white'
+          {/* Broker Card (if present) */}
+          {listing.broker_id ? (
+            <div className="p-5 border rounded-xl shadow-sm bg-white mt-4">
+              <h3 className="font-semibold">Listed by Broker</h3>
+              <p className="text-sm text-gray-600 mt-1">Broker ID: {listing.broker_id}</p>
+              {listing.website ? (
+                <a href={listing.website} target="_blank" rel="noreferrer" className="text-blue-600 text-sm mt-2 inline-block">
+                  Visit Website →
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Contact Seller */}
+      <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2">
+          <div className="p-5 border rounded-xl bg-white shadow-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Contact Seller</h2>
+              <button
+                onClick={() => router.push(`/deal-maker?listingId=${encodeURIComponent(id)}`)}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                title="AI Enhanced Deal Maker"
+              >
+                🤝 Propose Deal
+              </button>
+            </div>
+
+            {/* Access / Profile Gate */}
+            {!user || !buyer ? (
+              <div className="mt-4 p-4 border border-red-200 bg-red-50 text-red-800 rounded">
+                Please log in and complete your buyer profile before contacting the seller.
+              </div>
+            ) : (
+              <>
+                {/* Banner */}
+                <div
+                  className={`mt-4 p-4 rounded border ${
+                    hasThread
+                      ? 'bg-blue-50 border-blue-100 text-blue-900'
+                      : 'bg-amber-50 border-amber-200 text-amber-900'
                   }`}
                 >
-                  {isSaved ? '★ Saved — Click to Unsave' : '☆ Save Listing'}
-                </button>
+                  {hasThread ? (
+                    <div>
+                      <p className="font-medium">
+                        You already have a conversation on this listing. Messages you send here will be added to that thread.
+                      </p>
+                      {lastMessage ? (
+                        <div className="mt-2 text-sm flex items-start gap-2">
+                          <span className="px-2 py-0.5 rounded bg-white/70 border text-gray-700">
+                            {lastMessage.from_seller ? 'Seller' : 'You'}
+                          </span>
+                          <span className="truncate flex-1">
+                            {String(lastMessage.message || '').replace(/\s+/g, ' ').slice(0, 120)}
+                            {String(lastMessage.message || '').length > 120 ? '…' : ''}
+                          </span>
+                          <span className="text-gray-600 shrink-0">{ts(lastMessage.created_at)}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className="font-medium">This will start a new conversation with the seller.</p>
+                  )}
+                </div>
 
-                {/* ✅ NEW: Propose Deal CTA */}
-                <button
-                  onClick={() => router.push(`/deal-maker?listingId=${id}`)}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700"
-                >
-                  🤝 Propose Deal
-                </button>
+                {/* Composer */}
+                <form onSubmit={handleSendMessage} className="mt-4">
+                  <label htmlFor="message" className="block text-sm font-medium text-gray-700">
+                    Your message
+                  </label>
+                  <textarea
+                    id="message"
+                    className="mt-1 w-full border rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                    rows={4}
+                    placeholder="Introduce yourself and share why you're interested…"
+                    value={composerMsg}
+                    onChange={(e) => setComposerMsg(e.target.value)}
+                    disabled={sending}
+                  />
+                  {/* Attachments toggle */}
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setAttachOpen((v) => !v)}
+                      className="text-blue-700 hover:text-blue-900 text-sm"
+                    >
+                      {attachOpen ? 'Hide attachments' : 'Attach files (optional)'}
+                    </button>
+                    {attachOpen ? (
+                      <div className="mt-2">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          multiple
+                          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg"
+                          onChange={(e) => setFiles(e.target.files)}
+                          className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-3 file:rounded-md file:border-0 file:text-sm file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+                          disabled={sending}
+                        />
+                        {files && files.length ? (
+                          <div className="mt-2 text-xs text-gray-600">
+                            {Array.from(files).map((f, i) => (
+                              <div key={i} className="truncate">
+                                • {f.name}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
 
-                <button
-                  onClick={openConversation}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium bg-white/90 text-blue-700 border border-blue-200 hover:bg-white"
-                >
-                  💬 Open Conversation
-                </button>
-              </div>
+                  {/* Buttons Row */}
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <button
+                      type="submit"
+                      disabled={sending}
+                      className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {sending ? 'Sending…' : 'Send Message'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => router.push(`/deal-maker?listingId=${encodeURIComponent(id)}`)}
+                      className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+                    >
+                      🤝 Propose Deal
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={toggleSave}
+                      disabled={saving}
+                      className="px-4 py-2 rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {saving ? (saved ? 'Unsaving…' : 'Saving…') : saved ? 'Unsave Listing' : 'Save Listing'}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleEmailMe}
+                      disabled={emailing}
+                      className="px-4 py-2 rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      {emailing ? 'Emailing…' : 'Email Me This Listing'}
+                    </button>
+
+                    <Link
+                      href={`/messages?listingId=${encodeURIComponent(id)}&buyerEmail=${encodeURIComponent(buyer?.email || '')}`}
+                      className="text-blue-700 hover:text-blue-900 text-sm inline-flex items-center gap-2 ml-auto"
+                    >
+                      💬 View Full Conversation
+                      <span className="inline-flex items-center justify-center min-w-[22px] h-[22px] text-xs px-2 rounded-full bg-gray-200 text-gray-800">
+                        {messagesLoading ? '…' : messageCount}
+                      </span>
+                    </Link>
+                  </div>
+                </form>
+              </>
             )}
           </div>
         </div>
 
-        {/* Broker card */}
-        {broker && (
-          <aside className="mt-6 p-4 border rounded-xl bg-white shadow-sm">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                {/* Avatar */}
-                {brokerAvatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={brokerAvatar}
-                    alt={brokerFullName || 'Broker'}
-                    className="h-12 w-12 rounded-full object-cover border"
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                  />
-                ) : (
-                  <div className="h-12 w-12 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center font-semibold border">
-                    {initials(brokerFullName || broker?.company_name || 'BR')}
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-sm text-gray-500">Listed by</p>
-                  <p className="text-base font-medium">
-                    {brokerFullName || 'Broker'}
-                    {broker?.verified && (
-                      <span className="ml-2 text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        Verified
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-sm text-gray-600">{broker?.company_name || '—'}</p>
-                  <p className="text-xs text-gray-500">
-                    {broker?.license_number
-                      ? `Lic # ${broker.license_number}${broker.license_state ? ` (${broker.license_state})` : ''}`
-                      : ''}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4">
-                {brokerLogo && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={brokerLogo}
-                    alt="Company logo"
-                    className="h-10 w-auto object-contain border rounded bg-white p-1"
-                    onError={(e) => (e.currentTarget.style.display = 'none')}
-                  />
-                )}
-                <div className="text-right">
-                  {broker?.phone && <div className="text-sm">{broker.phone}</div>}
-                  {broker?.website && (
-                    <a
-                      href={broker.website}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-sm text-blue-600 hover:underline"
-                    >
-                      Website
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {brokerCardImg && (
-              <div className="mt-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={brokerCardImg}
-                  alt="Business card"
-                  className="w-full max-h-48 object-contain rounded border"
-                  onError={(e) => (e.currentTarget.style.display = 'none')}
-                />
-              </div>
-            )}
-          </aside>
-        )}
-
         {/* Financial Highlights */}
-        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-          <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-6 border-b-2 border-[#F59E0B] pb-2">
-            Financial Highlights
-          </h2>
-
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
-            <div className="text-3xl md:text-4xl font-bold text-emerald-700">
-              Asking Price: {listing.asking_price ? `$${toNum(listing.asking_price).toLocaleString()}` : 'Inquire'}
-            </div>
-
-            {sellerFinancingFlag && (
-              <span className="mt-4 md:mt-0 inline-block bg-green-50 text-green-800 text-sm font-semibold px-3 py-1 rounded border border-green-200">
-                Seller Financing Possible
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6 text-gray-800">
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Annual Revenue</p>
-              <p className="text-lg font-bold">{listing.annual_revenue ? `$${toNum(listing.annual_revenue).toLocaleString()}` : 'N/A'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Annual Profit</p>
-              <p className="text-lg font-bold">{listing.annual_profit ? `$${toNum(listing.annual_profit).toLocaleString()}` : 'N/A'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">SDE</p>
-              <p className="text-lg font-bold">{listing.sde ? `$${toNum(listing.sde).toLocaleString()}` : 'N/A'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Inventory Value</p>
-              <p className="text-lg font-bold">{listing.inventory_value ? `$${toNum(listing.inventory_value).toLocaleString()}` : 'N/A'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Equipment Value</p>
-              <p className="text-lg font-bold">{listing.equipment_value ? `$${toNum(listing.equipment_value).toLocaleString()}` : 'N/A'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Employees</p>
-              <p className="text-lg font-bold">{listing.employees || 'N/A'}</p>
-            </div>
-          </div>
-        </section>
-
-        {/* 📈 Growth & Value Simulator */}
-        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-          <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4">
-            Growth & Value Simulator
-          </h2>
-          <p className="text-gray-700 mb-4">
-            See how modest revenue growth can increase SDE and potential exit value over time.
-            Buyers often price on earnings × a multiple.
-          </p>
-          <GrowthSimulator
-            baseRevenue={toNum(listing.annual_revenue)}
-            baseSDE={toNum(listing.sde ?? listing.annual_profit)}
-            defaultGrowthPct={5}
-            defaultYears={3}
-            defaultMultiple={2.5}
-          />
-        </section>
-
-        {/* Business Description */}
-        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-          <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4 border-b-2 border-[#F59E0B] pb-2">
-            Business Description
-          </h2>
-          {listing.description_choice === 'ai' && listing.ai_description ? (
-            parseDescriptionSections(listing.ai_description).map(({ title, content }, i) => (
-              <section key={i} className="mb-6">
-                <h3 className="text-xl font-semibold mb-2">{title}</h3>
-                <p className="whitespace-pre-line text-gray-800 leading-relaxed">{content}</p>
-              </section>
-            ))
-          ) : (
-            <p className="text-gray-800 leading-relaxed text-lg">
-              {listing.business_description || 'No description available.'}
-            </p>
-          )}
-        </section>
-
-        {/* Business Details */}
-        <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-          <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4 border-b-2 border-[#F59E0B] pb-2">
-            Business Details
-          </h2>
-          <div className="grid md:grid-cols-2 gap-6 text-gray-800">
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Monthly Lease</p>
-              <p className="text-lg font-bold">{listing.monthly_lease ? `$${toNum(listing.monthly_lease).toLocaleString()}` : 'N/A'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Home-Based</p>
-              <p className="text-lg font-bold">{listing.home_based ? 'Yes' : 'No'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Relocatable</p>
-              <p className="text-lg font-bold">{listing.relocatable ? 'Yes' : 'No'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Years in Business</p>
-              <p className="text-lg font-bold">{listing.years_in_business || 'N/A'}</p>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Financing Type</p>
-              <p className="text-lg font-bold">{listing.financing_type?.replace(/-/g, ' ') || 'N/A'}</p>
-            </div>
-
-            {/* Website - show only if logged-in buyer */}
-            <div className="bg-gray-50 p-4 rounded-lg shadow-sm md:col-span-2">
-              <p className="text-xs uppercase text-gray-500 font-semibold">Website</p>
-              {buyer ? (
-                listing.website ? (
-                  <p className="text-lg font-bold">
-                    <a
-                      href={listing.website}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      {listing.website}
-                    </a>
-                  </p>
-                ) : (
-                  <p className="text-lg font-bold italic text-gray-500">Website not provided</p>
-                )
-              ) : (
-                <p className="text-lg font-bold italic text-red-600">
-                  Login to view website details
-                </p>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* Additional Photos */}
-        {otherImages.length > 0 && (
-          <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-            <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4 border-b-2 border-[#F59E0B] pb-2">
-              Additional Photos
-            </h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {otherImages.map((url, idx) => (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  key={idx}
-                  src={url}
-                  alt={`Business ${idx + 2}`}
-                  className="w-full h-44 object-cover rounded-lg"
-                  onError={(e) => {
-                    e.currentTarget.src = '/placeholder-listing.jpg';
-                  }}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* AI Enhanced Deal Maker (keep for visibility even with hero CTA) */}
-        {buyer && (
-          <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-            <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4">
-              AI Enhanced Deal Maker
-            </h2>
-            <p className="text-gray-700 mb-4">
-              Use AI to structure a creative offer (seller financing, rent-to-own, profit share, etc.)
-              based on this business’s details.
-            </p>
-            <button
-              onClick={() => router.push(`/deal-maker?listingId=${id}`)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-lg font-medium"
-            >
-              Launch Deal Builder
-            </button>
-          </section>
-        )}
-
-        {/* Buyer Actions */}
-        {buyer ? (
-          <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-            <h2 className="text-3xl font-serif font-semibold text-[#1E3A8A] mb-4">Contact Seller</h2>
-            {success ? (
-              <p className="text-green-600">✅ Your message was sent!</p>
-            ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <textarea
-                  className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-400"
-                  rows="5"
-                  placeholder="Write your message to the seller..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  required
-                />
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png"
-                  onChange={(e) => setAttachment(e.target.files[0] || null)}
-                  className="block mt-2"
-                />
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="submit"
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg"
-                  >
-                    Send Message
-                  </button>
-
-                  {/* ✅ NEW: Propose Deal (secondary placement) */}
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/deal-maker?listingId=${id}`)}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg"
-                  >
-                    🤝 Propose Deal
-                  </button>
-
-                  <button
-                    onClick={toggleSave}
-                    type="button"
-                    disabled={saving}
-                    className="bg-gray-100 hover:bg-gray-200 px-5 py-2 rounded-lg border"
-                  >
-                    {isSaved ? 'Unsave' : 'Save Listing'}
-                  </button>
-                  <button
-                    onClick={handleEmailMe}
-                    type="button"
-                    className="bg-gray-100 hover:bg-gray-200 px-5 py-2 rounded-lg border"
-                  >
-                    Email Me This Listing
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openConversation}
-                    className="bg-white hover:bg-gray-50 text-blue-700 border border-blue-200 px-5 py-2 rounded-lg"
-                  >
-                    💬 Open Conversation
-                  </button>
+        <div className="md:col-span-1">
+          <div className="p-5 border rounded-xl bg-white shadow-sm">
+            <h3 className="font-semibold">Financial Highlights</h3>
+            <dl className="mt-3 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-gray-500">Asking</dt>
+                <dd className="font-medium">{currency(toNum(listing.asking_price)) || '—'}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-500">Revenue</dt>
+                <dd className="font-medium">{currency(toNum(listing.annual_revenue)) || '—'}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-500">{listing.sde != null ? 'SDE' : 'Profit'}</dt>
+                <dd className="font-medium">
+                  {listing.sde != null
+                    ? currency(toNum(listing.sde))
+                    : currency(toNum(listing.annual_profit)) || '—'}
+                </dd>
+              </div>
+              {listing.monthly_lease != null ? (
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">Monthly Lease</dt>
+                  <dd className="font-medium">{currency(toNum(listing.monthly_lease))}</dd>
                 </div>
-              </form>
-            )}
-          </section>
-        ) : (
-          <section className="bg-white rounded-2xl shadow-md p-8 mt-10">
-            <p className="text-red-600">
-              You must{' '}
-              <a
-                href={`/buyer-onboarding?redirect=/listings/${id}`}
-                className="underline font-semibold"
-              >
-                complete your buyer profile
-              </a>{' '}
-              before contacting the seller.
-            </p>
-          </section>
-        )}
+              ) : null}
+            </dl>
+          </div>
+        </div>
       </div>
-    </main>
+
+      {/* Growth & Value Simulator */}
+      <div className="mt-8 p-5 border rounded-xl bg-white shadow-sm">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Growth & Value Simulator</h2>
+          <button
+            onClick={() => router.push(`/deal-maker?listingId=${encodeURIComponent(id)}`)}
+            className="text-green-700 hover:text-green-900"
+            title="AI Enhanced Deal Maker"
+          >
+            Launch AI Enhanced Deal Maker →
+          </button>
+        </div>
+        <div className="mt-4">
+          <GrowthSimulator
+            askingPrice={toNum(listing.asking_price)}
+            annualRevenue={toNum(listing.annual_revenue)}
+            sde={toNum(listing.sde ?? listing.annual_profit)}
+          />
+        </div>
+      </div>
+
+      {/* Description */}
+      {(aiDescription || businessDescription) && (
+        <div className="mt-8 p-5 border rounded-xl bg-white shadow-sm">
+          <h2 className="text-lg font-semibold">Business Description</h2>
+          {aiDescription ? (
+            <div className="mt-2 whitespace-pre-line leading-relaxed text-gray-800">{aiDescription}</div>
+          ) : null}
+          {!aiDescription && businessDescription ? (
+            <div className="mt-2 whitespace-pre-line leading-relaxed text-gray-800">{businessDescription}</div>
+          ) : null}
+        </div>
+      )}
+
+      {/* Details */}
+      <div className="mt-8 p-5 border rounded-xl bg-white shadow-sm">
+        <h2 className="text-lg font-semibold">Business Details</h2>
+        <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+          {locationText ? (
+            <div className="flex justify-between">
+              <dt className="text-gray-500">Location</dt>
+              <dd className="font-medium">{locationText}</dd>
+            </div>
+          ) : null}
+          {listing.website ? (
+            <div className="flex justify-between">
+              <dt className="text-gray-500">Website</dt>
+              <dd className="font-medium truncate">
+                <a href={listing.website} className="text-blue-700 hover:underline" target="_blank" rel="noreferrer">
+                  {listing.website}
+                </a>
+              </dd>
+            </div>
+          ) : null}
+          {listing.financing_type ? (
+            <div className="flex justify-between">
+              <dt className="text-gray-500">Financing Type</dt>
+              <dd className="font-medium">{listing.financing_type}</dd>
+            </div>
+          ) : null}
+          {listing.ad_id ? (
+            <div className="flex justify-between">
+              <dt className="text-gray-500">Ad #</dt>
+              <dd className="font-medium">{listing.ad_id}</dd>
+            </div>
+          ) : null}
+        </dl>
+      </div>
+
+      {/* Additional Photos */}
+      {Array.isArray(listing.image_urls) && listing.image_urls.length > 1 ? (
+        <div className="mt-8 p-5 border rounded-xl bg-white shadow-sm">
+          <h2 className="text-lg font-semibold">Additional Photos</h2>
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {listing.image_urls.slice(1).map((url, idx) => (
+              <img
+                key={idx}
+                src={url}
+                alt={`Photo ${idx + 2}`}
+                className="w-full h-40 object-cover rounded-lg border"
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Footer Actions */}
+      <div className="mt-10 flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => router.push(`/deal-maker?listingId=${encodeURIComponent(id)}`)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700"
+        >
+          🤝 Propose Deal
+        </button>
+        <button
+          onClick={toggleSave}
+          disabled={saving}
+          className="px-4 py-2 rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {saving ? (saved ? 'Unsaving…' : 'Saving…') : saved ? 'Unsave Listing' : 'Save Listing'}
+        </button>
+        <button
+          onClick={handleEmailMe}
+          disabled={emailing}
+          className="px-4 py-2 rounded-lg border border-gray-300 text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {emailing ? 'Emailing…' : 'Email Me This Listing'}
+        </button>
+      </div>
+    </div>
   );
 }
-
