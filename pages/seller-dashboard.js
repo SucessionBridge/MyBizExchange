@@ -131,6 +131,9 @@ export default function SellerDashboard() {
   // Simple “AI” (smart template) draft
   const [draftingFor, setDraftingFor] = useState(null);
 
+  // CSV explainer modal
+  const [csvHelpOpen, setCsvHelpOpen] = useState(false);
+
   // Realtime
   const channelsRef = useRef([]);
 
@@ -492,6 +495,7 @@ export default function SellerDashboard() {
                             <button
                               onClick={() => router.push(`/sellers?edit=${lst.id}#financing`)}
                               className="text-[11px] text-emerald-700 underline"
+                              title="Add seller financing terms to attract more buyers"
                             >
                               Add financing terms
                             </button>
@@ -505,13 +509,25 @@ export default function SellerDashboard() {
                         <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                           <MiniStat label="Buyers" value={stats.uniqueBuyers} />
                           <MiniStat label="Awaiting" value={stats.awaiting} highlight={stats.awaiting > 0} />
-                          <button
-                            onClick={() => exportCSV(lst.id)}
-                            className="border rounded px-2 py-1 hover:bg-gray-100"
-                            title="Export CSV of inquiries"
-                          >
-                            ⬇️ Export CSV
-                          </button>
+                          {/* Export + Help */}
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => exportCSV(lst.id)}
+                              className="border rounded px-2 py-1 hover:bg-gray-100"
+                              title="Download a spreadsheet summary of buyer conversations for this listing"
+                            >
+                              ⬇️ Export CSV
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCsvHelpOpen(true)}
+                              className="w-6 h-6 inline-flex items-center justify-center rounded-full border text-gray-600 hover:bg-gray-50"
+                              title="What's in this CSV?"
+                              aria-label="What's in this CSV?"
+                            >
+                              ?
+                            </button>
+                          </div>
                         </div>
 
                         <div className="mt-3 flex gap-2">
@@ -546,7 +562,16 @@ export default function SellerDashboard() {
           {/* Conversations */}
           <div className="bg-white p-6 rounded-xl shadow">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-blue-800">Buyer Conversations</h2>
+              <div className="flex items-center gap-3">
+                <h2 className="text-xl font-semibold text-blue-800">Buyer Conversations</h2>
+                <button
+                  type="button"
+                  onClick={() => setCsvHelpOpen(true)}
+                  className="text-xs text-blue-700 hover:underline"
+                >
+                  What’s in the CSV?
+                </button>
+              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="search"
@@ -814,6 +839,11 @@ export default function SellerDashboard() {
         </div>
       </div>
 
+      {/* CSV Explainer modal */}
+      {csvHelpOpen && (
+        <CsvExplainerModal onClose={() => setCsvHelpOpen(false)} />
+      )}
+
       {/* Calendar modal */}
       {calKey && (
         <CalendarModal
@@ -954,6 +984,65 @@ function CalendarModal({ title, onTitle, slots, onSlots, duration, onDuration, o
         <p className="mt-3 text-xs text-gray-500">
           We generate Google Calendar links for each proposed time. Times are shown in your current timezone.
         </p>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------ CSV Explainer ------------------------------ */
+function CsvExplainerModal({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+      <div className="bg-white w-full max-w-md rounded-xl shadow-xl p-5">
+        <div className="flex items-start justify-between">
+          <h3 className="text-lg font-semibold">What’s in this CSV?</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 ml-3"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mt-3 space-y-2 text-sm text-gray-700">
+          <p>
+            The CSV is a <em>summary of buyer conversations</em> for a single listing, so you can sort/filter in Excel/Sheets or import into a CRM.
+          </p>
+
+          <div className="bg-gray-50 border rounded p-3">
+            <div className="font-medium mb-1">Each row = one buyer thread</div>
+            <ul className="list-disc pl-5 space-y-1">
+              <li><strong>Buyer Name</strong></li>
+              <li><strong>Buyer Email</strong></li>
+              <li><strong>Messages</strong> (count)</li>
+              <li><strong>Last Message At</strong> (your local time)</li>
+              <li><strong>Awaiting Reply</strong> (Yes/No)</li>
+            </ul>
+          </div>
+
+          <div className="bg-blue-50 border border-blue-100 rounded p-3">
+            <div className="font-medium text-blue-900 mb-1">Popular uses</div>
+            <ul className="list-disc pl-5 text-blue-900 space-y-1">
+              <li>Create a follow-up list (filter <em>Awaiting Reply = Yes</em>)</li>
+              <li>Import into a CRM or email tool</li>
+              <li>Share a quick traction snapshot</li>
+            </ul>
+          </div>
+
+          <div className="text-xs text-gray-600">
+            Note: the CSV <strong>does not include message bodies or attachments</strong>—just thread-level metadata.
+          </div>
+        </div>
+
+        <div className="mt-4 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+          >
+            Got it
+          </button>
+        </div>
       </div>
     </div>
   );
