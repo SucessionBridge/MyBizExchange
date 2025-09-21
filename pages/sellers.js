@@ -193,9 +193,15 @@ export default function SellerWizard() {
 
   const [step, setStep] = useState(1);
   const [previewMode, setPreviewMode] = useState(false);
-  const [imagePreviews, setImagePreviews] = useState([]);
+
+  // 👉 EDIT-MODE additions
   const [isEditing, setIsEditing] = useState(false);
   const [listingId, setListingId] = useState(null);
+  const [loadingExisting, setLoadingExisting] = useState(false);
+
+  // Images: separate existing server URLs from new local previews
+  const [existingUrls, setExistingUrls] = useState([]); // from DB
+  const [imagePreviews, setImagePreviews] = useState([]); // blob: previews for new files
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
@@ -250,9 +256,106 @@ export default function SellerWizard() {
     proudOf: '',
     adviceToBuyer: '',
     annualProfit: '',
-    // seller_financing_considered, down_payment, interest_rate, term_length
-    images: []
+    seller_financing_considered: '',
+    down_payment: '',
+    interest_rate: '',
+    term_length: '',
+    images: [] // File objects for NEW uploads only
   });
+
+  // ======== EDIT MODE: load listing when ?edit=<id> =========
+  useEffect(() => {
+    const { edit } = router.query || {};
+    if (!authUser || !edit) return;
+
+    (async () => {
+      try {
+        setLoadingExisting(true);
+        const { data, error } = await supabase
+          .from('sellers')
+          .select('*')
+          .eq('id', edit)
+          .single();
+
+        if (error) throw error;
+        // Optional guard: ensure owner
+        if (data?.email && authUser?.email && data.email !== authUser.email) {
+          alert('You can only edit your own listing.');
+          router.replace('/seller-dashboard');
+          return;
+        }
+
+        setIsEditing(true);
+        setListingId(edit);
+
+        // Map DB snake_case -> wizard form keys
+        setFormData(prev => ({
+          ...prev,
+          name: prev.name || '',
+          email: authUser.email || prev.email || '',
+          businessName: data.business_name || '',
+          hideBusinessName: !!data.hide_business_name,
+          industry: data.industry || '',
+          location: data.location || '',
+          location_city: data.location_city || data.city || '',
+          location_state: data.location_state || data.state_or_province || '',
+          years_in_business: data.years_in_business || '',
+          owner_hours_per_week: data.owner_hours_per_week || '',
+          website: data.website || '',
+          annualRevenue: data.annual_revenue ?? '',
+          sde: data.sde ?? '',
+          askingPrice: data.asking_price ?? '',
+          employees: data.employees ?? '',
+          monthly_lease: data.monthly_lease ?? '',
+          inventory_value: data.inventory_value ?? '',
+          equipment_value: data.equipment_value ?? '',
+          includesInventory: !!data.includes_inventory,
+          includesBuilding: !!data.includes_building,
+          relocatable: !!data.relocatable,
+          home_based: !!data.home_based,
+          financingType: (data.financing_type || 'buyer-financed').replace(/\s+/g, '-'),
+          businessDescription: data.business_description || '',
+          aiDescription: data.ai_description || '',
+          descriptionChoice: data.description_choice || (data.ai_description ? 'ai' : 'manual'),
+          ownerInvolvement: data.owner_involvement || '',
+          growthPotential: data.growth_potential || '',
+          reasonForSelling: data.reason_for_selling || '',
+          trainingOffered: data.training_offered || '',
+          sentenceSummary: data.sentence_summary || '',
+          customers: data.customers || '',
+          bestSellers: data.best_sellers || '',
+          customerProfile: data.customer_profile || '',
+          repeatCustomers: data.repeat_customers || '',
+          keepsThemComing: data.keeps_them_coming || '',
+          proudOf: data.proud_of || '',
+          adviceToBuyer: data.advice_to_buyer || '',
+          annualProfit: data.annual_profit ?? '',
+          seller_financing_considered: data.seller_financing_considered || '',
+          down_payment: data.down_payment ?? '',
+          interest_rate: (data.seller_financing_interest_rate ?? data.interest_rate) ?? '',
+          term_length: data.term_length ?? '',
+          images: [] // start with none; existing images live in existingUrls
+        }));
+
+        const urls = Array.isArray(data.image_urls) ? data.image_urls.slice(0, 8) : [];
+        setExistingUrls(urls);
+        setPreviewMode(false);
+
+        // If deep-linked to financing, scroll after paint
+        if (typeof window !== 'undefined' && window.location.hash === '#financing') {
+          setTimeout(() => {
+            const el = document.getElementById('financing');
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 50);
+        }
+      } catch (err) {
+        console.error('Failed to load listing for edit:', err);
+        alert('Could not load the listing to edit.');
+      } finally {
+        setLoadingExisting(false);
+      }
+    })();
+  }, [router.query, authUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // If they switch to preview and there's no AI text yet, generate once
   useEffect(() => {
@@ -332,7 +435,8 @@ export default function SellerWizard() {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
-    const remaining = Math.max(0, 8 - (formData.images?.length || 0));
+    const currentCount = existingUrls.length + imagePreviews.length;
+    const remaining = Math.max(0, 8 - currentCount);
     const selected = files.slice(0, remaining);
 
     const filtered = [];
@@ -349,23 +453,36 @@ export default function SellerWizard() {
     }
     if (!filtered.length) return;
 
-    const newPreviews = filtered.map(file => URL.createObjectURL(file));
-
+    const newBlobs = filtered.map(file => URL.createObjectURL(file));
     setFormData(prev => ({ ...prev, images: [...prev.images, ...filtered] }));
-    setImagePreviews(prev => [...prev, ...newPreviews]);
+    setImagePreviews(prev => [...prev, ...newBlobs]);
   };
 
   const deleteImageAt = (index) => {
-    const url = imagePreviews[index];
-    if (url) URL.revokeObjectURL(url);
-
-    setImagePreviews(prev => prev.filter((_, i) => i !== index));
-    setFormData(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
+    // If index is inside existing URLs, remove from server list
+    if (index < existingUrls.length) {
+      setExistingUrls(prev => prev.filter((_, i) => i !== index));
+      return;
+    }
+    // Else remove a new blob preview and its file
+    const blobIdx = index - existingUrls.length;
+    setImagePreviews(prev => {
+      const url = prev[blobIdx];
+      try { if (url && url.startsWith('blob:')) URL.revokeObjectURL(url); } catch {}
+      return prev.filter((_, i) => i !== blobIdx);
+    });
+    setFormData(prev => ({
+      ...prev,
+      images: prev.images.filter((_, i) => i !== blobIdx)
+    }));
   };
 
   useEffect(() => {
+    // cleanup blob urls on unmount
     return () => {
-      imagePreviews.forEach(u => URL.revokeObjectURL(u));
+      imagePreviews.forEach(u => {
+        try { if (u && u.startsWith('blob:')) URL.revokeObjectURL(u); } catch {}
+      });
     };
   }, [imagePreviews]);
 
@@ -450,13 +567,14 @@ export default function SellerWizard() {
         brokerId = b.id;
       }
 
-      // Upload images to Supabase Storage
+      // Upload NEW images to Supabase Storage
       const uploadedImageUrls = [];
       for (const file of formData.images) {
-        const filePath = `seller-${Date.now()}-${file.name}`;
+        const fileSafe = file.name.replace(/[^\w.\-]+/g, '_');
+        const filePath = `seller-${authUser.id}/${Date.now()}-${fileSafe}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('seller-images')
-          .upload(filePath, file);
+          .upload(filePath, file, { cacheControl: '3600', upsert: false });
 
         if (uploadError) {
           console.error("❌ Image upload failed:", uploadError.message);
@@ -474,10 +592,10 @@ export default function SellerWizard() {
 
       const cleanString = (val) => (typeof val === 'string' && val.trim() === '') ? null : val?.trim() || null;
 
-      // 🔐 Use verified auth email/id — avoids orphaned listings
+      // Build payload (snake_case to match DB)
       const payload = {
         name: cleanString(formData.name) || 'Unnamed Seller',
-        email: authUser.email, // keep using verified email field in your schema
+        email: authUser.email,
         business_name: cleanString(formData.businessName) || 'Unnamed Business',
         hide_business_name: !!formData.hideBusinessName,
         industry: cleanString(formData.industry) || 'Unknown Industry',
@@ -503,7 +621,7 @@ export default function SellerWizard() {
         includes_building: !!formData.includesBuilding,
         relocatable: !!formData.relocatable,
         home_based: !!formData.home_based,
-        financing_type: cleanString(formData.financingType) || 'buyer-financed',
+        financing_type: cleanString(formData.financingType)?.replace(/-/g, ' ') || 'buyer financed',
         description_choice: formData.descriptionChoice,
         business_description: formData.descriptionChoice === 'manual' ? cleanString(formData.businessDescription) : null,
         ai_description: formData.descriptionChoice === 'ai' ? cleanString(formData.aiDescription) : null,
@@ -528,33 +646,50 @@ export default function SellerWizard() {
 
         auth_id: authUser.id, // RLS owner link
         financing_preference: cleanString(formData.financingPreference),
-        down_payment: Number(formData.downPayment) || 0,
-        term_length: Number(formData.termLength) || 0,
-        seller_financing_interest_rate: Number(formData.sellerFinancingInterestRate || formData.interestRate) || 0,
-        interest_rate: Number(formData.interestRate) || 0,
-        image_urls: uploadedImageUrls,
+        down_payment: Number(formData.down_payment) || 0,
+        term_length: Number(formData.term_length) || 0,
+        seller_financing_interest_rate: Number(formData.sellerFinancingInterestRate || formData.interest_rate) || 0,
+        interest_rate: Number(formData.interest_rate) || 0,
+
+        // IMAGES:
+        image_urls: isEditing
+          ? [...existingUrls, ...uploadedImageUrls].slice(0, 8)
+          : uploadedImageUrls,
 
         broker_id: brokerId, // 👈 ties listing to verified broker when in broker mode
       };
 
-      const res = await fetch('/api/submit-seller-listing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      if (isEditing && listingId) {
+        // ✅ UPDATE existing listing
+        const { error } = await supabase.from('sellers').update(payload).eq('id', listingId);
+        if (error) throw error;
+        setSubmitSuccess(true);
+        alert('Listing updated!');
+        // If they came for financing, keep them here; otherwise you may redirect:
+        // router.push(`/listings/${listingId}`);
+      } else {
+        // ✅ CREATE new listing via your existing API
+        const res = await fetch('/api/submit-seller-listing', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        console.error("❌ Submission failed:", errData);
-        setSubmitError(errData.error || 'Unknown error');
-        setIsSubmitting(false);
-        return;
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.error("❌ Submission failed:", errData);
+          setSubmitError(errData.error || 'Unknown error');
+          setIsSubmitting(false);
+          return;
+        }
+
+        setSubmitSuccess(true);
+        setSubmitError('');
+        alert('Listing created!');
+        // router.push('/seller-dashboard');
       }
 
-      setSubmitSuccess(true);
-      setSubmitError('');
       setIsSubmitting(false);
-      // router.push('/thank-you');
     } catch (error) {
       console.error("❌ Submission error:", error);
       setSubmitError('Submission error, please try again.');
@@ -565,6 +700,8 @@ export default function SellerWizard() {
   const renderBackButton = () => (
     <button onClick={() => setStep(s => Math.max(1, s - 1))} className="text-sm text-blue-600 underline mt-2">Back</button>
   );
+
+  const allPreviewUrls = () => [...existingUrls, ...imagePreviews];
 
   const renderImages = () => (
     <div className="space-y-2">
@@ -577,9 +714,9 @@ export default function SellerWizard() {
         className="w-full border rounded p-2"
       />
       <p className="text-xs text-gray-500">Up to 8 photos • JPG/PNG • max 8MB each</p>
-      {imagePreviews.length > 0 && (
+      {allPreviewUrls().length > 0 && (
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-3 mt-2">
-          {imagePreviews.map((src, i) => (
+          {allPreviewUrls().map((src, i) => (
             <div key={i} className="relative group">
               <img
                 src={src}
@@ -604,7 +741,7 @@ export default function SellerWizard() {
 
   const renderPreview = () => {
     const toTitleCase = (str) =>
-      str
+      String(str || '')
         .toLowerCase()
         .split(' ')
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
@@ -620,6 +757,8 @@ export default function SellerWizard() {
       }
     };
 
+    const previews = allPreviewUrls();
+
     return (
       <div className="bg-white rounded shadow p-6 space-y-8 font-serif text-gray-900">
         <h2 className="text-4xl font-bold tracking-tight mb-1">{getListingTitle()}</h2>
@@ -629,9 +768,9 @@ export default function SellerWizard() {
             : formData.location}
         </p>
 
-        {(imagePreviews.length > 0) && (
+        {(previews.length > 0) && (
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
-            {imagePreviews.map((src, i) => (
+            {previews.map((src, i) => (
               <div key={i} className="relative">
                 <img
                   src={src}
@@ -822,11 +961,11 @@ export default function SellerWizard() {
               disabled={isSubmitting}
               className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded disabled:opacity-50"
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Listing'}
+              {isSubmitting ? (isEditing ? 'Updating...' : 'Submitting...') : (isEditing ? 'Update Listing' : 'Submit Listing')}
             </button>
           </div>
-          {isSubmitting && <p className="text-sm text-gray-600">⏳ Please wait while we submit your listing...</p>}
-          {submitSuccess && <p className="text-sm text-green-600">✅ Your listing has been submitted successfully!</p>}
+          {isSubmitting && <p className="text-sm text-gray-600">⏳ Please wait…</p>}
+          {submitSuccess && <p className="text-sm text-green-600">✅ Done!</p>}
           {submitError && <p className="text-sm text-red-600">❌ {submitError}</p>}
         </div>
 
@@ -870,7 +1009,7 @@ export default function SellerWizard() {
 
   // --------------- Render ---------------
 
-  if (loadingAuth) {
+  if (loadingAuth || loadingExisting) {
     return <main className="bg-white min-h-screen p-6 font-sans"><div className="max-w-2xl mx-auto">Loading…</div></main>;
   }
 
@@ -899,7 +1038,9 @@ export default function SellerWizard() {
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
       </Head>
       <div className="max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6 text-center">{previewMode ? 'Listing Preview' : 'Seller Onboarding'}</h1>
+        <h1 className="text-3xl font-bold mb-6 text-center">
+          {previewMode ? (isEditing ? 'Edit Listing Preview' : 'Listing Preview') : (isEditing ? 'Edit Listing' : 'Seller Onboarding')}
+        </h1>
         {previewMode ? renderPreview() : (
           step === 1 ? (
             <div className="space-y-4">
@@ -925,7 +1066,12 @@ export default function SellerWizard() {
               />
 
               <label className="flex items-center"><input name="hideBusinessName" type="checkbox" checked={formData.hideBusinessName} onChange={handleChange} className="mr-2" />Hide Business Name</label>
-              <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
+              <div className="flex gap-2">
+                <button onClick={() => setStep(2)} className="w-full bg-blue-600 text-white py-3 rounded">{isEditing ? 'Continue Editing' : 'Next'}</button>
+                {isEditing && (
+                  <button onClick={() => setPreviewMode(true)} className="w-full bg-gray-200 text-gray-900 py-3 rounded">Preview</button>
+                )}
+              </div>
             </div>
           ) : step === 2 ? (
             <div className="space-y-4">
@@ -1193,7 +1339,7 @@ export default function SellerWizard() {
               </p>
 
               {/* 🔹 Seller Financing Encouragement Box */}
-              <div className="bg-gray-50 p-4 rounded border mt-4">
+              <div id="financing" className="bg-gray-50 p-4 rounded border mt-4">
                 <h3 className="font-semibold mb-2">Seller Financing Option</h3>
                 <p className="text-sm text-gray-600 mb-2">
                   Offering seller financing can help you sell faster and attract more qualified buyers.
@@ -1249,7 +1395,12 @@ export default function SellerWizard() {
 
               {renderImages()}
 
-              <button onClick={() => setStep(3)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
+              <div className="flex gap-2">
+                <button onClick={() => setStep(3)} className="w-full bg-blue-600 text-white py-3 rounded">Next</button>
+                {isEditing && (
+                  <button onClick={() => setPreviewMode(true)} className="w-full bg-gray-200 text-gray-900 py-3 rounded">Preview</button>
+                )}
+              </div>
               {renderBackButton()}
             </div>
           ) : (
@@ -1295,7 +1446,19 @@ export default function SellerWizard() {
                 </button>
               </div>
 
-              {renderBackButton()}
+              <div className="flex gap-3">
+                <button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded disabled:opacity-50"
+                >
+                  {isSubmitting ? (isEditing ? 'Updating…' : 'Submitting…') : (isEditing ? 'Update Listing' : 'Submit Listing')}
+                </button>
+                {renderBackButton()}
+              </div>
+              {isSubmitting && <p className="text-sm text-gray-600">⏳ Please wait while we submit your listing...</p>}
+              {submitSuccess && <p className="text-sm text-green-600">✅ Your listing has been submitted successfully!</p>}
+              {submitError && <p className="text-sm text-red-600">❌ {submitError}</p>}
             </div>
           )
         )}
