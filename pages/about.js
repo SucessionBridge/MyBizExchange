@@ -42,7 +42,7 @@ export default function AboutPage() {
 
         {/* Our Story */}
         <section className="mt-12 md:mt-16 bg-white rounded-xl border border-gray-200 shadow-sm p-6 md:p-8">
-          <h2 className="text-2xl font-semibold text-[#2E3A59]">Why we built SuccessionBridge</h2>
+          <h2 className="text-2xl font-semibold text-[#2E3A59]">Why we built MyBizExchange</h2>
           <div className="mt-3 space-y-4 text-gray-700 leading-relaxed">
             {SHOW_FOUNDER_NAME ? (
               <p>
