@@ -143,7 +143,7 @@ export default function Header() {
       <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
         {/* Logo */}
         <Link href="/?force=true">
-          <span className="flex items-center gap-2 text-2xl font-serif font-bold cursor-pointer select-none" title="MyBizExchange — mybizexchange.com">
+          <span className="flex items-center gap-0 text-2xl font-serif font-bold cursor-pointer select-none" title="MyBizExchange — mybizexchange.com">
             <span className="text-[#1E3A8A]">My<span className="sr-only"> </span>Biz</span>
             <span className="text-[#F59E0B] flex items-center">
               Exchange
