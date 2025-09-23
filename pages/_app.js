@@ -1,5 +1,6 @@
 // pages/_app.js
 import '../styles/globals.css';
+import Head from 'next/head';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { SessionContextProvider } from '@supabase/auth-helpers-react';
@@ -47,11 +48,31 @@ export default function App({ Component, pageProps }) {
     <SessionContextProvider supabaseClient={supabase} initialSession={pageProps.initialSession}>
       <ErrorBoundary>
         <div className={`${inter.variable} ${merriweather.variable} font-sans bg-white text-gray-800 min-h-screen flex flex-col`}>
+          {/* Default SEO / branding for MyBizExchange */}
+          <Head>
+            <title>MyBizExchange</title>
+            <meta name="description" content="MyBizExchange — a modern marketplace for buying and selling small businesses, with a focus on seller-financed deals." />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <meta name="theme-color" content="#1E3A8A" />
+            <meta property="og:site_name" content="MyBizExchange" />
+            <meta property="og:title" content="MyBizExchange" />
+            <meta property="og:type" content="website" />
+            <meta property="og:url" content="https://mybizexchange.com" />
+            {/* Update this image in /public if you have a branded OG image */}
+            <meta property="og:image" content="/og-default.png" />
+            <link rel="icon" href="/favicon.ico" />
+            <link rel="canonical" href="https://mybizexchange.com" />
+          </Head>
+
           <Header />
+
           <main className="flex-1 pt-20 px-4">
             <Component {...pageProps} />
           </main>
-          <Footer />
+
+          {/* You can pass brand props if your Footer supports them; harmless if ignored */}
+          <Footer brandName="MyBizExchange" domain="mybizexchange.com" />
+
           <Toaster
             position="top-right"
             toastOptions={{
@@ -64,5 +85,4 @@ export default function App({ Component, pageProps }) {
     </SessionContextProvider>
   );
 }
-
 
