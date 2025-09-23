@@ -6,6 +6,40 @@ import supabase from '../lib/supabaseClient';
 
 const ROLES = ['buyer', 'seller', 'broker', 'investor'];
 
+const SUBHEAD_BY_ROLE = {
+  buyer:
+    "Be first to see new listings that match your budget and location. We’ll email you curated deals before the public feed.",
+  seller:
+    "List now (free during pre-launch) and get early visibility with qualified buyers. Add simple seller-financing terms to boost traction.",
+  broker:
+    "Bring your pipeline and get preferred placement when we open. Simple NDA/LOI workflow and buyer triage built-in.",
+  investor:
+    "Get early access to small-cap, cash-flowing deals and flexible structures. Indicate your ticket size and focus.",
+};
+
+const BENEFITS_BY_ROLE = {
+  buyer: [
+    'First peek at new listings (email alerts)',
+    'Filters by budget, industry, and location',
+    'Deal Maker to structure creative offers',
+  ],
+  seller: [
+    'Free to list during pre-launch',
+    'Featured to early buyer cohort',
+    'Guidance to set seller-financing terms',
+  ],
+  broker: [
+    'Preferred placement for verified brokers',
+    'Centralized buyer messaging + NDA/LOI',
+    'CSV export & pipeline reporting',
+  ],
+  investor: [
+    'Qualified, off-market opportunities',
+    'Flexible seller-financing friendly',
+    'Option to indicate thesis & ticket size',
+  ],
+};
+
 export default function Prelaunch() {
   const [role, setRole] = useState('buyer');
   const [form, setForm] = useState({
@@ -22,6 +56,11 @@ export default function Prelaunch() {
     // common
     heard_from: '',
   });
+
+  // Counters for social proof (optional; loads after mount)
+  const [totalCount, setTotalCount] = useState(null);
+  const [segmentCount, setSegmentCount] = useState(null);
+
   const [referredBy, setReferredBy] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -40,6 +79,26 @@ export default function Prelaunch() {
       if (r) setReferredBy(r);
     } catch {}
   }, []);
+
+  // Lightweight social proof counts
+  useEffect(() => {
+    (async () => {
+      try {
+        const total = await supabase
+          .from('prelaunch_signups')
+          .select('id', { count: 'exact', head: true });
+        setTotalCount(typeof total.count === 'number' ? total.count : null);
+
+        const seg = await supabase
+          .from('prelaunch_signups')
+          .select('id', { count: 'exact', head: true })
+          .eq('role', role);
+        setSegmentCount(typeof seg.count === 'number' ? seg.count : null);
+      } catch {
+        // ignore
+      }
+    })();
+  }, [role]);
 
   const referralLink = useMemo(() => {
     if (!refCode) return '';
@@ -81,23 +140,16 @@ export default function Prelaunch() {
       if (!payload.name) return fail('Please enter your name.');
       if (!validEmail(payload.email)) return fail('Please enter a valid email.');
 
-      // Role-specific enrichment
       if (role === 'buyer') {
         payload.budget_min = Number(form.budget_min) || null;
         payload.budget_max = Number(form.budget_max) || null;
       } else if (role === 'seller') {
         payload.industry = (form.industry || '').trim() || null;
         payload.financing_open = (form.financing_open || '').trim() || null;
-      } else if (role === 'broker') {
-        // Optional: you can later add broker-specific fields
-      } else if (role === 'investor') {
-        // Optional: add investor-specific fields later
       }
 
-      // Ensure a ref code exists for this email (upsert by email)
       const myCode = genRefCode(payload.email);
 
-      // Try upsert; requires a unique index on email if you want true upsert.
       const { data: upData, error: upErr } = await supabase
         .from('prelaunch_signups')
         .upsert([{ ...payload, ref_code: myCode, referred_by: referredBy || null }], { onConflict: 'email' })
@@ -105,8 +157,7 @@ export default function Prelaunch() {
         .single();
 
       if (upErr) {
-        // Fallback: if onConflict not available, try: find existing, then insert/update manually.
-        // (You can remove this fallback once the unique index on email exists.)
+        // Fallback path if onConflict not set server-side
         const { data: existing } = await supabase
           .from('prelaunch_signups')
           .select('*')
@@ -146,10 +197,9 @@ export default function Prelaunch() {
   }
 
   async function finalizeSuccess(row) {
-    // Compute queue position within role = count of rows where created_at <= mine
+    // Compute queue position within role
     let pos = null;
     try {
-      // If you don't have created_at, you can just show total count instead.
       const createdAt = row?.created_at;
       if (createdAt) {
         const { count } = await supabase
@@ -195,7 +245,7 @@ export default function Prelaunch() {
     <>
       <Head>
         <title>Join the Waitlist – MyBizExchange</title>
-        <meta name="description" content="Get early access to MyBizExchange — where seller-financed deals get discovered." />
+        <meta name="description" content="Join the pre-launch of MyBizExchange — be first to see seller-financed deals or list your business for free during pre-launch." />
         <meta property="og:site_name" content="MyBizExchange" />
         <meta property="og:title" content="Join the Waitlist – MyBizExchange" />
       </Head>
@@ -203,12 +253,27 @@ export default function Prelaunch() {
       <div className="max-w-3xl mx-auto py-10 px-4">
         {/* Hero */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-serif font-bold text-[#2E3A59]">Seller-Financed Deals, Discovered.</h1>
-          <p className="mt-3 text-lg text-gray-700">
-            Join the pre-launch list to get early access to{' '}
-            <span className="font-semibold text-blue-700">MyBizExchange</span>.
+          <h1 className="text-4xl font-serif font-bold text-[#2E3A59]">Get First Pick of New Deals.</h1>
+          <p className="mt-3 text-lg text-gray-800">
+            Join the pre-launch for <span className="font-semibold">MyBizExchange</span> — where seller-financed deals get discovered.
           </p>
           <div className="mt-4">{RoleTabs}</div>
+          <p className="mt-3 text-[15px] text-gray-700 max-w-2xl mx-auto">
+            {SUBHEAD_BY_ROLE[role]}
+          </p>
+
+          {/* Social proof + urgency */}
+          <div className="mt-4 flex items-center justify-center gap-3 text-sm text-gray-600">
+            {typeof totalCount === 'number' && (
+              <span className="rounded-full bg-gray-100 px-2 py-1">Total joined: {totalCount.toLocaleString()}</span>
+            )}
+            {typeof segmentCount === 'number' && (
+              <span className="rounded-full bg-gray-100 px-2 py-1 capitalize">{role}s in line: {segmentCount.toLocaleString()}</span>
+            )}
+            <span className="rounded-full bg-amber-50 text-amber-800 px-2 py-1 border border-amber-200">
+              Early cohort invites start soon
+            </span>
+          </div>
           {referredBy && (
             <p className="mt-2 text-xs text-gray-500">Referred by <span className="font-mono">{referredBy}</span></p>
           )}
@@ -217,8 +282,26 @@ export default function Prelaunch() {
         {/* Form / Success */}
         {!done ? (
           <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-xl shadow-sm p-5 space-y-4">
-            {/* Common fields */}
+            {/* Role-specific “Why join now” bullets */}
             <div className="grid sm:grid-cols-2 gap-3">
+              <div className="border rounded-lg p-3">
+                <div className="text-sm font-semibold mb-1">Why join now</div>
+                <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1.5">
+                  {BENEFITS_BY_ROLE[role].map((b, i) => <li key={i}>{b}</li>)}
+                </ul>
+              </div>
+              <div className="border rounded-lg p-3">
+                <div className="text-sm font-semibold mb-1">What happens next</div>
+                <ul className="list-disc pl-5 text-sm text-gray-700 space-y-1.5">
+                  <li>We’ll invite users in waves as we balance markets</li>
+                  <li>You’ll get a welcome email with next steps</li>
+                  <li>You can move up the list by sharing your link</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Common fields */}
+            <div className="grid sm:grid-cols-2 gap-3 mt-1">
               <div>
                 <label className="block text-sm font-medium mb-1">Name</label>
                 <input
@@ -300,56 +383,63 @@ export default function Prelaunch() {
             )}
 
             {role === 'seller' && (
-              <div className="grid sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Industry</label>
-                  <input
-                    name="industry"
-                    value={form.industry}
-                    onChange={onChange}
-                    className="w-full border rounded px-3 py-2"
-                    placeholder="Home services"
-                  />
+              <>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Industry</label>
+                    <input
+                      name="industry"
+                      value={form.industry}
+                      onChange={onChange}
+                      className="w-full border rounded px-3 py-2"
+                      placeholder="Home services"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Open to seller financing?</label>
+                    <select
+                      name="financing_open"
+                      value={form.financing_open}
+                      onChange={onChange}
+                      className="w-full border rounded px-3 py-2"
+                    >
+                      <option value="">Select</option>
+                      <option value="yes">Yes</option>
+                      <option value="maybe">Maybe</option>
+                      <option value="no">No</option>
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Open to seller financing?</label>
-                  <select
-                    name="financing_open"
-                    value={form.financing_open}
-                    onChange={onChange}
-                    className="w-full border rounded px-3 py-2"
-                  >
-                    <option value="">Select</option>
-                    <option value="yes">Yes</option>
-                    <option value="maybe">Maybe</option>
-                    <option value="no">No</option>
-                  </select>
+
+                {/* Inline “List now for free” prompt */}
+                <div className="mt-1 text-[13px] text-gray-700 bg-emerald-50 border border-emerald-200 rounded p-3">
+                  Want to jump the line? <Link href="/sellers"><a className="font-semibold text-emerald-800 underline">List your business now</a></Link> — it’s free during pre-launch and gets featured to early buyers.
                 </div>
-              </div>
+              </>
             )}
 
             {role === 'broker' && (
               <div>
-                <label className="block text-sm font-medium mb-1">How many listings do you handle per year? (optional)</label>
+                <label className="block text-sm font-medium mb-1">Anything we should know? (optional)</label>
                 <input
                   name="heard_from"
                   value={form.heard_from}
                   onChange={onChange}
                   className="w-full border rounded px-3 py-2"
-                  placeholder="e.g., 10–20; also tell us where you broker"
+                  placeholder="e.g., markets you cover, typical deal size"
                 />
               </div>
             )}
 
             {role === 'investor' && (
               <div>
-                <label className="block text-sm font-medium mb-1">What types of deals are you looking for? (optional)</label>
+                <label className="block text-sm font-medium mb-1">Focus (optional)</label>
                 <input
                   name="heard_from"
                   value={form.heard_from}
                   onChange={onChange}
                   className="w-full border rounded px-3 py-2"
-                  placeholder="e.g., search fund, SBA lender, holdco, ticket size"
+                  placeholder="e.g., search fund, holdco, $250k–$1M EBITDA"
                 />
               </div>
             )}
@@ -361,7 +451,7 @@ export default function Prelaunch() {
 
             {error && <div className="text-sm text-rose-700">{error}</div>}
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <button
                 type="submit"
                 disabled={submitting}
@@ -369,6 +459,22 @@ export default function Prelaunch() {
               >
                 {submitting ? 'Joining…' : 'Join the Waitlist'}
               </button>
+
+              {/* Secondary CTAs by role */}
+              {role === 'seller' && (
+                <Link href="/sellers">
+                  <a className="inline-block rounded border border-emerald-300 bg-white px-4 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
+                    List now — free in pre-launch
+                  </a>
+                </Link>
+              )}
+              {role === 'buyer' && (
+                <Link href="/listings">
+                  <a className="inline-block rounded border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">
+                    Browse listings
+                  </a>
+                </Link>
+              )}
               <Link href="/"><a className="text-sm text-gray-600 hover:underline">Back to home</a></Link>
             </div>
           </form>
@@ -380,6 +486,7 @@ export default function Prelaunch() {
               {typeof position === 'number' ? (
                 <> You’re approximately <span className="font-semibold">#{position}</span> in the {role} queue.</>
               ) : null}
+              {' '}We’ll email next steps and, for buyers, early matches as we bring sellers online.
             </p>
 
             {referralLink && (
@@ -401,7 +508,7 @@ export default function Prelaunch() {
                     {copyOK ? 'Copied ✓' : 'Copy'}
                   </button>
                 </div>
-                <p className="text-xs text-gray-600 mt-1">Share it—each signup bumps you up the list.</p>
+                <p className="text-xs text-gray-600 mt-1">Share it — each signup bumps you up the list.</p>
               </div>
             )}
 
@@ -426,22 +533,22 @@ export default function Prelaunch() {
           </div>
         )}
 
-        {/* How it works / FAQ (light) */}
+        {/* Lightweight FAQ */}
         <div className="mt-10 grid md:grid-cols-2 gap-6">
           <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="text-lg font-semibold">How the waitlist works</h3>
+            <h3 className="text-lg font-semibold">Why sign up before we go live?</h3>
             <ul className="mt-2 list-disc pl-5 text-sm text-gray-700 space-y-1.5">
-              <li>We onboard in waves to balance sellers and buyers.</li>
-              <li>Sellers open to financing and verified buyers get earlier access.</li>
-              <li>Sharing your link moves you up the list.</li>
+              <li>Early access to listings and features</li>
+              <li>Better placement if you’re selling</li>
+              <li>We balance markets by region & price band</li>
             </ul>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <h3 className="text-lg font-semibold">What you’ll get</h3>
+            <h3 className="text-lg font-semibold">Will you spam me?</h3>
             <ul className="mt-2 list-disc pl-5 text-sm text-gray-700 space-y-1.5">
-              <li>Early access to seller-financed deals</li>
-              <li>AI tools to value, structure, and message</li>
-              <li>Intros to lenders familiar with SBA and holdbacks</li>
+              <li>No — a welcome email and occasional updates</li>
+              <li>Buyers: only relevant matches based on your inputs</li>
+              <li>Unsubscribe anytime</li>
             </ul>
           </div>
         </div>
