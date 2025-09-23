@@ -4,7 +4,7 @@ export default function WhyWeBuilt() {
     <section className="bg-white rounded-xl p-10 mb-16 shadow-md border border-gray-200">
       <div className="max-w-4xl mx-auto text-center">
         <h2 className="text-3xl font-semibold text-[#2E3A59] mb-6">
-          Why We Built SuccessionBridge
+          Why We Built MyBizExchange
         </h2>
 
         <p className="text-lg text-gray-700 mb-4">
@@ -24,7 +24,7 @@ export default function WhyWeBuilt() {
         </p>
 
         <p className="text-lg text-gray-700 mb-8">
-          SuccessionBridge exists to give owners that same advantage — modern tools to package
+          MyBizExchange exists to give owners that same advantage — modern tools to package
           your business, attract the right buyers, and take control of the process.
         </p>
 
