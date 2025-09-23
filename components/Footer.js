@@ -10,7 +10,7 @@ export default function Footer() {
           {/* Brand */}
           <div>
             <div className="text-2xl font-semibold">
-              Succession<span className="text-[#F59E0B]">Bridge</span>
+              MyBiz<span className="text-[#F59E0B]">Exchange</span>
             </div>
             <p className="mt-3 text-sm text-white/70">
               Helping owners exit and buyers take the baton.
@@ -151,7 +151,7 @@ export default function Footer() {
 
         {/* Bottom bar */}
         <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/70">
-          <p>© {new Date().getFullYear()} SuccessionBridge. All rights reserved.</p>
+          <p>© {new Date().getFullYear()}MyBizExchange. All rights reserved.</p>
           <Link href="/privacy#ca-do-not-sell">
             <a className="hover:underline">CA: Do Not Sell My Personal Info</a>
           </Link>
