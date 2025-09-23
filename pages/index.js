@@ -86,7 +86,7 @@ export default function Home() {
         .order("created_at", { ascending: false })
         .limit(8);
 
-      if (!error && data) {
+    if (!error && data) {
         setFeaturedListings(data);
       } else {
         console.warn("⚠️ Failed to fetch featured listings:", error?.message);
@@ -114,7 +114,7 @@ export default function Home() {
               Millions of boomer-owned businesses are changing hands. Many will close without a buyer.
             </h1>
             <p className="mt-4 text-xl font-semibold text-[#2E3A59] max-w-2xl mx-auto">
-              SuccessionBridge helps retiring owners sell with flexible financing options that secure your exit and protect your legacy.
+              MyBizExchange helps retiring owners sell with flexible financing options that secure your exit and protect your legacy.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0 items-center justify-center">
               <Link href="/listings">
@@ -324,7 +324,7 @@ export default function Home() {
             />
           </div>
           <div>
-            <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">How SuccessionBridge Works</h2>
+            <h2 className="text-3xl font-semibold text-[#2E3A59] mb-4">How MyBizExchange Works</h2>
             <p className="text-lg text-gray-700 mb-6">
               We make selling simple. From valuation to flexible financing, we connect business owners nearing retirement with serious buyers ready to carry on your legacy.
             </p>
