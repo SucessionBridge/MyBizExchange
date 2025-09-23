@@ -10,10 +10,10 @@ export default function AboutPage() {
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937]">
       <Head>
-        <title>About Us — SuccessionBridge</title>
+        <title>About Us — MyBizExchange</title>
         <meta
           name="description"
-          content="SuccessionBridge helps main-street owners sell well: more qualified eyes, plain-English valuation guidance, and flexible financing basics."
+          content="MyBizExchange helps main-street owners sell well: more qualified eyes, plain-English valuation guidance, and flexible financing basics."
         />
       </Head>
 
@@ -46,7 +46,7 @@ export default function AboutPage() {
           <div className="mt-3 space-y-4 text-gray-700 leading-relaxed">
             {SHOW_FOUNDER_NAME ? (
               <p>
-                Hi, I’m <strong>{FOUNDER_NAME}</strong>, founder of SuccessionBridge. I’ve bought, built, and sold multiple
+                Hi, I’m <strong>{FOUNDER_NAME}</strong>, founder of MyBizExchange. I’ve bought, built, and sold multiple
                 businesses—some wins, some hard lessons. I’ve used seller financing as a buyer (great outcomes) and as a
                 seller (one deal that went sideways while the buyer still did fine). Those experiences shaped how we think
                 about risk and structure.
@@ -75,7 +75,7 @@ export default function AboutPage() {
               </span>
             </p>
             <p>
-              SuccessionBridge exists to give main-street owners that same advantage: modern listing tools, valuation guidance,
+              MyBizExchange exists to give main-street owners that same advantage: modern listing tools, valuation guidance,
               and practical financing basics that help you reach serious buyers and structure deals that actually work.
               Many brokers do great work; you can use our platform as a DIY path or alongside a broker.
             </p>
@@ -87,7 +87,7 @@ export default function AboutPage() {
           <h3 className="text-xl font-semibold text-[#2E3A59]">The spark: a driveway conversation</h3>
           <div className="mt-3 space-y-4 text-gray-700 leading-relaxed">
             <p>
-              The idea for SuccessionBridge clicked on a road trip with my son, who runs a small landscaping company.
+              The idea for MyBizExchange clicked on a road trip with my son, who runs a small landscaping company.
               We’d seen two commercial mowers listed at less than half their value—three hours away. We drove out, met the
               owner, and asked why he was selling.
             </p>
@@ -103,7 +103,7 @@ export default function AboutPage() {
             </p>
             <p>
               That’s the gap we’re closing. If a listing can help an owner capture even an extra <strong>$50,000</strong>,
-              spending <strong>$50/month</strong> is a no-brainer. SuccessionBridge is the place to try—put the opportunity in
+              spending <strong>$50/month</strong> is a no-brainer. MyBizExchange is the place to try—put the opportunity in
               front of qualified buyers and let the market create the value.
             </p>
           </div>
