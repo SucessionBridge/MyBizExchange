@@ -6,6 +6,53 @@ import { Menu, X, ChevronDown } from 'lucide-react';
 import supabase from '../lib/supabaseClient';
 import { toast } from 'react-hot-toast';
 
+/**
+ * Branding switch:
+ *  - 'exchange'  => new MyBizExchange arrows icon
+ *  - 'bridge'    => legacy bridge icon (kept for continuity)
+ *  - 'monogram'  => compact MBX monogram
+ */
+const BRAND_ICON = 'exchange';
+
+/* ---------------------------- Brand Icons (SVG) ---------------------------- */
+function IconExchange({ className }) {
+  // Circular exchange arrows (implies “marketplace / swap”)
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true">
+      <defs>
+        <linearGradient id="bxg1" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#1E3A8A" />
+          <stop offset="1" stopColor="#F59E0B" />
+        </linearGradient>
+      </defs>
+      <circle cx="32" cy="32" r="30" fill="none" stroke="url(#bxg1)" strokeWidth="3" />
+      <path d="M18 28c3-7 10-12 18-12h2" fill="none" stroke="#1E3A8A" strokeWidth="3" strokeLinecap="round" />
+      <path d="M36 14l7 5-7 5" fill="none" stroke="#1E3A8A" strokeWidth="3" strokeLinecap="round" />
+      <path d="M46 36c-3 7-10 12-18 12h-2" fill="none" stroke="#F59E0B" strokeWidth="3" strokeLinecap="round" />
+      <path d="M28 50l-7-5 7-5" fill="none" stroke="#F59E0B" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+function IconBridge({ className }) {
+  // Your legacy bridge motif (refined)
+  return (
+    <svg viewBox="0 0 200 80" className={className} aria-hidden="true">
+      <path d="M0 60h200v4H0z M20 60V30h4v30z M180 60V30h-4v30z M0 30 C60 0 140 0 200 30" fill="none" stroke="#F59E0B" strokeWidth="4" />
+      <path d="M95 60V20h4v40z" fill="#F59E0B" />
+    </svg>
+  );
+}
+function IconMonogram({ className }) {
+  // “MBX” monogram for compact use
+  return (
+    <svg viewBox="0 0 128 48" className={className} aria-hidden="true">
+      <rect x="2" y="2" width="124" height="44" rx="8" fill="none" stroke="#1E3A8A" strokeWidth="3" />
+      <text x="16" y="33" fontFamily="Inter, ui-sans-serif, system-ui" fontWeight="800" fontSize="24" fill="#1E3A8A">MB</text>
+      <text x="70" y="33" fontFamily="Inter, ui-sans-serif, system-ui" fontWeight="800" fontSize="24" fill="#F59E0B">X</text>
+    </svg>
+  );
+}
+
 export default function Header() {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState(null);
@@ -89,19 +136,18 @@ export default function Header() {
     timerRef.current = setTimeout(() => setter(false), 120);
   };
 
+  const LogoIcon = BRAND_ICON === 'bridge' ? IconBridge : BRAND_ICON === 'monogram' ? IconMonogram : IconExchange;
+
   return (
     <header className="bg-white border-b shadow-sm sticky top-0 z-50">
       <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
         {/* Logo */}
         <Link href="/?force=true">
-          <span className="flex items-center text-2xl font-serif font-bold cursor-pointer">
-            <span className="text-[#1E3A8A]">Succession</span>
-            <span className="text-[#F59E0B] flex items-center relative">
-              Bridge
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 80" className="w-12 h-6 ml-1" style={{ transform: 'translateY(-2px)' }}>
-                <path d="M0 60h200v4H0z M20 60V30h4v30z M180 60V30h-4v30z M0 30 C60 0 140 0 200 30" fill="none" stroke="#F59E0B" strokeWidth="4" />
-                <path d="M95 60V20h4v40z" fill="#F59E0B" />
-              </svg>
+          <span className="flex items-center gap-2 text-2xl font-serif font-bold cursor-pointer select-none" title="MyBizExchange — mybizexchange.com">
+            <span className="text-[#1E3A8A]">My<span className="sr-only"> </span>Biz</span>
+            <span className="text-[#F59E0B] flex items-center">
+              Exchange
+              <LogoIcon className="w-10 h-6 ml-1" />
             </span>
           </span>
         </Link>
@@ -393,9 +439,11 @@ export default function Header() {
               <Link href="/login"><span className="py-2" onClick={() => setIsOpen(false)}>Login</span></Link>
             )}
           </nav>
+          <div className="px-4 pb-3 text-[11px] text-gray-500">
+            You’re on <span className="font-semibold">mybizexchange.com</span> — a marketplace where seller-financed deals get discovered.
+          </div>
         </div>
       )}
     </header>
   );
 }
-
