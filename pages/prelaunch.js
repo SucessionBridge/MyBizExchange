@@ -18,6 +18,22 @@ export default function Prelaunch() {
   const [error, setError] = useState('');
   const [source, setSource] = useState({ ref: '', path: '' });
 
+  // Referral form state
+  const [refForm, setRefForm] = useState({
+    yourName: '',
+    yourEmail: '',
+    businessName: '',
+    businessCity: '',
+    businessType: '',
+    ownerName: '',
+    ownerEmail: '',
+    ownerPhone: '',
+    notes: '',
+  });
+  const [refSubmitting, setRefSubmitting] = useState(false);
+  const [refDone, setRefDone] = useState(false);
+  const [refError, setRefError] = useState('');
+
   useEffect(() => {
     (async () => {
       try {
@@ -60,6 +76,16 @@ export default function Prelaunch() {
     }
     setSubmitting(true);
     try {
+      // Suggested schema (SQL):
+      // create table prelaunch_signups (
+      //   id bigserial primary key,
+      //   email text not null,
+      //   role text not null check (role in ('buyer','seller','broker')),
+      //   name text, city text, state text,
+      //   referrer_url text, landing_url text,
+      //   created_at timestamptz default now(),
+      //   unique (email, role)
+      // );
       const payload = {
         email: form.email.trim(),
         role: form.role,
@@ -87,13 +113,83 @@ export default function Prelaunch() {
     }
   };
 
+  // Referral helpers
+  const onRefChange = (e) => {
+    const { name, value } = e.target;
+    setRefForm((p) => ({ ...p, [name]: value }));
+  };
+
+  const validateReferral = () => {
+    if (!refForm.businessName?.trim()) return 'Please add the business name.';
+    if (!refForm.yourEmail?.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(refForm.yourEmail))
+      return 'Please enter a valid email for yourself (in case we have follow-ups).';
+    return '';
+  };
+
+  const submitReferral = async (e) => {
+    e.preventDefault();
+    setRefError('');
+    const v = validateReferral();
+    if (v) {
+      setRefError(v);
+      return;
+    }
+    setRefSubmitting(true);
+    try {
+      // Suggested schema:
+      // create table prelaunch_referrals (
+      //   id bigserial primary key,
+      //   referrer_name text,
+      //   referrer_email text not null,
+      //   business_name text not null,
+      //   business_city text,
+      //   business_type text, -- coffee shop, wine store, bookstore, etc.
+      //   owner_name text,
+      //   owner_email text,
+      //   owner_phone text,
+      //   notes text,
+      //   referrer_url text,
+      //   landing_url text,
+      //   created_at timestamptz default now()
+      // );
+      const payload = {
+        referrer_name: refForm.yourName?.trim() || null,
+        referrer_email: refForm.yourEmail?.trim(),
+        business_name: refForm.businessName?.trim(),
+        business_city: refForm.businessCity?.trim() || null,
+        business_type: refForm.businessType?.trim() || null,
+        owner_name: refForm.ownerName?.trim() || null,
+        owner_email: refForm.ownerEmail?.trim() || null,
+        owner_phone: refForm.ownerPhone?.trim() || null,
+        notes: refForm.notes?.trim() || null,
+        referrer_url: source.ref || null,
+        landing_url: source.path || null,
+      };
+
+      const { error: insErr } = await supabase.from('prelaunch_referrals').insert([payload]);
+      if (insErr) {
+        console.error('referral insert error:', insErr);
+        setRefError(insErr.message || 'Something went wrong. Please try again.');
+        setRefSubmitting(false);
+        return;
+      }
+
+      setRefDone(true);
+      setRefSubmitting(false);
+    } catch (err) {
+      console.error(err);
+      setRefError('Unexpected error. Please try again.');
+      setRefSubmitting(false);
+    }
+  };
+
   return (
     <>
       <Head>
         <title>Pre-Launch | MyBizExchange</title>
         <meta
           name="description"
-          content="Join the pre-launch for MyBizExchange to lock in founding-member benefits, free listing for DIY sellers, 10 free ads for brokers, and first-look access for buyers."
+          content="Join the MyBizExchange pre-launch. List your business, refer a local owner, or reserve your founding member spot."
         />
       </Head>
 
@@ -125,16 +221,30 @@ export default function Prelaunch() {
                   Reserve Your Spot
                 </a>
 
-                <Link href="/listings">
+                <Link href="/sellers">
                   <a
-                    className="inline-flex h-12 items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50
-                               focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2
-                               px-6 font-semibold text-gray-800 transition"
+                    className="inline-flex h-12 items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700
+                               focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2
+                               text-white px-6 font-semibold transition"
                   >
-                    Keep Browsing
+                    List Your Business
                   </a>
                 </Link>
+
+                <a
+                  href="#refer"
+                  className="inline-flex h-12 items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50
+                             focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2
+                             px-6 font-semibold text-gray-800 transition"
+                >
+                  Refer a Business Owner
+                </a>
               </div>
+
+              {/* quick hint about who we're seeking */}
+              <p className="mt-3 text-sm text-gray-600">
+                Ideal for walk-in businesses: coffee shops, wine stores, bookstores, bakeries, salons, auto repair, and more.
+              </p>
             </div>
           </div>
         </section>
@@ -349,29 +459,226 @@ export default function Prelaunch() {
                   We’ll email your early-access invite as we roll out Founding Member benefits.
                 </p>
                 <div className="mt-6 flex items-center justify-center gap-3">
-                  <Link href="/listings">
-                    <a className="inline-flex h-12 items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50
-                                   focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2
-                                   px-6 font-semibold transition">
-                      Browse Listings
-                    </a>
-                  </Link>
                   <Link href="/sellers">
                     <a className="inline-flex h-12 items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700
                                    focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2
                                    text-white px-6 font-semibold transition">
-                      List Free Now
+                      List Your Business
                     </a>
                   </Link>
+                  <a
+                    href="#refer"
+                    className="inline-flex h-12 items-center justify-center rounded-lg border border-gray-300 bg-white hover:bg-gray-50
+                               focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2
+                               px-6 font-semibold transition"
+                  >
+                    Refer a Business Owner
+                  </a>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Small note about transparency—no counters shown */}
           <p className="mt-4 text-center text-[12px] text-gray-500">
             We’re not showing signup counts yet—we’ll share metrics once we have launch-ready numbers.
           </p>
+        </section>
+
+        {/* REFERRAL SECTION */}
+        <section id="refer" className="scroll-mt-24 max-w-6xl mx-auto px-4 pb-20">
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+            <div className="md:flex md:items-start md:justify-between gap-6">
+              <div className="md:w-1/2">
+                <h2 className="text-2xl font-semibold text-gray-900">Know a Local Owner Who Might Sell?</h2>
+                <p className="mt-2 text-gray-700 text-sm">
+                  We’re especially looking for <span className="font-medium">walk-in businesses</span> with steady customers—coffee shops, wine
+                  stores, bookstores, bakeries, salons/barbers, auto repair, and similar neighborhood staples. If you’re a
+                  regular or a friend of the owner, a quick intro helps them explore seller-financed options without pressure.
+                </p>
+
+                {/* chips */}
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {['Coffee Shop', 'Wine Store', 'Bookstore', 'Bakery', 'Salon / Barber', 'Auto Repair', 'Restaurant', 'Boutique Retail'].map((t) => (
+                    <span
+                      key={t}
+                      className="inline-flex items-center rounded-full bg-gray-100 text-gray-800 px-3 py-1 text-xs font-medium"
+                    >
+                      {t}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="md:w-1/2 mt-6 md:mt-0">
+                {!refDone ? (
+                  <form className="space-y-4" onSubmit={submitReferral}>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="yourName" className="block text-sm font-medium text-gray-700">
+                          Your Name (optional)
+                        </label>
+                        <input
+                          id="yourName"
+                          name="yourName"
+                          value={refForm.yourName}
+                          onChange={onRefChange}
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                          placeholder="Jane Doe"
+                          autoComplete="name"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="yourEmail" className="block text-sm font-medium text-gray-700">
+                          Your Email
+                        </label>
+                        <input
+                          id="yourEmail"
+                          name="yourEmail"
+                          type="email"
+                          value={refForm.yourEmail}
+                          onChange={onRefChange}
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                          placeholder="you@example.com"
+                          autoComplete="email"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="businessName" className="block text-sm font-medium text-gray-700">
+                        Business Name
+                      </label>
+                      <input
+                        id="businessName"
+                        name="businessName"
+                        value={refForm.businessName}
+                        onChange={onRefChange}
+                        className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                        placeholder="e.g., Main Street Coffee"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="businessCity" className="block text-sm font-medium text-gray-700">
+                          City (optional)
+                        </label>
+                        <input
+                          id="businessCity"
+                          name="businessCity"
+                          value={refForm.businessCity}
+                          onChange={onRefChange}
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                          placeholder="City"
+                          autoComplete="address-level2"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="businessType" className="block text-sm font-medium text-gray-700">
+                          Type (optional)
+                        </label>
+                        <input
+                          id="businessType"
+                          name="businessType"
+                          value={refForm.businessType}
+                          onChange={onRefChange}
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                          placeholder="Coffee shop, wine store, bookstore…"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid sm:grid-cols-3 gap-4">
+                      <div>
+                        <label htmlFor="ownerName" className="block text-sm font-medium text-gray-700">
+                          Owner Name (optional)
+                        </label>
+                        <input
+                          id="ownerName"
+                          name="ownerName"
+                          value={refForm.ownerName}
+                          onChange={onRefChange}
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                          placeholder="If you know it"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="ownerEmail" className="block text-sm font-medium text-gray-700">
+                          Owner Email (optional)
+                        </label>
+                        <input
+                          id="ownerEmail"
+                          name="ownerEmail"
+                          type="email"
+                          value={refForm.ownerEmail}
+                          onChange={onRefChange}
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                          placeholder="owner@example.com"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="ownerPhone" className="block text-sm font-medium text-gray-700">
+                          Owner Phone (optional)
+                        </label>
+                        <input
+                          id="ownerPhone"
+                          name="ownerPhone"
+                          value={refForm.ownerPhone}
+                          onChange={onRefChange}
+                          className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                          placeholder="(xxx) xxx-xxxx"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+                        Notes (optional)
+                      </label>
+                      <textarea
+                        id="notes"
+                        name="notes"
+                        value={refForm.notes}
+                        onChange={onRefChange}
+                        className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-2"
+                        placeholder="Anything helpful—why they might sell, best time to reach them, etc."
+                        rows={3}
+                      />
+                    </div>
+
+                    {refError && <p className="text-sm text-rose-700">{refError}</p>}
+
+                    <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                      <button
+                        type="submit"
+                        disabled={refSubmitting}
+                        className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-blue-600 hover:bg-blue-700
+                                   focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2
+                                   text-white px-6 font-semibold disabled:opacity-60 transition"
+                      >
+                        {refSubmitting ? 'Sending…' : 'Send Referral'}
+                      </button>
+                      <p className="text-[12px] text-gray-500">
+                        We’ll reach out respectfully and keep your intro low-pressure.
+                      </p>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-green-100 text-green-700 mb-3">
+                      ✓
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900">Thanks for the referral!</h3>
+                    <p className="mt-2 text-gray-700">
+                      We’ll take it from here and keep you posted if it turns into a listing.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* FAQ */}
@@ -409,3 +716,4 @@ export default function Prelaunch() {
     </>
   );
 }
+
