@@ -1,88 +1,84 @@
-// pages/sitemap.js
-import Link from 'next/link';
+// pages/sitemap.xml.js
 import { createClient } from '@supabase/supabase-js';
 
-export async function getStaticProps() {
+function buildUrlTag(loc, lastmod, changefreq = 'weekly', priority = '0.7') {
+  return `
+  <url>
+    <loc>${loc}</loc>
+    ${lastmod ? `<lastmod>${lastmod}</lastmod>` : ''}
+    <changefreq>${changefreq}</changefreq>
+    <priority>${priority}</priority>
+  </url>`;
+}
+
+export async function getServerSideProps({ req, res }) {
+  const host = req.headers['host'] || 'localhost:3000';
+  const isLocal = host.includes('localhost') || host.startsWith('127.0.0.1');
+  // Prefer env when set; else infer from request. Use https in prod.
+  const baseFromEnv = process.env.NEXT_PUBLIC_SITE_URL;
+  const siteUrl = baseFromEnv || `${isLocal ? 'http' : 'https'}://${host}`;
+
+  // Fetch active listings for dynamic entries
   let listings = [];
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     );
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('sellers')
-      .select('id, business_name')
+      .select('id, updated_at, created_at')
       .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .limit(100); // keep the page light; adjust as you like
-    listings = data || [];
-  } catch {
+      .order('updated_at', { ascending: false })
+      .limit(1000); // adjust if you expect more
+    if (!error && data) listings = data;
+  } catch (e) {
+    // Swallow errors; still return a valid sitemap for static pages
     listings = [];
   }
-  return { props: { listings }, revalidate: 3600 }; // update hourly
-}
 
-export default function HTMLSitemap({ listings }) {
-  return (
-    <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937]">
-      <div className="max-w-6xl mx-auto px-4 py-10">
-        <h1 className="text-3xl font-bold mb-6">Sitemap</h1>
+  // Core static routes you want indexed
+  const staticRoutes = [
+    '/', '/listings', '/sellers', '/business-valuation', '/scorecard',
+    '/pricing', '/about', '/contact', '/terms', '/privacy',
+    // Include your guides & blog root if they exist:
+    '/guides/how-buyers-value',
+    '/guides/financing-options',
+    '/guides/how-to-sell',
+    '/guides/prep-to-sell',
+    '/blog',
+    // Keep your HTML sitemap too (not required, but fine to expose):
+    '/sitemap'
+  ];
 
-        <section className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl border p-4">
-            <h2 className="font-semibold mb-2">Top Pages</h2>
-            <ul className="space-y-1 text-sm">
-              <li><Link href="/"><a className="hover:underline">Home</a></Link></li>
-              <li><Link href="/listings"><a className="hover:underline">Browse Listings</a></Link></li>
-              <li><Link href="/sellers"><a className="hover:underline">List Your Business</a></Link></li>
-              <li><Link href="/business-valuation"><a className="hover:underline">Value Your Business</a></Link></li>
-              <li><Link href="/scorecard"><a className="hover:underline">Sellability Scorecard</a></Link></li>
-              <li><Link href="/pricing"><a className="hover:underline">Pricing</a></Link></li>
-            </ul>
-          </div>
+  const nowISO = new Date().toISOString();
 
-          <div className="bg-white rounded-xl border p-4">
-            <h2 className="font-semibold mb-2">Guides</h2>
-            <ul className="space-y-1 text-sm">
-              <li><Link href="/guides/how-buyers-value"><a className="hover:underline">How Buyers Value Businesses</a></Link></li>
-              <li><Link href="/guides/financing-options"><a className="hover:underline">Financing Options</a></Link></li>
-              <li><Link href="/guides/how-to-sell"><a className="hover:underline">How to Sell Your Business</a></Link></li>
-              <li><Link href="/guides/prep-to-sell"><a className="hover:underline">Get Your Business Ready to Sell</a></Link></li>
-              <li><Link href="/blog"><a className="hover:underline">Blog</a></Link></li>
-            </ul>
-          </div>
-
-          <div className="bg-white rounded-xl border p-4">
-            <h2 className="font-semibold mb-2">Company</h2>
-            <ul className="space-y-1 text-sm">
-              <li><Link href="/about"><a className="hover:underline">About Us</a></Link></li>
-              <li><Link href="/contact"><a className="hover:underline">Contact</a></Link></li>
-              <li><Link href="/terms"><a className="hover:underline">Terms of Use</a></Link></li>
-              <li><Link href="/privacy"><a className="hover:underline">Privacy Notice</a></Link></li>
-            </ul>
-          </div>
-        </section>
-
-        <section className="mt-8 bg-white rounded-xl border p-4">
-          <h2 className="font-semibold mb-2">Recent Listings</h2>
-          {listings.length === 0 ? (
-            <div className="text-sm text-gray-600">No active listings yet.</div>
-          ) : (
-            <ul className="grid sm:grid-cols-2 gap-2 text-sm">
-              {listings.map((l) => (
-                <li key={l.id}>
-                  <Link href={`/listings/${l.id}`}>
-                    <a className="hover:underline">{l.business_name || `Listing #${l.id}`}</a>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-3 text-sm">
-            <Link href="/listings"><a className="text-blue-700 hover:underline">See all listings →</a></Link>
-          </div>
-        </section>
-      </div>
-    </main>
+  const staticXml = staticRoutes.map((path) =>
+    buildUrlTag(`${siteUrl}${path}`, nowISO, 'weekly', '0.6')
   );
+
+  const listingXml = listings.map((l) => {
+    const lastmod = (l.updated_at || l.created_at) ? new Date(l.updated_at || l.created_at).toISOString() : nowISO;
+    return buildUrlTag(`${siteUrl}/listings/${l.id}`, lastmod, 'daily', '0.8');
+  });
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset
+  xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+  xmlns:xhtml="http://www.w3.org/1999/xhtml">
+  ${[...staticXml, ...listingXml].join('\n')}
+</urlset>`.trim();
+
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  // Cache for 1h on the edge; serve stale for a day while revalidating
+  res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400');
+  res.write(xml);
+  res.end();
+
+  return { props: {} };
 }
+
+export default function SitemapXML() {
+  return null;
+}
+
