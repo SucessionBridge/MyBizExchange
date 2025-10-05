@@ -1,5 +1,5 @@
 // pages/buyer-dashboard.js
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import supabase from '../lib/supabaseClient';
@@ -23,9 +23,52 @@ export default function BuyerDashboard() {
   const [messages, setMessages] = useState([]);
   const [loadingMessages, setLoadingMessages] = useState(true);
 
-  // Suggested matches
-  const [matches, setMatches] = useState([]);
+  // Suggested matches (raw + filtered)
+  const [matches, setMatches] = useState([]); // [{ listing, score, reasons }]
   const [loadingMatches, setLoadingMatches] = useState(true);
+
+  // For KPI "New this week"
+  const [allSellersForKPI, setAllSellersForKPI] = useState([]);
+
+  // ---------- NEW: Filter state (client-side, URL-persisted) ----------
+  const [fIndustry, setFIndustry] = useState([]); // array of strings
+  const [fLocations, setFLocations] = useState([]); // array of city/state tokens
+  const [fPriceMin, setFPriceMin] = useState('');
+  const [fPriceMax, setFPriceMax] = useState('');
+  const [fRevMin, setFRevMin] = useState('');
+  const [fFinancing, setFFinancing] = useState(''); // '', 'seller', 'third-party', 'rent-to-own', 'self'
+  const [fSort, setFSort] = useState('newest'); // 'newest' | 'priceAsc' | 'priceDesc' | 'profitAsc' | 'profitDesc'
+
+  // Read filters from URL on mount
+  useEffect(() => {
+    const q = router.query;
+    const csv = (v) => (typeof v === 'string' ? v.split(',').map(s => s.trim()).filter(Boolean) : []);
+    if (q.ind) setFIndustry(csv(q.ind));
+    if (q.loc) setFLocations(csv(q.loc));
+    if (q.price) {
+      const [a, b] = String(q.price).split('-');
+      setFPriceMin(a || '');
+      setFPriceMax(b || '');
+    }
+    if (q.revMin) setFRevMin(String(q.revMin));
+    if (q.fin) setFFinancing(String(q.fin).toLowerCase());
+    if (q.sort) setFSort(String(q.sort));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Push filters to URL when they change (replaceState to avoid history spam)
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (fIndustry.length) params.set('ind', fIndustry.join(','));
+    if (fLocations.length) params.set('loc', fLocations.join(','));
+    if (fPriceMin || fPriceMax) params.set('price', `${fPriceMin || 0}-${fPriceMax || ''}`);
+    if (fRevMin) params.set('revMin', String(fRevMin));
+    if (fFinancing) params.set('fin', fFinancing);
+    if (fSort && fSort !== 'newest') params.set('sort', fSort);
+    const qs = params.toString();
+    const href = qs ? `/buyer-dashboard?${qs}` : '/buyer-dashboard';
+    router.replace(href, undefined, { shallow: true });
+  }, [fIndustry, fLocations, fPriceMin, fPriceMax, fRevMin, fFinancing, fSort, router]);
 
   // 1) Auth check
   useEffect(() => {
@@ -265,13 +308,14 @@ export default function BuyerDashboard() {
 
       const { data: sellers, error } = await supabase
         .from('sellers')
-        .select('id,business_name,location,city,state_or_province,asking_price,industry,financing_type,seller_financing_considered,image_urls,created_at')
+        .select('id,business_name,location,city,state_or_province,asking_price,annual_profit,industry,financing_type,seller_financing_considered,image_urls,created_at')
         .order('created_at', { ascending: false })
         .limit(250);
 
       if (error) {
         console.warn('Sellers fetch for matches error:', error.message);
         setMatches([]);
+        setAllSellersForKPI([]);
         setLoadingMatches(false);
         return;
       }
@@ -291,7 +335,8 @@ export default function BuyerDashboard() {
         });
 
       if (!cancelled) {
-        setMatches(scored.slice(0, 8));
+        setMatches(scored);
+        setAllSellersForKPI(sellers || []);
         setLoadingMatches(false);
       }
     };
@@ -314,6 +359,101 @@ export default function BuyerDashboard() {
     return Array.from(by.entries())
       .sort((a, b) => new Date(b[1].created_at) - new Date(a[1].created_at));
   }, [messages]);
+
+  // ---------- NEW: Profile completeness ----------
+  const profileScore = useMemo(() => {
+    if (!profile) return 0;
+    let s = 0;
+    if (Number(profile?.budget_for_purchase) > 0) s += 25;
+    if (String(profile?.industry_preference || '').trim()) s += 25;
+    if (String(profile?.city || profile?.state_or_province || '').trim()) s += 25;
+    if (String(profile?.financing_type || '').trim()) s += 25;
+    return s;
+  }, [profile]);
+
+  const completenessTips = useMemo(() => {
+    if (!profile) return [];
+    const tips = [];
+    if (!(Number(profile?.budget_for_purchase) > 0)) tips.push('Add your target budget');
+    if (!String(profile?.industry_preference || '').trim()) tips.push('Choose 1–3 industries');
+    if (!String(profile?.city || profile?.state_or_province || '').trim()) tips.push('Set your preferred location');
+    if (!String(profile?.financing_type || '').trim()) tips.push('Select preferred financing');
+    return tips.slice(0, 3);
+  }, [profile]);
+
+  // ---------- NEW: Filtered matches (client-side) ----------
+  const filteredMatches = useMemo(() => {
+    const norm = (s) => String(s || '').toLowerCase();
+    const inPrice = (ask) => {
+      const n = toNum(ask);
+      const min = toNum(fPriceMin);
+      const max = toNum(fPriceMax) || Number.POSITIVE_INFINITY;
+      return n >= (min || 0) && n <= max;
+    };
+    const inRev = (rev) => {
+      const n = toNum(rev);
+      const min = toNum(fRevMin);
+      return n >= (min || 0);
+    };
+    const locHit = (l) => {
+      if (!fLocations.length) return true;
+      const city = norm(l?.city);
+      const st = norm(l?.state_or_province);
+      const loc = norm(l?.location);
+      return fLocations.some(tok => (city && city.includes(norm(tok))) || (st && st.includes(norm(tok))) || (loc && loc.includes(norm(tok))));
+    };
+    const indHit = (l) => {
+      if (!fIndustry.length) return true;
+      const li = norm(l?.industry);
+      return fIndustry.some(tok => li.includes(norm(tok)));
+    };
+    const finHit = (l) => {
+      if (!fFinancing) return true;
+      const lf = norm(l?.financing_type);
+      const sellerConsidered = norm(l?.seller_financing_considered);
+      if (fFinancing === 'seller') return sellerConsidered === 'yes' || sellerConsidered === 'maybe' || lf.includes('seller');
+      if (fFinancing === 'third-party') return lf.includes('third') || lf.includes('buyer');
+      if (fFinancing === 'rent-to-own') return lf.includes('rent');
+      if (fFinancing === 'self') return true;
+      return true;
+    };
+
+    let arr = matches.filter(m =>
+      indHit(m.listing) &&
+      locHit(m.listing) &&
+      inPrice(m.listing.asking_price) &&
+      inRev(m.listing.annual_profit) &&
+      finHit(m.listing)
+    );
+
+    // Sort
+    const byNum = (v) => toNum(v);
+    if (fSort === 'priceAsc') arr = arr.slice().sort((a, b) => byNum(a.listing.asking_price) - byNum(b.listing.asking_price));
+    else if (fSort === 'priceDesc') arr = arr.slice().sort((a, b) => byNum(b.listing.asking_price) - byNum(a.listing.asking_price));
+    else if (fSort === 'profitAsc') arr = arr.slice().sort((a, b) => byNum(a.listing.annual_profit) - byNum(b.listing.annual_profit));
+    else if (fSort === 'profitDesc') arr = arr.slice().sort((a, b) => byNum(b.listing.annual_profit) - byNum(a.listing.annual_profit));
+    // default 'newest' keeps server order (already newest first)
+
+    return arr;
+  }, [matches, fIndustry, fLocations, fPriceMin, fPriceMax, fRevMin, fFinancing, fSort]);
+
+  const clearFilters = useCallback(() => {
+    setFIndustry([]); setFLocations([]); setFPriceMin(''); setFPriceMax(''); setFRevMin(''); setFFinancing(''); setFSort('newest');
+  }, []);
+
+  // ---------- NEW: KPI computations ----------
+  const kpiSaved = savedListings.length;
+  const kpiMatches = filteredMatches.length; // show filtered count (more intuitive with filter bar)
+  const kpiConvos = latestByListing.length;
+  const kpiNewThisWeek = useMemo(() => {
+    if (!Array.isArray(allSellersForKPI)) return 0;
+    const now = Date.now();
+    const week = 7 * 24 * 60 * 60 * 1000;
+    return allSellersForKPI.filter(s => {
+      const t = new Date(s.created_at).getTime();
+      return Number.isFinite(t) && now - t <= week;
+    }).length;
+  }, [allSellersForKPI]);
 
   if (loadingAuth || loadingProfile) {
     return (
@@ -345,11 +485,23 @@ export default function BuyerDashboard() {
   return (
     <main className="min-h-screen bg-blue-50 p-6 sm:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* ---------- NEW: KPI strip ---------- */}
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <KpiTile label="Saved" value={kpiSaved} href="#saved" />
+          <KpiTile label="Matches" value={kpiMatches} href="#matches" />
+          <KpiTile label="Conversations" value={kpiConvos} href="#conversations" />
+          <KpiTile label="New this week" value={kpiNewThisWeek} href="/listings" />
+        </section>
+
         {/* Header / Actions */}
         <div className="bg-white rounded-xl shadow border border-gray-200 p-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-blue-800">Buyer Dashboard</h1>
             <p className="text-gray-600 mt-1">Welcome back{profile?.name ? `, ${profile.name}` : ''}.</p>
+            <p className="text-[13px] text-emerald-700 mt-2">
+              Tip: Try our <Link href="/deal-maker"><a className="underline font-semibold">🤝 Deal Maker</a></Link> to structure creative offers faster.
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Link href="/buyer-onboarding?next=/buyer-dashboard">
@@ -388,9 +540,23 @@ export default function BuyerDashboard() {
           </div>
         )}
 
-        {/* Profile summary */}
+        {/* ---------- NEW: Profile completeness ---------- */}
         <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-blue-700 mb-3">Your Buying Preferences</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xl font-semibold text-blue-700">Your Buying Preferences</h2>
+            <div className="text-sm text-gray-600">
+              Profile completeness
+              <div className="mt-1 w-44 h-2 bg-gray-200 rounded-full overflow-hidden inline-block align-middle ml-2">
+                <div
+                  className="h-full bg-emerald-600"
+                  style={{ width: `${profileScore}%` }}
+                  aria-label={`Profile completeness ${profileScore}%`}
+                />
+              </div>
+              <span className="ml-2 font-semibold text-gray-800">{profileScore}%</span>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
             <InfoTile label="Location" value={`${profile.city || '—'}${(profile.city && profile.state_or_province) ? ', ' : ''}${profile.state_or_province || '—'}`} />
             <InfoTile label="Financing" value={profile.financing_type || '—'} />
@@ -399,11 +565,22 @@ export default function BuyerDashboard() {
             <InfoTile label="Industry" value={profile.industry_preference || '—'} />
             <InfoTile label="Relocate?" value={profile.willing_to_relocate || '—'} />
           </div>
-          <p className="text-xs text-gray-500 mt-3">Update your profile anytime to improve matching with sellers.</p>
+
+          {profileScore < 100 && (
+            <div className="mt-4 bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-900">
+              <div className="font-medium mb-1">Complete your profile to get stronger matches:</div>
+              <ul className="list-disc ml-5">
+                {completenessTips.map((t, i) => <li key={i}>{t}</li>)}
+              </ul>
+              <Link href="/buyer-onboarding?next=/buyer-dashboard">
+                <a className="inline-block mt-2 text-blue-700 underline font-semibold">Update profile →</a>
+              </Link>
+            </div>
+          )}
         </section>
 
-        {/* Suggested Matches */}
-        <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
+        {/* ---------- NEW: Filter bar + Suggested Matches ---------- */}
+        <section id="matches" className="bg-white rounded-xl shadow border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xl font-semibold text-gray-800">Suggested Matches</h2>
             <Link href="/listings">
@@ -411,15 +588,122 @@ export default function BuyerDashboard() {
             </Link>
           </div>
 
+          {/* Filter bar */}
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] gap-3 mb-4">
+            <input
+              type="text"
+              placeholder="Industry (comma-separated)"
+              value={fIndustry.join(', ')}
+              onChange={e => setFIndustry(splitCSV(e.target.value))}
+              className="px-3 py-2 border rounded-lg text-sm"
+              aria-label="Filter by industry"
+            />
+            <input
+              type="text"
+              placeholder="Location (city/state; comma-separated)"
+              value={fLocations.join(', ')}
+              onChange={e => setFLocations(splitCSV(e.target.value))}
+              className="px-3 py-2 border rounded-lg text-sm"
+              aria-label="Filter by location"
+            />
+            <div className="flex gap-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="Price min"
+                value={fPriceMin}
+                onChange={e => setFPriceMin(e.target.value)}
+                className="w-1/2 px-3 py-2 border rounded-lg text-sm"
+                aria-label="Price minimum"
+              />
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="Price max"
+                value={fPriceMax}
+                onChange={e => setFPriceMax(e.target.value)}
+                className="w-1/2 px-3 py-2 border rounded-lg text-sm"
+                aria-label="Price maximum"
+              />
+            </div>
+            <input
+              type="number"
+              inputMode="numeric"
+              placeholder="Profit (SDE) min"
+              value={fRevMin}
+              onChange={e => setFRevMin(e.target.value)}
+              className="px-3 py-2 border rounded-lg text-sm"
+              aria-label="Minimum profit"
+            />
+            <div className="flex gap-2">
+              <select
+                value={fFinancing}
+                onChange={e => setFFinancing(e.target.value)}
+                className="px-3 py-2 border rounded-lg text-sm"
+                aria-label="Financing filter"
+              >
+                <option value="">Any financing</option>
+                <option value="seller">Seller financing</option>
+                <option value="third-party">Third-party</option>
+                <option value="rent-to-own">Rent-to-own</option>
+                <option value="self">Self financing</option>
+              </select>
+              <select
+                value={fSort}
+                onChange={e => setFSort(e.target.value)}
+                className="px-3 py-2 border rounded-lg text-sm"
+                aria-label="Sort matches"
+              >
+                <option value="newest">Newest</option>
+                <option value="priceAsc">Price ↑</option>
+                <option value="priceDesc">Price ↓</option>
+                <option value="profitAsc">Profit ↑</option>
+                <option value="profitDesc">Profit ↓</option>
+              </select>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50"
+                aria-label="Clear filters"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+
+          {/* Results */}
           {loadingMatches ? (
             <p className="text-gray-600">Finding matches…</p>
-          ) : matches.length === 0 ? (
-            <p className="text-gray-600">
-              No strong matches yet. Try broadening your priorities or browse the marketplace.
-            </p>
+          ) : filteredMatches.length === 0 ? (
+            <div className="text-gray-700">
+              <p className="mb-3">No strong matches yet.</p>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  className="text-xs px-2 py-1 border rounded-lg bg-white hover:bg-gray-50"
+                  onClick={() => setFIndustry([])}
+                >Any industry</button>
+                <button
+                  className="text-xs px-2 py-1 border rounded-lg bg-white hover:bg-gray-50"
+                  onClick={() => setFLocations([])}
+                >Any location</button>
+                <button
+                  className="text-xs px-2 py-1 border rounded-lg bg-white hover:bg-gray-50"
+                  onClick={() => { setFPriceMin(''); setFPriceMax(''); }}
+                >Any price</button>
+                <button
+                  className="text-xs px-2 py-1 border rounded-lg bg-white hover:bg-gray-50"
+                  onClick={() => setFFinancing('')}
+                >Any financing</button>
+              </div>
+              <p className="mt-3 text-sm text-gray-600">
+                Or head to the marketplace and use <strong>🤝 Propose a Deal</strong> to structure an offer:
+                {' '}
+                <Link href="/listings"><a className="text-blue-700 underline">Browse listings →</a></Link>
+              </p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5">
-              {matches.map(({ listing, score, reasons }) => {
+              {filteredMatches.map(({ listing, score, reasons }) => {
                 const cover = Array.isArray(listing.image_urls) && listing.image_urls.length > 0 ? listing.image_urls[0] : placeholder;
                 return (
                   <div key={listing.id} className="group block rounded-xl overflow-hidden border border-gray-200 bg-white shadow-sm transform transition duration-200 md:hover:-translate-y-0.5 md:hover:shadow-lg">
@@ -436,9 +720,14 @@ export default function BuyerDashboard() {
                           />
                         </div>
                         <div className="p-3">
-                          <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
-                            {listing.business_name || 'Unnamed Business'}
-                          </h3>
+                          <div className="flex items-start justify-between gap-2">
+                            <h3 className="text-[15px] font-semibold text-blue-700 line-clamp-2 min-h-[40px]">
+                              {listing.business_name || 'Unnamed Business'}
+                            </h3>
+                            <span className="text-[11px] mt-0.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 whitespace-nowrap">
+                              Score {score}
+                            </span>
+                          </div>
                           <div className="mt-1.5 flex items-center justify-between">
                             <p className="text-[14px] font-semibold text-gray-900">
                               {listing.asking_price ? `$${toNum(listing.asking_price).toLocaleString()}` : 'Inquire'}
@@ -474,7 +763,7 @@ export default function BuyerDashboard() {
         </section>
 
         {/* Saved listings */}
-        <section className="bg-white rounded-xl shadow border border-gray-200 p-6">
+        <section id="saved" className="bg-white rounded-xl shadow border border-gray-200 p-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-xl font-semibold text-gray-800">Saved Listings</h2>
             <Link href="/listings">
@@ -485,10 +774,16 @@ export default function BuyerDashboard() {
           {loadingSaved ? (
             <p className="text-gray-600">Loading saved listings…</p>
           ) : savedListings.length === 0 ? (
-            <p className="text-gray-600">
-              You haven’t saved any listings yet.{` `}
-              <Link href="/listings"><a className="text-blue-600 underline">Browse available businesses</a></Link>.
-            </p>
+            <div className="text-gray-700">
+              <p>You haven’t saved any listings yet.</p>
+              <div className="mt-3">
+                <Link href="/listings">
+                  <a className="inline-flex items-center justify-center bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-semibold">
+                    Browse listings & Propose a Deal →
+                  </a>
+                </Link>
+              </div>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5">
               {savedListings.map((lst) => {
@@ -559,7 +854,9 @@ export default function BuyerDashboard() {
         </section>
 
         {/* Recent conversations */}
-        <RecentConversations profileEmail={profile?.email} />
+        <div id="conversations">
+          <RecentConversations profileEmail={profile?.email} />
+        </div>
 
         {/* Danger Zone: deactivate or delete */}
         <BuyerDangerZone />
@@ -568,7 +865,20 @@ export default function BuyerDashboard() {
   );
 }
 
-/* ---------- Matching helpers ---------- */
+/* ---------- Small components (added) ---------- */
+
+function KpiTile({ label, value, href }) {
+  return (
+    <Link href={href || '#'}>
+      <a className="block bg-white rounded-xl shadow border border-gray-200 p-4 hover:shadow-md transition">
+        <div className="text-[13px] text-gray-500">{label}</div>
+        <div className="text-2xl font-bold text-gray-900 mt-1">{value}</div>
+      </a>
+    </Link>
+  );
+}
+
+/* ---------- Matching helpers (unchanged + a couple tiny tweaks) ---------- */
 
 function toNum(v) {
   if (v === null || v === undefined) return 0;
@@ -588,6 +898,13 @@ function parseCSV(str) {
   return String(str || '')
     .split(',')
     .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function splitCSV(s) {
+  return String(s || '')
+    .split(',')
+    .map(x => x.trim())
     .filter(Boolean);
 }
 
@@ -623,7 +940,6 @@ function financingCompatible(profileFinancing, listing) {
     return sellerConsidered === 'yes' || sellerConsidered === 'maybe' || lf === 'seller-financing';
   }
   if (pf === 'rent-to-own') {
-    // ✅ FIX: don’t always return truthy
     return lf === 'rent-to-own' || sellerConsidered === 'yes' || sellerConsidered === 'maybe';
   }
   if (pf === 'third-party') {
@@ -766,7 +1082,7 @@ function RecentConversations({ profileEmail }) {
       {loadingMessages ? (
         <p className="text-gray-600">Loading messages…</p>
       ) : latestByListing.length === 0 ? (
-        <p className="text-gray-600">No conversations yet. Start by contacting a seller on a listing.</p>
+        <p className="text-gray-600">No conversations yet. Contact a seller on any listing to start a thread.</p>
       ) : (
         <div className="divide-y">
           {latestByListing.map(([lid, last]) => (
