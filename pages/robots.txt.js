@@ -1,14 +1,16 @@
 // pages/robots.txt.js
 export async function getServerSideProps({ req, res }) {
   const host = req.headers['host'];
-  const proto = req.headers['x-forwarded-proto'] || 'https';
+  // Always prefer https for production; fallback for local
+  const proto = host.includes('localhost') ? 'http' : 'https';
   const siteUrl = `${proto}://${host}`;
 
   const text = [
     'User-agent: *',
     'Allow: /',
+    'Crawl-delay: 10',
     `Sitemap: ${siteUrl}/sitemap.xml`,
-    ''
+    '',
   ].join('\n');
 
   res.setHeader('Content-Type', 'text/plain');
