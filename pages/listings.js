@@ -129,6 +129,25 @@ export default function Listings() {
   const [buyerEmail, setBuyerEmail] = useState(null);
   const [error, setError] = useState('');
 
+  // 🔐 NEW: auth check to hide the unlock card after login
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (mounted) {
+        setIsLoggedIn(!!data?.user);
+        setCheckingAuth(false);
+      }
+    })();
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      setIsLoggedIn(!!s?.user);
+    });
+    return () => sub?.subscription?.unsubscribe?.();
+  }, []);
+
   // Debounce search input for normal keyword queries
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedTerm(searchTerm.trim()), 500);
@@ -305,44 +324,46 @@ export default function Listings() {
           </div>
         </form>
 
-        {/* 🔓 Unlock Section */}
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-10 max-w-3xl mx-auto text-center border border-gray-100">
-          <h2 className="text-3xl font-bold text-[#1E3A8A] mb-3">Unlock Full Buyer Access</h2>
-          <p className="text-gray-600 mb-6 text-lg">
-            Unlock AI-powered tools to make smarter offers and match with the right businesses.
-          </p>
+        {/* 🔓 Unlock Section — now hidden if logged in */}
+        {!checkingAuth && !isLoggedIn && (
+          <div className="bg-white rounded-2xl shadow-lg p-8 mb-10 max-w-3xl mx-auto text-center border border-gray-100">
+            <h2 className="text-3xl font-bold text-[#1E3A8A] mb-3">Unlock Full Buyer Access</h2>
+            <p className="text-gray-600 mb-6 text-lg">
+              Unlock AI-powered tools to make smarter offers and match with the right businesses.
+            </p>
 
-          <div className="text-left max-w-md mx-auto space-y-3 mb-6">
-            {[
-              'Access detailed financials and seller info',
-              'Message sellers directly',
-              'Save and track listings in your dashboard',
-              'Use our AI-powered Deal Maker to structure offers',
-              'Get AI-matched with businesses that fit your goals'
-            ].map((text, idx) => (
-              <div className="flex items-start" key={idx}>
-                <svg className="w-5 h-5 text-green-500 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <p className="ml-3 text-gray-700">{text}</p>
-              </div>
-            ))}
-          </div>
+            <div className="text-left max-w-md mx-auto space-y-3 mb-6">
+              {[
+                'Access detailed financials and seller info',
+                'Message sellers directly',
+                'Save and track listings in your dashboard',
+                'Use our AI-powered Deal Maker to structure offers',
+                'Get AI-matched with businesses that fit your goals'
+              ].map((text, idx) => (
+                <div className="flex items-start" key={idx}>
+                  <svg className="w-5 h-5 text-green-500 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <p className="ml-3 text-gray-700">{text}</p>
+                </div>
+              ))}
+            </div>
 
-          {/* Buttons: **grid** to avoid any overlap on mobile; row on sm+ */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Link href="/buyer-onboarding">
-              <a className="block w-full text-center bg-[#1E3A8A] hover:bg-[#0f2357] text-white px-6 py-3 rounded-lg font-semibold shadow">
-                Create Buyer Profile
-              </a>
-            </Link>
-            <Link href="/login">
-              <a className="block w-full text-center bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold border">
-                Login
-              </a>
-            </Link>
+            {/* Buttons: grid to avoid overlap on mobile; row on sm+ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Link href="/buyer-onboarding">
+                <a className="block w-full text-center bg-[#1E3A8A] hover:bg-[#0f2357] text-white px-6 py-3 rounded-lg font-semibold shadow">
+                  Create Buyer Profile
+                </a>
+              </Link>
+              <Link href="/login">
+                <a className="block w-full text-center bg-gray-100 hover:bg-gray-200 text-gray-800 px-6 py-3 rounded-lg font-semibold border">
+                  Login
+                </a>
+              </Link>
+            </div>
           </div>
-        </div>
+        )}
 
         {error && <p className="text-center text-red-600 mb-6">{error}</p>}
 
@@ -374,4 +395,3 @@ export default function Listings() {
     </div>
   );
 }
-
