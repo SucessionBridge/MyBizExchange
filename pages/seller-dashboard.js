@@ -1,7 +1,7 @@
-// pages/seller-dashboard.js
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
+// pages/seller-dashboard.js
 
 /* ------------ helper: who/colour for SELLER view (original core) ------------ */
 function whoAndColorForSeller(msg, sellerAuthId) {
@@ -28,6 +28,9 @@ const QUICK_TEMPLATES = [
   "We’re considering seller financing. Tell me a bit about your experience and timeline.",
   "Can you share your background and what attracts you to this business?"
 ];
+
+// Max size for uploads (in MB)
+const MAX_FILE_MB = 25;
 
 /* --------------------- localStorage: 'last seen' timestamps ------------------ */
 const seenStorage = {
@@ -190,7 +193,7 @@ export default function SellerDashboard() {
         .in('listing_id', ids)
         .order('created_at', { ascending: true });
 
-      if (error) {
+    if (error) {
         console.error('Failed to fetch messages:', error.message);
         setMessages([]);
       } else {
@@ -291,15 +294,26 @@ export default function SellerDashboard() {
         [...thread].reverse().find(m => m.buyer_name && m.buyer_name.trim()) || thread[0];
       const buyerName = knownBuyerMsg?.buyer_name?.trim() || buyerEmail || 'Buyer';
 
+      // attachments (with size/type checks + sanitized path)
       let attachments = [];
       if (files.length > 0) {
+        const skipped = [];
         for (const file of files) {
           const isImage = file.type?.startsWith('image/');
           const isVideo = file.type?.startsWith('video/');
-          if (!isImage && !isVideo) continue;
+          if (!isImage && !isVideo) {
+            skipped.push(`${file.name} (unsupported type)`);
+            continue;
+          }
+          const tooBig = file.size > MAX_FILE_MB * 1024 * 1024;
+          if (tooBig) {
+            skipped.push(`${file.name} (> ${MAX_FILE_MB}MB)`);
+            continue;
+          }
 
           const safeName = file.name.replace(/[^\w.\-]+/g, '_');
-          const path = `listing-${listingId}/seller-${sellerEmail}/${Date.now()}-${safeName}`;
+          const safeSeller = String(sellerEmail || 'seller').replace(/[^\w.\-]+/g, '_');
+          const path = `listing-${listingId}/seller-${safeSeller}/${Date.now()}-${safeName}`;
           const { error: upErr } = await supabase.storage
             .from(ATTACH_BUCKET)
             .upload(path, file, { cacheControl: '3600', upsert: false });
@@ -315,6 +329,9 @@ export default function SellerDashboard() {
             mime: file.type,
             kind: isImage ? 'image' : 'video',
           });
+        }
+        if (skipped.length) {
+          alert(`Some files were skipped:\n- ${skipped.join('\n- ')}`);
         }
       }
 
@@ -383,14 +400,19 @@ export default function SellerDashboard() {
         last?.from_seller ? "No" : "Yes"
       ]);
     });
+
     const csv = rows.map(r => r.map(v => `"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    // Prepend BOM for Excel; safer anchor click for Safari
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    a.style.display = 'none';
     a.href = url;
     a.download = `listing-${lid}-inquiries.csv`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
   /* ------------------------- Smart “AI” local draft ------------------------ */
