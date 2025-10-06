@@ -3,45 +3,35 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
 
-/* -----------------------------------------------------------------------------
-  Seller Dashboard (pages router)
-  - Safe hook usage (no conditional hooks)
-  - Hydration guard to avoid React #310/#418 in production
-  - “Welcome back” header to mirror Buyer dashboard
-  - Listings + grouped buyer conversations
-  - Quick replies, “AI” local draft (no API calls)
-  - Archive + last-seen (localStorage)
-  - CSV export (BOM + safe anchor click)
-  - Calendar slots -> GCal links
-  - Attachment uploads (image/video) w/ size + type checks
------------------------------------------------------------------------------ */
-
-/* ----------------------------- small pure helpers --------------------------- */
+/* ------------ helper: who/colour for SELLER view (original core) ------------ */
 function whoAndColorForSeller(msg, sellerAuthId) {
-  if (msg.from_seller === true)  return { who: 'You',   color: 'bg-green-100 text-green-900' };
-  if (msg.from_seller === false) return { who: 'Buyer', color: 'bg-blue-100 text-blue-900' };
+  if (msg.from_seller === true)  return { who: "You",   color: "bg-green-100 text-green-900" };
+  if (msg.from_seller === false) return { who: "Buyer", color: "bg-blue-100 text-blue-900" };
 
   const fromMe =
     msg?.seller_id && sellerAuthId &&
     String(msg.seller_id).toLowerCase() === String(sellerAuthId).toLowerCase();
 
   return fromMe
-    ? { who: 'You',   color: 'bg-green-100 text-green-900' }
-    : { who: 'Buyer', color: 'bg-blue-100 text-blue-900' };
+    ? { who: "You",   color: "bg-green-100 text-green-900" }
+    : { who: "Buyer", color: "bg-blue-100 text-blue-900" };
 }
 
 const convKey = (listingId, buyerEmail) =>
   `${listingId}__${(buyerEmail || 'unknown').toLowerCase()}`;
 
 const ATTACH_BUCKET = 'message-attachments';
-const MAX_FILE_MB = 25;
+const DISPLAY_NAME_KEY = 'seller_display_name_v1';   // local override for greeting
 
 const QUICK_TEMPLATES = [
-  'Thanks for your interest! When would you like to chat?',
-  'Happy to share more details. What questions do you have?',
-  'We’re considering seller financing. Tell me a bit about your experience and timeline.',
-  'Can you share your background and what attracts you to this business?'
+  "Thanks for your interest! When would you like to chat?",
+  "Happy to share more details. What questions do you have?",
+  "We’re considering seller financing. Tell me a bit about your experience and timeline.",
+  "Can you share your background and what attracts you to this business?"
 ];
+
+// Max size for uploads (in MB)
+const MAX_FILE_MB = 25;
 
 /* --------------------- localStorage: 'last seen' timestamps ------------------ */
 const seenStorage = {
@@ -118,12 +108,9 @@ function gcalLink({ title, start, minutes=30, details, location }) {
 export default function SellerDashboard() {
   const router = useRouter();
 
-  // Mount guard prevents SSR/CSR mismatches (e.g., timezone, window usage)
-  const [mounted, setMounted] = useState(false);
-
   const [user, setUser] = useState(null);
   const [sellerEmail, setSellerEmail] = useState(null);
-  const [sellerName, setSellerName] = useState(null); // for “Welcome back”
+  const [sellerName, setSellerName] = useState(''); // NEW: friendly name for greeting
 
   const [sellerListings, setSellerListings] = useState([]);
   const [loadingListings, setLoadingListings] = useState(true);
@@ -155,9 +142,7 @@ export default function SellerDashboard() {
   // Realtime
   const channelsRef = useRef([]);
 
-  /* ---------------------------- Mount + Auth -------------------------------- */
-  useEffect(() => { setMounted(true); }, []);
-
+  /* ---------------------------- Auth & Greeting ---------------------------- */
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase.auth.getUser();
@@ -165,45 +150,60 @@ export default function SellerDashboard() {
         router.push('/login');
         return;
       }
+
       setUser(data.user);
       const email = data.user.email || null;
       setSellerEmail(email);
 
-      // Try to fetch a friendly name (mirror buyer dash UX). If you store names
-      // in a 'profiles' table (id = auth.user.id) or in 'sellers', try both.
-      let friendly = null;
+      // Resolve friendly display name with robust fallbacks
+      let friendly =
+        (typeof window !== 'undefined'
+          ? localStorage.getItem(DISPLAY_NAME_KEY)
+          : null) || null;
 
-      // 1) profiles table (optional)
-      try {
-        const { data: prof } = await supabase
-          .from('profiles')
-          .select('full_name')
-          .eq('id', data.user.id)
-          .maybeSingle?.() ?? {};
-        if (prof?.full_name) friendly = prof.full_name;
-      } catch {}
+      // 1) user metadata (OAuth providers often set this)
+      if (!friendly) {
+        const um = data.user.user_metadata || {};
+        friendly = um.full_name || um.name || um.preferred_username || null;
+      }
 
-      // 2) fallback: first seller row’s contact_name (if present)
-      if (!friendly && email) {
+      // 2) profiles table
+      if (!friendly) {
         try {
-          const { data: sellers } = await supabase
-            .from('sellers')
-            .select('contact_name')
-            .eq('email', email)
-            .limit(1);
-          const cn = sellers?.[0]?.contact_name;
-          if (cn) friendly = cn;
+          let profRes = await supabase
+            .from('profiles')
+            .select('full_name, name, display_name')
+            .eq('id', data.user.id)
+            .single();
+          if (profRes?.data) {
+            friendly = profRes.data.display_name || profRes.data.full_name || profRes.data.name || null;
+          }
         } catch {}
       }
 
-      // 3) email local part fallback
-      if (!friendly && email) friendly = email.split('@')[0];
+      // 3) sellers table (by email)
+      if (!friendly && email) {
+        try {
+          const sellersRes = await supabase
+            .from('sellers')
+            .select('display_name, contact_name, owner_name')
+            .eq('email', email)
+            .limit(1);
+          const s = sellersRes?.data?.[0];
+          friendly = s?.display_name || s?.contact_name || s?.owner_name || null;
+        } catch {}
+      }
+
+      // 4) final fallback: email local part
+      if (!friendly && email) {
+        friendly = email.split('@')[0];
+      }
 
       setSellerName(friendly || 'there');
     })();
   }, [router]);
 
-  /* ------------------------------ Listings ---------------------------------- */
+  /* ---------------------------- Listings load ------------------------------ */
   useEffect(() => {
     if (!sellerEmail) return;
 
@@ -276,7 +276,7 @@ export default function SellerDashboard() {
     };
   }, [sellerListings]);
 
-  /* ----------------------- Grouped threads & stats -------------------------- */
+  /* ----------------------- Grouped threads & stats ------------------------- */
   const groupedByListingBuyer = useMemo(() => {
     const map = {};
     for (const msg of messages) {
@@ -317,7 +317,7 @@ export default function SellerDashboard() {
     return stats;
   }, [groupedByListingBuyer, listingIds]);
 
-  /* --------------------------- Composer helpers ----------------------------- */
+  /* --------------------------- Composer helpers ---------------------------- */
   function onPickFiles(listingId, buyerEmail, e) {
     const files = Array.from(e.target.files || []);
     const key = convKey(listingId, buyerEmail);
@@ -345,6 +345,7 @@ export default function SellerDashboard() {
         [...thread].reverse().find(m => m.buyer_name && m.buyer_name.trim()) || thread[0];
       const buyerName = knownBuyerMsg?.buyer_name?.trim() || buyerEmail || 'Buyer';
 
+      // attachments (with size/type checks + sanitized path)
       let attachments = [];
       if (files.length > 0) {
         const skipped = [];
@@ -412,7 +413,7 @@ export default function SellerDashboard() {
     }
   }
 
-  /* --------------------------- Filter / Search ------------------------------ */
+  /* --------------------------- Filter / Search ----------------------------- */
   function threadMatchesFilters(thread, key) {
     const isArchived = archiveStorage.isArchived(key);
     if (filterTab === 'archived') return isArchived;
@@ -433,10 +434,10 @@ export default function SellerDashboard() {
     return true;
   }
 
-  /* ------------------------------ CSV export -------------------------------- */
+  /* ------------------------------ CSV export ------------------------------- */
   function exportCSV(lid) {
     const buyersMap = groupedByListingBuyer[lid] || {};
-    const rows = [['Buyer Name','Buyer Email','Messages','Last Message At','Awaiting Reply']];
+    const rows = [["Buyer Name","Buyer Email","Messages","Last Message At","Awaiting Reply"]];
     Object.keys(buyersMap).forEach((bk) => {
       const thread = buyersMap[bk];
       const last = thread[thread.length - 1];
@@ -447,7 +448,7 @@ export default function SellerDashboard() {
         email,
         String(thread.length),
         new Date(last.created_at).toLocaleString(),
-        last?.from_seller ? 'No' : 'Yes'
+        last?.from_seller ? "No" : "Yes"
       ]);
     });
 
@@ -465,7 +466,7 @@ export default function SellerDashboard() {
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
-  /* ------------------------- Smart “AI” local draft ------------------------- */
+  /* ------------------------- Smart “AI” local draft ------------------------ */
   function draftSmartReply(listing, thread) {
     const lastBuyerMsg = [...thread].reverse().find(m => !m.from_seller)?.message || '';
     const name = listing?.business_name || 'the business';
@@ -493,12 +494,7 @@ export default function SellerDashboard() {
     return lines.join('\n\n');
   }
 
-  /* --------------------------------- UI ------------------------------------ */
-  // While SSR renders, skip client-only bits to avoid hydration mismatch
-  if (!mounted) {
-    return <div className="p-8 text-center text-gray-600">Loading…</div>;
-  }
-
+  /* --------------------------------- UI ----------------------------------- */
   if (!user) {
     return <div className="p-8 text-center text-gray-600">Loading dashboard…</div>;
   }
@@ -511,16 +507,16 @@ export default function SellerDashboard() {
     .reduce((a,b) => a+b, 0);
 
   return (
-    <main className="max-w-7xl mx-auto px-4 py-8">
-      {/* Welcome header (match Buyer dashboard tone) */}
-      <div className="rounded-xl border bg-gradient-to-r from-amber-50 to-white p-5 mb-6">
-        <div className="flex items-center justify-between">
+    <div className="max-w-7xl mx-auto px-4 py-8">
+      {/* Header */}
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-amber-900">
-              Welcome back, {sellerName || 'there'} 👋
+            <h1 className="text-2xl font-bold text-amber-900">
+              {sellerName ? `Welcome back, ${sellerName}` : 'Seller Dashboard'}
             </h1>
-            <p className="text-sm text-amber-800/80 mt-1">
-              Review buyer conversations, share files, and keep momentum going.
+            <p className="text-sm text-amber-900/80 mt-0.5">
+              Manage listings, message buyers, and track follow-ups.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -532,8 +528,7 @@ export default function SellerDashboard() {
             </button>
           </div>
         </div>
-
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+        <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
           <StatPill label="Listings" value={sellerListings.length} />
           <StatPill label="Conversations" value={totalConvs} />
           <StatPill label="Awaiting Reply" value={totalAwaiting} highlight />
@@ -544,7 +539,7 @@ export default function SellerDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Listings + Conversations */}
-        <section className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 space-y-8">
           {/* Listings */}
           <div className="bg-white p-6 rounded-xl shadow">
             <h2 className="text-xl font-semibold text-amber-700 mb-4">Your Listings</h2>
@@ -589,7 +584,7 @@ export default function SellerDashboard() {
 
                         <p className="text-gray-700"><strong>Industry:</strong> {lst.industry || '—'}</p>
                         <p className="text-gray-700"><strong>Asking Price:</strong> {lst.asking_price ? `$${Number(lst.asking_price).toLocaleString()}` : '—'}</p>
-                        <p className="text-gray-700"><strong>Location:</strong> {(lst.city || lst.location_city || '—')}, {(lst.state_or_province || lst.location_state || '—')}</p>
+                        <p className="text-gray-700"><strong>Location:</strong> {lst.city || lst.location_city || '—'}, {lst.state_or_province || lst.location_state || '—'}</p>
 
                         <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                           <MiniStat label="Buyers" value={stats.uniqueBuyers} />
@@ -912,7 +907,7 @@ export default function SellerDashboard() {
               })
             )}
           </div>
-        </section>
+        </div>
 
         {/* Right: Seller meta */}
         <aside className="bg-white p-6 rounded-xl shadow h-fit">
@@ -921,11 +916,52 @@ export default function SellerDashboard() {
           <p className="text-sm text-gray-600 mt-2">
             Threads are grouped by listing, then buyer. Use filters to find unreplied or archived conversations.
           </p>
+
+          {/* Display name editor */}
+          <div className="mt-4 border-t pt-4">
+            <label className="block text-sm font-medium mb-1">Display name</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={sellerName || ''}
+                onChange={(e) => setSellerName(e.target.value)}
+                className="border rounded px-2 py-1 flex-1"
+                placeholder="Your name"
+              />
+              <button
+                className="px-3 py-1 rounded bg-amber-600 text-white hover:bg-amber-700"
+                onClick={async () => {
+                  try {
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem(DISPLAY_NAME_KEY, sellerName || '');
+                    }
+                    if (user?.id) {
+                      // best-effort upsert to profiles
+                      await supabase
+                        .from('profiles')
+                        .upsert({ id: user.id, full_name: sellerName || null }, { onConflict: 'id' });
+                    }
+                    alert('Saved! Your greeting will use this name.');
+                  } catch (e) {
+                    console.warn('Save name failed:', e);
+                    alert('Saved locally. (Could not sync to database.)');
+                  }
+                }}
+              >
+                Save
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Used for the “Welcome back” greeting. Stored locally and synced to your profile when possible.
+            </p>
+          </div>
         </aside>
       </div>
 
       {/* CSV Explainer modal */}
-      {csvHelpOpen && <CsvExplainerModal onClose={() => setCsvHelpOpen(false)} />}
+      {csvHelpOpen && (
+        <CsvExplainerModal onClose={() => setCsvHelpOpen(false)} />
+      )}
 
       {/* Calendar modal */}
       {calKey && (
@@ -943,7 +979,7 @@ export default function SellerDashboard() {
           }}
         />
       )}
-    </main>
+    </div>
   );
 }
 
