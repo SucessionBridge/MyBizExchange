@@ -1,5 +1,5 @@
 // pages/broker-dashboard.js
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseBrowserClient';
@@ -11,6 +11,12 @@ export default function BrokerDashboard() {
   const [threads, setThreads] = useState([]);
   const [listings, setListings] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // UI state (MLS-style)
+  const [statusFilter, setStatusFilter] = useState('all'); // 'all' or specific status
+  const [financingFilter, setFinancingFilter] = useState('all'); // 'all' or specific type
+  const [search, setSearch] = useState('');
+  const [sortBy, setSortBy] = useState('mls'); // 'mls' | 'newest' | 'priceHigh' | 'priceLow' | 'name'
 
   useEffect(() => {
     let cancelled = false;
@@ -116,6 +122,7 @@ export default function BrokerDashboard() {
     };
   }, [router]);
 
+  // helpers
   const fmtMoney = (n) =>
     typeof n === 'number' && Number.isFinite(n) ? `$${n.toLocaleString()}` : 'Inquire';
 
@@ -126,24 +133,143 @@ export default function BrokerDashboard() {
     return l?.location || 'Location undisclosed';
   };
 
+  const isVerified =
+    (broker?.verification_status?.toLowerCase?.() === 'verified') ||
+    !!broker?.verified;
+
+  const statusBadgeClasses = (statusRaw) => {
+    const status = (statusRaw || '').toString().toLowerCase();
+    // MLS-style colors: active=green, pending=amber, sold=slate, withdrawn=rose, off-market=gray, draft=gray
+    if (status.includes('active')) return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    if (status.includes('pending') || status.includes('offer')) return 'bg-amber-50 text-amber-700 border-amber-200';
+    if (status.includes('sold') || status.includes('closed')) return 'bg-slate-50 text-slate-700 border-slate-200';
+    if (status.includes('withdraw') || status.includes('canceled') || status.includes('cancelled')) return 'bg-rose-50 text-rose-700 border-rose-200';
+    if (status.includes('off')) return 'bg-gray-50 text-gray-700 border-gray-200';
+    if (status.includes('draft')) return 'bg-gray-50 text-gray-700 border-gray-200';
+    return 'bg-gray-50 text-gray-700 border-gray-200';
+  };
+
+  const financingBadgeClasses = (type) => {
+    switch (type) {
+      case 'seller-financing-available':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'seller-financing-considered':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'buyer-financed':
+        return 'bg-gray-50 text-gray-700 border-gray-200';
+      default:
+        return 'bg-gray-50 text-gray-700 border-gray-200';
+    }
+  };
+
+  // derive facets & stats
+  const distinctStatuses = useMemo(() => {
+    const set = new Set((listings || []).map(l => (l.status || '').toString()).filter(Boolean));
+    return ['all', ...Array.from(set)];
+  }, [listings]);
+
+  const distinctFinancing = useMemo(() => {
+    const set = new Set((listings || []).map(l => (l.financing_type || '').toString()).filter(Boolean));
+    return ['all', ...Array.from(set)];
+  }, [listings]);
+
+  const quickStats = useMemo(() => {
+    const total = listings.length;
+    const byStatus = listings.reduce((acc, l) => {
+      const k = (l.status || 'Unspecified').toString();
+      acc[k] = (acc[k] || 0) + 1;
+      return acc;
+    }, {});
+    const activeCount = Object.entries(byStatus).reduce((sum, [k, v]) => {
+      return sum + (k.toLowerCase().includes('active') ? v : 0);
+    }, 0);
+    const pendingCount = Object.entries(byStatus).reduce((sum, [k, v]) => {
+      return sum + (k.toLowerCase().includes('pending') || k.toLowerCase().includes('offer') ? v : 0);
+    }, 0);
+    const soldCount = Object.entries(byStatus).reduce((sum, [k, v]) => {
+      return sum + (k.toLowerCase().includes('sold') || k.toLowerCase().includes('closed') ? v : 0);
+    }, 0);
+
+    const unread = (threads || []).reduce((sum, t) => sum + (Number(t.unread_count) || 0), 0);
+
+    return { total, activeCount, pendingCount, soldCount, unread, byStatus };
+  }, [listings, threads]);
+
+  // filtered + sorted listings (client-side only, preserving Supabase logic unchanged)
+  const filteredSortedListings = useMemo(() => {
+    let arr = [...(listings || [])];
+
+    // filter: status
+    if (statusFilter !== 'all') {
+      arr = arr.filter(l => (l.status || '').toString() === statusFilter);
+    }
+
+    // filter: financing
+    if (financingFilter !== 'all') {
+      arr = arr.filter(l => (l.financing_type || '').toString() === financingFilter);
+    }
+
+    // filter: search (business name or location)
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      arr = arr.filter(l => {
+        const name = (l.business_name || '').toLowerCase();
+        const loc = (listingLocation(l) || '').toLowerCase();
+        const idStr = String(l.id || '');
+        return name.includes(q) || loc.includes(q) || idStr.includes(q);
+      });
+    }
+
+    // sort
+    const numeric = (v) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : -Infinity;
+    };
+
+    if (sortBy === 'mls') {
+      // MLS-style: Active first, then Pending/Offer, then the rest,
+      // each bucket sorted by newest created_at
+      const bucketScore = (s) => {
+        const st = (s || '').toLowerCase();
+        if (st.includes('active')) return 0;
+        if (st.includes('pending') || st.includes('offer')) return 1;
+        if (st.includes('sold') || st.includes('closed')) return 3; // sold later
+        return 2; // everything else between pending and sold
+      };
+      arr.sort((a, b) => {
+        const score = bucketScore(a.status) - bucketScore(b.status);
+        if (score !== 0) return score;
+        const at = new Date(a.created_at || 0).getTime();
+        const bt = new Date(b.created_at || 0).getTime();
+        return bt - at; // newest first
+      });
+    } else if (sortBy === 'newest') {
+      arr.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+    } else if (sortBy === 'priceHigh') {
+      arr.sort((a, b) => numeric(b.asking_price) - numeric(a.asking_price));
+    } else if (sortBy === 'priceLow') {
+      arr.sort((a, b) => numeric(a.asking_price) - numeric(b.asking_price));
+    } else if (sortBy === 'name') {
+      arr.sort((a, b) => (a.business_name || '').localeCompare(b.business_name || ''));
+    }
+
+    return arr;
+  }, [listings, statusFilter, financingFilter, search, sortBy]);
+
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto p-6 space-y-6">
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="h-6 w-48 bg-gray-100 animate-pulse rounded" />
-        <div className="h-32 bg-gray-50 animate-pulse rounded" />
+        <div className="h-24 bg-gray-50 animate-pulse rounded" />
         <div className="h-64 bg-gray-50 animate-pulse rounded" />
       </div>
     );
   }
 
-  // ✅ Unified verified flag (checks either column)
-  const isVerified =
-    (broker?.verification_status?.toLowerCase?.() === 'verified') ||
-    !!broker?.verified;
-
   return (
-    <div className="max-w-5xl mx-auto p-6 space-y-8">
-      <header className="flex items-center gap-3">
+    <div className="max-w-6xl mx-auto p-6 space-y-8">
+      {/* Header */}
+      <header className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">
           {broker?.first_name ? `Welcome back, ${broker.first_name}` : 'Broker Dashboard'}
         </h1>
@@ -168,20 +294,27 @@ export default function BrokerDashboard() {
         </div>
       </header>
 
+      {/* Quick Stats (MLS-style cards) */}
+      <section className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <StatCard label="Total Listings" value={quickStats.total} />
+        <StatCard label="Active" value={quickStats.activeCount} tone="emerald" />
+        <StatCard label="Pending/Offers" value={quickStats.pendingCount} tone="amber" />
+        <StatCard label="Sold/Closed" value={quickStats.soldCount} tone="slate" />
+        <StatCard label="Unread Messages" value={quickStats.unread} tone="black" />
+      </section>
+
       {/* My Profile */}
       <section className="border rounded p-4">
         <div className="flex items-start gap-3">
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-semibold mb-1">My Profile</h2>
-           <div className="text-sm text-gray-600 mb-3">
-  { (broker?.verification_status?.toLowerCase?.() === 'verified') || broker?.verified
-      ? 'Status: verified'
-      : (broker?.verification_status?.toLowerCase?.() === 'rejected'
-          ? 'Status: rejected'
-          : 'Status: pending')
-  }
-</div>
-
+            <div className="text-sm text-gray-600 mb-3">
+              {(broker?.verification_status?.toLowerCase?.() === 'verified') || broker?.verified
+                ? 'Status: verified'
+                : (broker?.verification_status?.toLowerCase?.() === 'rejected'
+                    ? 'Status: rejected'
+                    : 'Status: pending')}
+            </div>
 
             <div className="grid md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
               <div><span className="text-gray-500">Name:</span> {`${broker?.first_name || ''} ${broker?.last_name || ''}`.trim() || '—'}</div>
@@ -212,7 +345,12 @@ export default function BrokerDashboard() {
 
       {/* Conversations */}
       <section>
-        <h2 className="text-lg font-semibold mb-3">Conversations</h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold">Conversations</h2>
+          <span className="text-xs text-gray-500">
+            Showing latest {Math.min((threads || []).length, 50)} threads
+          </span>
+        </div>
         <div className="grid gap-3">
           {(threads || []).map((t) => (
             <Link
@@ -221,7 +359,7 @@ export default function BrokerDashboard() {
               className="flex items-center justify-between border rounded p-3 hover:bg-gray-50"
             >
               <div>
-                <div className="text-sm text-gray-600">
+                <div className="text-sm text-gray-700 font-medium">
                   Listing #{t.listing_id} • Buyer #{t.buyer_id}
                 </div>
                 <div className="text-xs text-gray-500">
@@ -243,9 +381,90 @@ export default function BrokerDashboard() {
 
       {/* Listings */}
       <section>
-        <h2 className="text-lg font-semibold mb-3">My Listings</h2>
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <h2 className="text-lg font-semibold mr-2">My Listings</h2>
+
+          {/* Status filter pills */}
+          <div className="flex flex-wrap items-center gap-2">
+            {distinctStatuses.map((s) => (
+              <button
+                key={`status-${s}`}
+                onClick={() => setStatusFilter(s)}
+                className={
+                  'text-xs px-2 py-1 rounded-full border transition ' +
+                  (statusFilter === s
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
+                }
+                title={s === 'all' ? 'All statuses' : s}
+              >
+                {s === 'all' ? 'All' : s}
+              </button>
+            ))}
+          </div>
+
+          {/* Financing filter pills */}
+          <div className="flex flex-wrap items-center gap-2 ml-auto">
+            {distinctFinancing.map((f) => (
+              <button
+                key={`fin-${f}`}
+                onClick={() => setFinancingFilter(f)}
+                className={
+                  'text-xs px-2 py-1 rounded-full border transition ' +
+                  (financingFilter === f
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')
+                }
+                title={f === 'all' ? 'All financing' : f}
+              >
+                {f === 'all' ? 'All financing' : f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Search + Sort */}
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by business, location, or ID…"
+            className="w-full md:w-72 px-3 py-2 border rounded outline-none focus:ring-2 focus:ring-black/10"
+          />
+          <div className="flex items-center gap-2">
+            <label htmlFor="sort" className="text-sm text-gray-600">Sort</label>
+            <select
+              id="sort"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-2 border rounded text-sm"
+            >
+              <option value="mls">MLS order (status → newest)</option>
+              <option value="newest">Newest</option>
+              <option value="priceHigh">Price: High → Low</option>
+              <option value="priceLow">Price: Low → High</option>
+              <option value="name">Name A → Z</option>
+            </select>
+          </div>
+          {/* Clear filters */}
+          {(statusFilter !== 'all' || financingFilter !== 'all' || search) && (
+            <button
+              onClick={() => { setStatusFilter('all'); setFinancingFilter('all'); setSearch(''); setSortBy('mls'); }}
+              className="ml-auto text-sm px-3 py-2 rounded border border-gray-300 hover:bg-gray-50"
+              title="Clear all filters"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Results count */}
+        <div className="text-xs text-gray-600 mb-2">
+          Showing {filteredSortedListings.length} of {listings.length} listing{listings.length === 1 ? '' : 's'}
+        </div>
+
         <div className="grid md:grid-cols-2 gap-4">
-          {(listings || []).map((l) => (
+          {(filteredSortedListings || []).map((l) => (
             <div key={l.id} className="border rounded p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
@@ -262,18 +481,11 @@ export default function BrokerDashboard() {
                     Created {l.created_at ? new Date(l.created_at).toLocaleDateString() : '—'}
                   </div>
 
-                  {/* Financing + status badges */}
+                  {/* Financing + status badges (MLS colors) */}
                   <div className="mt-2 flex flex-wrap gap-2">
                     {l.financing_type && (
                       <span
-                        className={
-                          "text-xs px-2 py-1 rounded border " +
-                          (l.financing_type === 'seller-financing-available'
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : l.financing_type === 'seller-financing-considered'
-                              ? "bg-amber-50 text-amber-700 border-amber-200"
-                              : "bg-gray-50 text-gray-700 border-gray-200")
-                        }
+                        className={`text-xs px-2 py-1 rounded border ${financingBadgeClasses(l.financing_type)}`}
                         title="Financing"
                       >
                         {l.financing_type === 'seller-financing-available' && 'Seller financing available'}
@@ -282,7 +494,10 @@ export default function BrokerDashboard() {
                       </span>
                     )}
                     {l.status && (
-                      <span className="text-xs px-2 py-1 rounded border bg-gray-50 text-gray-700 border-gray-200">
+                      <span
+                        className={`text-xs px-2 py-1 rounded border ${statusBadgeClasses(l.status)}`}
+                        title="Status"
+                      >
                         {l.status}
                       </span>
                     )}
@@ -302,11 +517,31 @@ export default function BrokerDashboard() {
               </div>
             </div>
           ))}
-          {listings?.length === 0 && (
-            <div className="text-sm text-gray-500">No listings assigned.</div>
+          {filteredSortedListings?.length === 0 && (
+            <div className="text-sm text-gray-500">No listings match your filters.</div>
           )}
         </div>
       </section>
+    </div>
+  );
+}
+
+/** ---- Small UI helper for quick stats cards ---- **/
+function StatCard({ label, value, tone }) {
+  const pill =
+    tone === 'emerald' ? 'bg-emerald-50 text-emerald-700' :
+    tone === 'amber' ? 'bg-amber-50 text-amber-700' :
+    tone === 'slate' ? 'bg-slate-50 text-slate-700' :
+    tone === 'black' ? 'bg-black text-white' :
+    'bg-gray-50 text-gray-700';
+
+  return (
+    <div className="border rounded p-3">
+      <div className="text-xs text-gray-500 mb-1">{label}</div>
+      <div className="text-2xl font-semibold">{value ?? 0}</div>
+      <div className={`inline-block mt-2 text-xs px-2 py-0.5 rounded ${pill}`}>
+        {label}
+      </div>
     </div>
   );
 }
