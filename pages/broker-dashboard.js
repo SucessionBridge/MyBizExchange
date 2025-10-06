@@ -227,8 +227,7 @@ export default function BrokerDashboard() {
     };
 
     if (sortBy === 'mls') {
-      // MLS-style: Active first, then Pending/Offer, then the rest,
-      // each bucket sorted by newest created_at
+      // Status-priority: Active → Pending/Offers → Other → Sold/Closed; newest first within buckets
       const bucketScore = (s) => {
         const st = (s || '').toLowerCase();
         if (st.includes('active')) return 0;
@@ -439,7 +438,7 @@ export default function BrokerDashboard() {
               onChange={(e) => setSortBy(e.target.value)}
               className="px-3 py-2 border rounded text-sm"
             >
-              <option value="mls">MLS order (status → newest)</option>
+              <option value="mls">Sort by status (newest first)</option>
               <option value="newest">Newest</option>
               <option value="priceHigh">Price: High → Low</option>
               <option value="priceLow">Price: Low → High</option>
