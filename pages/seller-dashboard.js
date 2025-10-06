@@ -1,55 +1,47 @@
 // pages/seller-dashboard.js
 import { useEffect, useMemo, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
 
-/* ----------------- helpers: display name / initials (for header) ----------------- */
-function getDisplayName(user) {
-  const meta = user?.user_metadata || {};
-  const name = meta.full_name || meta.name || meta.display_name || '';
-  return (name || user?.email || 'Seller').trim();
-}
-function getFirstName(displayName) {
-  return (displayName || '').split(/\s+/)[0] || displayName || 'Seller';
-}
-function initialsFrom(name) {
-  return (name || '')
-    .split(/\s+/)
-    .map(s => s[0]?.toUpperCase())
-    .filter(Boolean)
-    .slice(0, 2)
-    .join('');
-}
+/* -----------------------------------------------------------------------------
+  Seller Dashboard (pages router)
+  - Safe hook usage (no conditional hooks)
+  - Hydration guard to avoid React #310/#418 in production
+  - “Welcome back” header to mirror Buyer dashboard
+  - Listings + grouped buyer conversations
+  - Quick replies, “AI” local draft (no API calls)
+  - Archive + last-seen (localStorage)
+  - CSV export (BOM + safe anchor click)
+  - Calendar slots -> GCal links
+  - Attachment uploads (image/video) w/ size + type checks
+----------------------------------------------------------------------------- */
 
-/* ------------ helper: who/colour for SELLER view (original core) ------------ */
+/* ----------------------------- small pure helpers --------------------------- */
 function whoAndColorForSeller(msg, sellerAuthId) {
-  if (msg.from_seller === true)  return { who: "You",   color: "bg-green-100 text-green-900" };
-  if (msg.from_seller === false) return { who: "Buyer", color: "bg-blue-100 text-blue-900" };
+  if (msg.from_seller === true)  return { who: 'You',   color: 'bg-green-100 text-green-900' };
+  if (msg.from_seller === false) return { who: 'Buyer', color: 'bg-blue-100 text-blue-900' };
 
   const fromMe =
     msg?.seller_id && sellerAuthId &&
     String(msg.seller_id).toLowerCase() === String(sellerAuthId).toLowerCase();
 
   return fromMe
-    ? { who: "You",   color: "bg-green-100 text-green-900" }
-    : { who: "Buyer", color: "bg-blue-100 text-blue-900" };
+    ? { who: 'You',   color: 'bg-green-100 text-green-900' }
+    : { who: 'Buyer', color: 'bg-blue-100 text-blue-900' };
 }
 
 const convKey = (listingId, buyerEmail) =>
   `${listingId}__${(buyerEmail || 'unknown').toLowerCase()}`;
 
 const ATTACH_BUCKET = 'message-attachments';
+const MAX_FILE_MB = 25;
 
 const QUICK_TEMPLATES = [
-  "Thanks for your interest! When would you like to chat?",
-  "Happy to share more details. What questions do you have?",
-  "We’re considering seller financing. Tell me a bit about your experience and timeline.",
-  "Can you share your background and what attracts you to this business?"
+  'Thanks for your interest! When would you like to chat?',
+  'Happy to share more details. What questions do you have?',
+  'We’re considering seller financing. Tell me a bit about your experience and timeline.',
+  'Can you share your background and what attracts you to this business?'
 ];
-
-// Max size for uploads (in MB)
-const MAX_FILE_MB = 25;
 
 /* --------------------- localStorage: 'last seen' timestamps ------------------ */
 const seenStorage = {
@@ -123,11 +115,15 @@ function gcalLink({ title, start, minutes=30, details, location }) {
 }
 
 /* ------------------------------ main component ------------------------------ */
-function SellerDashboard() {
+export default function SellerDashboard() {
   const router = useRouter();
+
+  // Mount guard prevents SSR/CSR mismatches (e.g., timezone, window usage)
+  const [mounted, setMounted] = useState(false);
 
   const [user, setUser] = useState(null);
   const [sellerEmail, setSellerEmail] = useState(null);
+  const [sellerName, setSellerName] = useState(null); // for “Welcome back”
 
   const [sellerListings, setSellerListings] = useState([]);
   const [loadingListings, setLoadingListings] = useState(true);
@@ -159,7 +155,9 @@ function SellerDashboard() {
   // Realtime
   const channelsRef = useRef([]);
 
-  /* ---------------------------- Auth & Listings ---------------------------- */
+  /* ---------------------------- Mount + Auth -------------------------------- */
+  useEffect(() => { setMounted(true); }, []);
+
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase.auth.getUser();
@@ -168,10 +166,44 @@ function SellerDashboard() {
         return;
       }
       setUser(data.user);
-      setSellerEmail(data.user.email || null);
+      const email = data.user.email || null;
+      setSellerEmail(email);
+
+      // Try to fetch a friendly name (mirror buyer dash UX). If you store names
+      // in a 'profiles' table (id = auth.user.id) or in 'sellers', try both.
+      let friendly = null;
+
+      // 1) profiles table (optional)
+      try {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', data.user.id)
+          .maybeSingle?.() ?? {};
+        if (prof?.full_name) friendly = prof.full_name;
+      } catch {}
+
+      // 2) fallback: first seller row’s contact_name (if present)
+      if (!friendly && email) {
+        try {
+          const { data: sellers } = await supabase
+            .from('sellers')
+            .select('contact_name')
+            .eq('email', email)
+            .limit(1);
+          const cn = sellers?.[0]?.contact_name;
+          if (cn) friendly = cn;
+        } catch {}
+      }
+
+      // 3) email local part fallback
+      if (!friendly && email) friendly = email.split('@')[0];
+
+      setSellerName(friendly || 'there');
     })();
   }, [router]);
 
+  /* ------------------------------ Listings ---------------------------------- */
   useEffect(() => {
     if (!sellerEmail) return;
 
@@ -244,7 +276,7 @@ function SellerDashboard() {
     };
   }, [sellerListings]);
 
-  /* ----------------------- Grouped threads & stats ------------------------- */
+  /* ----------------------- Grouped threads & stats -------------------------- */
   const groupedByListingBuyer = useMemo(() => {
     const map = {};
     for (const msg of messages) {
@@ -285,7 +317,7 @@ function SellerDashboard() {
     return stats;
   }, [groupedByListingBuyer, listingIds]);
 
-  /* --------------------------- Composer helpers ---------------------------- */
+  /* --------------------------- Composer helpers ----------------------------- */
   function onPickFiles(listingId, buyerEmail, e) {
     const files = Array.from(e.target.files || []);
     const key = convKey(listingId, buyerEmail);
@@ -313,7 +345,6 @@ function SellerDashboard() {
         [...thread].reverse().find(m => m.buyer_name && m.buyer_name.trim()) || thread[0];
       const buyerName = knownBuyerMsg?.buyer_name?.trim() || buyerEmail || 'Buyer';
 
-      // attachments (with size/type checks + sanitized path)
       let attachments = [];
       if (files.length > 0) {
         const skipped = [];
@@ -381,7 +412,7 @@ function SellerDashboard() {
     }
   }
 
-  /* --------------------------- Filter / Search ----------------------------- */
+  /* --------------------------- Filter / Search ------------------------------ */
   function threadMatchesFilters(thread, key) {
     const isArchived = archiveStorage.isArchived(key);
     if (filterTab === 'archived') return isArchived;
@@ -402,10 +433,10 @@ function SellerDashboard() {
     return true;
   }
 
-  /* ------------------------------ CSV export ------------------------------- */
+  /* ------------------------------ CSV export -------------------------------- */
   function exportCSV(lid) {
     const buyersMap = groupedByListingBuyer[lid] || {};
-    const rows = [["Buyer Name","Buyer Email","Messages","Last Message At","Awaiting Reply"]];
+    const rows = [['Buyer Name','Buyer Email','Messages','Last Message At','Awaiting Reply']];
     Object.keys(buyersMap).forEach((bk) => {
       const thread = buyersMap[bk];
       const last = thread[thread.length - 1];
@@ -416,7 +447,7 @@ function SellerDashboard() {
         email,
         String(thread.length),
         new Date(last.created_at).toLocaleString(),
-        last?.from_seller ? "No" : "Yes"
+        last?.from_seller ? 'No' : 'Yes'
       ]);
     });
 
@@ -434,7 +465,7 @@ function SellerDashboard() {
     setTimeout(() => URL.revokeObjectURL(url), 0);
   }
 
-  /* ------------------------- Smart “AI” local draft ------------------------ */
+  /* ------------------------- Smart “AI” local draft ------------------------- */
   function draftSmartReply(listing, thread) {
     const lastBuyerMsg = [...thread].reverse().find(m => !m.from_seller)?.message || '';
     const name = listing?.business_name || 'the business';
@@ -462,14 +493,15 @@ function SellerDashboard() {
     return lines.join('\n\n');
   }
 
-  /* --------------------------------- UI ----------------------------------- */
+  /* --------------------------------- UI ------------------------------------ */
+  // While SSR renders, skip client-only bits to avoid hydration mismatch
+  if (!mounted) {
+    return <div className="p-8 text-center text-gray-600">Loading…</div>;
+  }
+
   if (!user) {
     return <div className="p-8 text-center text-gray-600">Loading dashboard…</div>;
   }
-
-  const displayName = useMemo(() => getDisplayName(user), [user]);
-  const firstName = useMemo(() => getFirstName(displayName), [displayName]);
-  const userInitials = initialsFrom(displayName);
 
   const totalConvs = listingIds
     .map(lid => Object.keys(groupedByListingBuyer[lid] || {}).length)
@@ -479,20 +511,17 @@ function SellerDashboard() {
     .reduce((a,b) => a+b, 0);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+    <main className="max-w-7xl mx-auto px-4 py-8">
+      {/* Welcome header (match Buyer dashboard tone) */}
+      <div className="rounded-xl border bg-gradient-to-r from-amber-50 to-white p-5 mb-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center font-bold">
-              {userInitials || 'SL'}
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-amber-900">
-                Welcome back, {firstName}
-              </h1>
-              <p className="text-xs text-amber-800/80">Seller Dashboard</p>
-            </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-amber-900">
+              Welcome back, {sellerName || 'there'} 👋
+            </h1>
+            <p className="text-sm text-amber-800/80 mt-1">
+              Review buyer conversations, share files, and keep momentum going.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -503,7 +532,8 @@ function SellerDashboard() {
             </button>
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+
+        <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
           <StatPill label="Listings" value={sellerListings.length} />
           <StatPill label="Conversations" value={totalConvs} />
           <StatPill label="Awaiting Reply" value={totalAwaiting} highlight />
@@ -514,7 +544,7 @@ function SellerDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Listings + Conversations */}
-        <div className="lg:col-span-2 space-y-8">
+        <section className="lg:col-span-2 space-y-8">
           {/* Listings */}
           <div className="bg-white p-6 rounded-xl shadow">
             <h2 className="text-xl font-semibold text-amber-700 mb-4">Your Listings</h2>
@@ -559,7 +589,7 @@ function SellerDashboard() {
 
                         <p className="text-gray-700"><strong>Industry:</strong> {lst.industry || '—'}</p>
                         <p className="text-gray-700"><strong>Asking Price:</strong> {lst.asking_price ? `$${Number(lst.asking_price).toLocaleString()}` : '—'}</p>
-                        <p className="text-gray-700"><strong>Location:</strong> {lst.city || lst.location_city || '—'}, {lst.state_or_province || lst.location_state || '—'}</p>
+                        <p className="text-gray-700"><strong>Location:</strong> {(lst.city || lst.location_city || '—')}, {(lst.state_or_province || lst.location_state || '—')}</p>
 
                         <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                           <MiniStat label="Buyers" value={stats.uniqueBuyers} />
@@ -882,22 +912,20 @@ function SellerDashboard() {
               })
             )}
           </div>
-        </div>
+        </section>
 
         {/* Right: Seller meta */}
-        <div className="bg-white p-6 rounded-xl shadow h-fit">
+        <aside className="bg-white p-6 rounded-xl shadow h-fit">
           <h2 className="text-xl font-semibold text-amber-800 mb-4">Account</h2>
           <p><strong>Email:</strong> {sellerEmail || '—'}</p>
           <p className="text-sm text-gray-600 mt-2">
             Threads are grouped by listing, then buyer. Use filters to find unreplied or archived conversations.
           </p>
-        </div>
+        </aside>
       </div>
 
       {/* CSV Explainer modal */}
-      {csvHelpOpen && (
-        <CsvExplainerModal onClose={() => setCsvHelpOpen(false)} />
-      )}
+      {csvHelpOpen && <CsvExplainerModal onClose={() => setCsvHelpOpen(false)} />}
 
       {/* Calendar modal */}
       {calKey && (
@@ -915,7 +943,7 @@ function SellerDashboard() {
           }}
         />
       )}
-    </div>
+    </main>
   );
 }
 
@@ -955,19 +983,10 @@ function Tabs({ value, onChange }) {
   );
 }
 
-/** Attachment preview (client-only URL resolution) */
+/** Inline preview for message attachments (public bucket) */
 function AttachmentPreview({ att }) {
-  const [url, setUrl] = useState(null);
-
-  useEffect(() => {
-    try {
-      const { data } = supabase.storage.from('message-attachments').getPublicUrl(att.path);
-      setUrl(data?.publicUrl || null);
-    } catch {
-      setUrl(null);
-    }
-  }, [att?.path]);
-
+  const { data } = supabase.storage.from('message-attachments').getPublicUrl(att.path);
+  const url = data?.publicUrl;
   if (!url) return null;
 
   if (att.kind === 'image') {
@@ -1111,6 +1130,3 @@ function CsvExplainerModal({ onClose }) {
     </div>
   );
 }
-
-/* ---------- EXPORT: disable SSR so browser-only bits don't crash ---------- */
-export default dynamic(() => Promise.resolve(SellerDashboard), { ssr: false });
