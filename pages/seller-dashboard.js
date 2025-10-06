@@ -1,7 +1,7 @@
+// pages/seller-dashboard.js
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
-// pages/seller-dashboard.js
 
 /* ------------ helper: who/colour for SELLER view (original core) ------------ */
 function whoAndColorForSeller(msg, sellerAuthId) {
@@ -193,7 +193,7 @@ export default function SellerDashboard() {
         .in('listing_id', ids)
         .order('created_at', { ascending: true });
 
-    if (error) {
+      if (error) {
         console.error('Failed to fetch messages:', error.message);
         setMessages([]);
       } else {
