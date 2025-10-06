@@ -21,7 +21,6 @@ const convKey = (listingId, buyerEmail) =>
   `${listingId}__${(buyerEmail || 'unknown').toLowerCase()}`;
 
 const ATTACH_BUCKET = 'message-attachments';
-const DISPLAY_NAME_KEY = 'seller_display_name_v1';   // local override for greeting
 
 const QUICK_TEMPLATES = [
   "Thanks for your interest! When would you like to chat?",
@@ -110,7 +109,7 @@ export default function SellerDashboard() {
 
   const [user, setUser] = useState(null);
   const [sellerEmail, setSellerEmail] = useState(null);
-  const [sellerName, setSellerName] = useState(''); // NEW: friendly name for greeting
+  const [sellerName, setSellerName] = useState(null); // ← NEW
 
   const [sellerListings, setSellerListings] = useState([]);
   const [loadingListings, setLoadingListings] = useState(true);
@@ -142,7 +141,7 @@ export default function SellerDashboard() {
   // Realtime
   const channelsRef = useRef([]);
 
-  /* ---------------------------- Auth & Greeting ---------------------------- */
+  /* ---------------------------- Auth & Listings ---------------------------- */
   useEffect(() => {
     (async () => {
       const { data, error } = await supabase.auth.getUser();
@@ -150,60 +149,11 @@ export default function SellerDashboard() {
         router.push('/login');
         return;
       }
-
       setUser(data.user);
-      const email = data.user.email || null;
-      setSellerEmail(email);
-
-      // Resolve friendly display name with robust fallbacks
-      let friendly =
-        (typeof window !== 'undefined'
-          ? localStorage.getItem(DISPLAY_NAME_KEY)
-          : null) || null;
-
-      // 1) user metadata (OAuth providers often set this)
-      if (!friendly) {
-        const um = data.user.user_metadata || {};
-        friendly = um.full_name || um.name || um.preferred_username || null;
-      }
-
-      // 2) profiles table
-      if (!friendly) {
-        try {
-          let profRes = await supabase
-            .from('profiles')
-            .select('full_name, name, display_name')
-            .eq('id', data.user.id)
-            .single();
-          if (profRes?.data) {
-            friendly = profRes.data.display_name || profRes.data.full_name || profRes.data.name || null;
-          }
-        } catch {}
-      }
-
-      // 3) sellers table (by email)
-      if (!friendly && email) {
-        try {
-          const sellersRes = await supabase
-            .from('sellers')
-            .select('display_name, contact_name, owner_name')
-            .eq('email', email)
-            .limit(1);
-          const s = sellersRes?.data?.[0];
-          friendly = s?.display_name || s?.contact_name || s?.owner_name || null;
-        } catch {}
-      }
-
-      // 4) final fallback: email local part
-      if (!friendly && email) {
-        friendly = email.split('@')[0];
-      }
-
-      setSellerName(friendly || 'there');
+      setSellerEmail(data.user.email || null);
     })();
   }, [router]);
 
-  /* ---------------------------- Listings load ------------------------------ */
   useEffect(() => {
     if (!sellerEmail) return;
 
@@ -218,12 +168,25 @@ export default function SellerDashboard() {
       if (error) {
         console.error('Failed to fetch seller listings:', error.message);
         setSellerListings([]);
+        setSellerName(null);
       } else {
-        setSellerListings(data || []);
+        const rows = data || [];
+        setSellerListings(rows);
+
+        // Pull name from your sellers rows (first non-empty "name" wins)
+        const namedRow = rows.find(r => (r?.name || '').trim().length > 0);
+        if (namedRow?.name) {
+          setSellerName(namedRow.name.trim());
+        } else {
+          // optional: fall back to auth profile metadata if you store full_name there
+          const metaName = (user?.user_metadata?.full_name || '').trim();
+          if (metaName) setSellerName(metaName);
+          else setSellerName(null);
+        }
       }
       setLoadingListings(false);
     })();
-  }, [sellerEmail]);
+  }, [sellerEmail, user]);
 
   /* ------------------------------ Messages load ----------------------------- */
   useEffect(() => {
@@ -494,6 +457,11 @@ export default function SellerDashboard() {
     return lines.join('\n\n');
   }
 
+  // Compute display name for the header
+  const displayName = (sellerName && sellerName.trim())
+    ? sellerName.trim()
+    : (sellerEmail ? String(sellerEmail).split('@')[0] : 'Seller');
+
   /* --------------------------------- UI ----------------------------------- */
   if (!user) {
     return <div className="p-8 text-center text-gray-600">Loading dashboard…</div>;
@@ -510,12 +478,13 @@ export default function SellerDashboard() {
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
-        <div className="flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-amber-900">
-              {sellerName ? `Welcome back, ${sellerName}` : 'Seller Dashboard'}
+              {/* Personalized greeting by NAME */}
+              Welcome back, {displayName}
             </h1>
-            <p className="text-sm text-amber-900/80 mt-0.5">
+            <p className="text-amber-900/80 mt-1">
               Manage listings, message buyers, and track follow-ups.
             </p>
           </div>
@@ -910,52 +879,16 @@ export default function SellerDashboard() {
         </div>
 
         {/* Right: Seller meta */}
-        <aside className="bg-white p-6 rounded-xl shadow h-fit">
+        <div className="bg-white p-6 rounded-xl shadow h-fit">
           <h2 className="text-xl font-semibold text-amber-800 mb-4">Account</h2>
           <p><strong>Email:</strong> {sellerEmail || '—'}</p>
+          {displayName && (
+            <p className="mt-1"><strong>Display name:</strong> {displayName}</p>
+          )}
           <p className="text-sm text-gray-600 mt-2">
             Threads are grouped by listing, then buyer. Use filters to find unreplied or archived conversations.
           </p>
-
-          {/* Display name editor */}
-          <div className="mt-4 border-t pt-4">
-            <label className="block text-sm font-medium mb-1">Display name</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={sellerName || ''}
-                onChange={(e) => setSellerName(e.target.value)}
-                className="border rounded px-2 py-1 flex-1"
-                placeholder="Your name"
-              />
-              <button
-                className="px-3 py-1 rounded bg-amber-600 text-white hover:bg-amber-700"
-                onClick={async () => {
-                  try {
-                    if (typeof window !== 'undefined') {
-                      localStorage.setItem(DISPLAY_NAME_KEY, sellerName || '');
-                    }
-                    if (user?.id) {
-                      // best-effort upsert to profiles
-                      await supabase
-                        .from('profiles')
-                        .upsert({ id: user.id, full_name: sellerName || null }, { onConflict: 'id' });
-                    }
-                    alert('Saved! Your greeting will use this name.');
-                  } catch (e) {
-                    console.warn('Save name failed:', e);
-                    alert('Saved locally. (Could not sync to database.)');
-                  }
-                }}
-              >
-                Save
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Used for the “Welcome back” greeting. Stored locally and synced to your profile when possible.
-            </p>
-          </div>
-        </aside>
+        </div>
       </div>
 
       {/* CSV Explainer modal */}
@@ -1112,7 +1045,7 @@ function CalendarModal({ title, onTitle, slots, onSlots, duration, onDuration, o
 function CsvExplainerModal({ onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="bg-white w-full max-w-md rounded-xl shadow-xl p-5">
+      <div className="bg-white w/full max-w-md rounded-xl shadow-xl p-5">
         <div className="flex items-start justify-between">
           <h3 className="text-lg font-semibold">What’s in this CSV?</h3>
           <button
@@ -1129,7 +1062,7 @@ function CsvExplainerModal({ onClose }) {
             The CSV is a <em>summary of buyer conversations</em> for a single listing, so you can sort/filter in Excel/Sheets or import into a CRM.
           </p>
 
-          <div className="bg-gray-50 border rounded p-3">
+        <div className="bg-gray-50 border rounded p-3">
             <div className="font-medium mb-1">Each row = one buyer thread</div>
             <ul className="list-disc pl-5 space-y-1">
               <li><strong>Buyer Name</strong></li>
