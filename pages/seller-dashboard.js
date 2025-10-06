@@ -3,6 +3,24 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
 
+/* ----------------- helpers: display name / initials (for header) ----------------- */
+function getDisplayName(user) {
+  const meta = user?.user_metadata || {};
+  const name = meta.full_name || meta.name || meta.display_name || '';
+  return (name || user?.email || 'Seller').trim();
+}
+function getFirstName(displayName) {
+  return (displayName || '').split(/\s+/)[0] || displayName || 'Seller';
+}
+function initialsFrom(name) {
+  return (name || '')
+    .split(/\s+/)
+    .map(s => s[0]?.toUpperCase())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('');
+}
+
 /* ------------ helper: who/colour for SELLER view (original core) ------------ */
 function whoAndColorForSeller(msg, sellerAuthId) {
   if (msg.from_seller === true)  return { who: "You",   color: "bg-green-100 text-green-900" };
@@ -448,6 +466,10 @@ export default function SellerDashboard() {
     return <div className="p-8 text-center text-gray-600">Loading dashboard…</div>;
   }
 
+  const displayName = useMemo(() => getDisplayName(user), [user]);
+  const firstName = useMemo(() => getFirstName(displayName), [displayName]);
+  const userInitials = initialsFrom(displayName);
+
   const totalConvs = listingIds
     .map(lid => Object.keys(groupedByListingBuyer[lid] || {}).length)
     .reduce((a,b) => a+b, 0);
@@ -460,7 +482,17 @@ export default function SellerDashboard() {
       {/* Header */}
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-amber-900">Seller Dashboard</h1>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-200 text-amber-900 flex items-center justify-center font-bold">
+              {userInitials || 'SL'}
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-amber-900">
+                Welcome back, {firstName}
+              </h1>
+              <p className="text-xs text-amber-800/80">Seller Dashboard</p>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => router.push('/sellers')}
@@ -1032,7 +1064,7 @@ function CsvExplainerModal({ onClose }) {
             The CSV is a <em>summary of buyer conversations</em> for a single listing, so you can sort/filter in Excel/Sheets or import into a CRM.
           </p>
 
-          <div className="bg-gray-50 border rounded p-3">
+        <div className="bg-gray-50 border rounded p-3">
             <div className="font-medium mb-1">Each row = one buyer thread</div>
             <ul className="list-disc pl-5 space-y-1">
               <li><strong>Buyer Name</strong></li>
