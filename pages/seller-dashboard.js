@@ -1,5 +1,6 @@
 // pages/seller-dashboard.js
 import { useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 import supabase from '../lib/supabaseClient';
 
@@ -122,7 +123,7 @@ function gcalLink({ title, start, minutes=30, details, location }) {
 }
 
 /* ------------------------------ main component ------------------------------ */
-export default function SellerDashboard() {
+function SellerDashboard() {
   const router = useRouter();
 
   const [user, setUser] = useState(null);
@@ -954,10 +955,19 @@ function Tabs({ value, onChange }) {
   );
 }
 
-/** Inline preview for message attachments (public bucket) */
+/** Attachment preview (client-only URL resolution) */
 function AttachmentPreview({ att }) {
-  const { data } = supabase.storage.from('message-attachments').getPublicUrl(att.path);
-  const url = data?.publicUrl;
+  const [url, setUrl] = useState(null);
+
+  useEffect(() => {
+    try {
+      const { data } = supabase.storage.from('message-attachments').getPublicUrl(att.path);
+      setUrl(data?.publicUrl || null);
+    } catch {
+      setUrl(null);
+    }
+  }, [att?.path]);
+
   if (!url) return null;
 
   if (att.kind === 'image') {
@@ -996,7 +1006,7 @@ function CalendarModal({ title, onTitle, slots, onSlots, duration, onDuration, o
   function insertText() {
     const lines = [];
     lines.push(`Here are a few times (all in my timezone) — let me know which works:`);
-    slots.filter(Boolean).forEach((s, i) => {
+    slots.filter(Boolean).forEach((s) => {
       const pretty = fmtLocal(s);
       const link = gcalLink({ title, start: s, minutes: duration, details: `Intro call about the listing\n${listingUrl}` });
       lines.push(`• ${pretty} — Add to Calendar: ${link}`);
@@ -1064,7 +1074,7 @@ function CsvExplainerModal({ onClose }) {
             The CSV is a <em>summary of buyer conversations</em> for a single listing, so you can sort/filter in Excel/Sheets or import into a CRM.
           </p>
 
-        <div className="bg-gray-50 border rounded p-3">
+          <div className="bg-gray-50 border rounded p-3">
             <div className="font-medium mb-1">Each row = one buyer thread</div>
             <ul className="list-disc pl-5 space-y-1">
               <li><strong>Buyer Name</strong></li>
@@ -1101,3 +1111,6 @@ function CsvExplainerModal({ onClose }) {
     </div>
   );
 }
+
+/* ---------- EXPORT: disable SSR so browser-only bits don't crash ---------- */
+export default dynamic(() => Promise.resolve(SellerDashboard), { ssr: false });
