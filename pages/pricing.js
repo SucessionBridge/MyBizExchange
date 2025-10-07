@@ -1,14 +1,21 @@
-
 // pages/pricing.js
 import Head from 'next/head'
 import Link from 'next/link'
+import { useState } from 'react'
 
 export default function PricingPage() {
+  // Toggle this to false later to remove the overlay globally
+  const SHOW_FREE_OVERLAY = true
+  const [showOverlay, setShowOverlay] = useState(SHOW_FREE_OVERLAY)
+
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937]">
       <Head>
         <title>Pricing — SuccessionBridge</title>
-        <meta name="description" content="Simple, transparent pricing for listing your business on SuccessionBridge." />
+        <meta
+          name="description"
+          content="Simple, transparent pricing for listing your business on SuccessionBridge."
+        />
       </Head>
 
       <div className="max-w-6xl mx-auto px-4 py-12 md:py-16">
@@ -23,60 +30,104 @@ export default function PricingPage() {
           </p>
         </section>
 
-        {/* Plans */}
-        <section className="grid md:grid-cols-3 gap-6 md:gap-8">
-          {/* Monthly (3-mo min) */}
-          <PlanCard
-            name="Monthly Flex"
-            price="$55"
-            cadence="/ month"
-            badge="3-month minimum"
-            description="Get listed fast. Best if you’re testing the market."
-            features={[
-              'Public listing + messaging',
-              'Valuation summary PDF',
-              'AI description polish (basic)',
-              '3-month minimum term',
-            ]}
-            ctaHref="/sellers?plan=monthly"
-            cta="Start with Monthly"
-            finePrint="Billed monthly with a 3-month minimum."
-          />
+        {/* Plans (with optional transparent overlay) */}
+        <section className="relative">
+          {/* Overlay */}
+          {showOverlay && (
+            <>
+              {/* Dim layer – allows clicks to pass through except the message box */}
+              <div className="pointer-events-none absolute inset-0 bg-black/50 rounded-2xl z-10" />
 
-          {/* 6-month (recommended) */}
-          <PlanCard
-            name="6-Month Saver"
-            price="$50"
-            cadence="/ month"
-            badge="Recommended"
-            highlight
-            description="Covers the typical time-to-sell window."
-            features={[
-              'Everything in Monthly',
-              'Homepage/category boost rotations',
-              'Priority in buyer alerts',
-              'Best fit for 100–189 day sell cycle',
-            ]}
-            ctaHref="/sellers?plan=semiannual"
-            cta="Choose 6-Month ($300)"
-            finePrint="One-time $300 for 6 months."
-          />
+              {/* Message card */}
+              <div className="absolute inset-0 z-20 flex items-center justify-center px-4">
+                <div className="pointer-events-auto bg-white/12 backdrop-blur-md border border-white/30 rounded-xl max-w-xl w-full mx-auto p-5 text-center">
+                  <p className="text-white text-lg font-semibold">
+                    🚀 Early Access: Listings Are <span className="text-emerald-300">FREE</span>
+                  </p>
+                  <p className="text-white/90 text-sm mt-1">
+                    While we fill the marketplace, adding your business is free.
+                    <br className="hidden sm:block" />
+                    <span className="font-semibold">First-come, first-free</span> — lock in your spot today.
+                  </p>
 
-          {/* Annual */}
-          <PlanCard
-            name="1-Year"
-            price="$500"
-            cadence="/ year"
-            description="Maximum exposure over a full year."
-            features={[
-              'Everything in 6-Month',
-              'Featured in newsletter at least once',
-              'Great for seasonal or niche businesses',
-            ]}
-            ctaHref="/sellers?plan=annual"
-            cta="Choose Annual"
-            finePrint="One-time $500 for 12 months."
-          />
+                  <div className="mt-4 flex flex-col sm:flex-row items-center justify-center gap-2">
+                    <Link href="/sellers">
+                      <a className="inline-block px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold">
+                        List Your Business Free
+                      </a>
+                    </Link>
+                    <button
+                      onClick={() => setShowOverlay(false)}
+                      className="px-4 py-2 rounded-lg bg-white/80 hover:bg-white text-gray-800 font-medium"
+                      aria-label="Dismiss early access message"
+                    >
+                      Got it
+                    </button>
+                  </div>
+
+                  <p className="text-[11px] text-white/70 mt-2">
+                    Pricing below reflects standard plans and will apply after the early access period.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* Pricing grid (slightly dimmed if overlay shown) */}
+          <div className={`grid md:grid-cols-3 gap-6 md:gap-8 transition-opacity ${showOverlay ? 'opacity-60' : 'opacity-100'}`}>
+            {/* Monthly (3-mo min) */}
+            <PlanCard
+              name="Monthly Flex"
+              price="$55"
+              cadence="/ month"
+              badge="3-month minimum"
+              description="Get listed fast. Best if you’re testing the market."
+              features={[
+                'Public listing + messaging',
+                'Valuation summary PDF',
+                'AI description polish (basic)',
+                '3-month minimum term',
+              ]}
+              ctaHref="/sellers?plan=monthly"
+              cta="Start with Monthly"
+              finePrint="Billed monthly with a 3-month minimum."
+            />
+
+            {/* 6-month (recommended) */}
+            <PlanCard
+              name="6-Month Saver"
+              price="$50"
+              cadence="/ month"
+              badge="Recommended"
+              highlight
+              description="Covers the typical time-to-sell window."
+              features={[
+                'Everything in Monthly',
+                'Homepage/category boost rotations',
+                'Priority in buyer alerts',
+                'Best fit for 100–189 day sell cycle',
+              ]}
+              ctaHref="/sellers?plan=semiannual"
+              cta="Choose 6-Month ($300)"
+              finePrint="One-time $300 for 6 months."
+            />
+
+            {/* Annual */}
+            <PlanCard
+              name="1-Year"
+              price="$500"
+              cadence="/ year"
+              description="Maximum exposure over a full year."
+              features={[
+                'Everything in 6-Month',
+                'Featured in newsletter at least once',
+                'Great for seasonal or niche businesses',
+              ]}
+              ctaHref="/sellers?plan=annual"
+              cta="Choose Annual"
+              finePrint="One-time $500 for 12 months."
+            />
+          </div>
         </section>
 
         {/* Notes / assurances */}
@@ -199,3 +250,4 @@ function Faq({ q, children }) {
     </details>
   )
 }
+
