@@ -13,32 +13,32 @@ export default function PricingPage() {
         />
       </Head>
 
-      <div className="max-w-6xl mx-auto px-4 py-12 md:py-16 relative">
-        {/* Permanent overlay message */}
-        <div className="absolute inset-0 z-10 flex items-start justify-center pt-8 pointer-events-none">
-          <div className="bg-black/70 backdrop-blur-md border border-white/20 rounded-xl max-w-xl w-full mx-auto p-5 text-center text-white">
-            <p className="text-lg font-semibold">
-              Early Access: Listings Are <span className="text-emerald-300">FREE</span>
-            </p>
-            <p className="text-sm mt-1 text-white/90">
-              While we fill the marketplace, adding your business is free.<br />
-              <span className="font-semibold">First-come, first-free</span> — lock in your spot today.
-            </p>
-            <div className="mt-4">
-              <Link href="/sellers">
-                <a className="inline-block px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold">
-                  List Your Business Free
-                </a>
-              </Link>
-            </div>
-            <p className="text-[11px] text-white/70 mt-2">
-              Standard pricing shown below will apply after Early Access ends.
-            </p>
+      {/* Transparent, readable message OVER the page (clickable) */}
+      <div className="pointer-events-none absolute inset-x-0 top-6 z-20 flex justify-center px-4">
+        <div className="pointer-events-auto max-w-2xl w-full rounded-2xl border border-white/20 bg-black/40 backdrop-blur-sm text-white shadow-lg px-6 py-5 text-center">
+          <p className="text-xl font-semibold">
+            Early Access: Listings Are <span className="text-emerald-300">FREE</span>
+          </p>
+          <p className="text-sm mt-1 text-white/95">
+            While we fill the marketplace, adding your business is free.{' '}
+            <span className="font-semibold">First-come, first-free</span> — lock in your spot today.
+          </p>
+          <div className="mt-4">
+            <Link href="/sellers">
+              <a className="inline-block px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-semibold">
+                List Your Business Free
+              </a>
+            </Link>
           </div>
+          <p className="text-[11px] text-white/80 mt-2">
+            Standard pricing shown below will apply after Early Access ends.
+          </p>
         </div>
+      </div>
 
+      <div className="max-w-6xl mx-auto px-4 py-12 md:py-16 relative z-0">
         {/* Hero */}
-        <section className="text-center mb-10 md:mb-14 relative z-0 opacity-70">
+        <section className="text-center mb-10 md:mb-14">
           <h1 className="text-4xl md:text-5xl font-serif font-bold tracking-tight text-[#2E3A59]">
             Simple, transparent pricing
           </h1>
@@ -49,7 +49,8 @@ export default function PricingPage() {
         </section>
 
         {/* Plans */}
-        <section className="relative grid md:grid-cols-3 gap-6 md:gap-8 opacity-70">
+        <section className="grid md:grid-cols-3 gap-6 md:gap-8">
+          {/* Monthly (3-mo min) */}
           <PlanCard
             name="Monthly Flex"
             price="$55"
@@ -67,6 +68,7 @@ export default function PricingPage() {
             finePrint="Billed monthly with a 3-month minimum."
           />
 
+          {/* 6-month (recommended) */}
           <PlanCard
             name="6-Month Saver"
             price="$50"
@@ -85,6 +87,7 @@ export default function PricingPage() {
             finePrint="One-time $300 for 6 months."
           />
 
+          {/* Annual */}
           <PlanCard
             name="1-Year"
             price="$500"
@@ -102,7 +105,7 @@ export default function PricingPage() {
         </section>
 
         {/* Notes / assurances */}
-        <section className="mt-10 md:mt-14 grid md:grid-cols-3 gap-4 opacity-70">
+        <section className="mt-10 md:mt-14 grid md:grid-cols-3 gap-4">
           <Note title="No success fees">
             We don’t charge a broker-style commission. Your plan covers distribution and tools.
           </Note>
@@ -115,7 +118,7 @@ export default function PricingPage() {
         </section>
 
         {/* FAQ */}
-        <section className="mt-12 md:mt-16 bg-white rounded-xl border border-gray-200 shadow-sm p-6 md:p-8 opacity-70">
+        <section className="mt-12 md:mt-16 bg-white rounded-xl border border-gray-200 shadow-sm p-6 md:p-8">
           <h2 className="text-2xl font-semibold text-[#2E3A59]">FAQ</h2>
           <div className="mt-4 space-y-4">
             <Faq q="What if I sell before my plan ends?">
@@ -136,7 +139,7 @@ export default function PricingPage() {
         </section>
 
         {/* CTA footer */}
-        <section className="text-center mt-10 md:mt-16 opacity-70">
+        <section className="text-center mt-10 md:mt-16">
           <Link href="/sellers">
             <a className="inline-block bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg">
               List my business
@@ -221,5 +224,3 @@ function Faq({ q, children }) {
     </details>
   )
 }
-
-
