@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback } from "react"; 
 import Head from "next/head";
 import { useRouter } from "next/router";
 import supabase from "../lib/supabaseClient";
@@ -7,22 +7,23 @@ import Script from "next/script";
 import WhyWeBuilt from "../components/WhyWeBuilt";
 
 /** ─────────────────────────────────────────────────────────────
- *  Attention Banner (home-page only, improved UX)
- *  - New copy: “Don’t just close your business. We can help.”
+ *  Attention Banner (glass style + mobile sticky)
+ *  - Copy (Option B): mission-driven, clear about helping to SELL
  *  - CTA opens Calendly popup
- *  - Dismiss = temporary hide (7 days) → shows reopen pill
- *  - Undo toast (5s)
+ *  - Dismiss = temporary hide (7 days) + Undo toast
  *  - Permanent hide after Calendly booking (postMessage event)
+ *  - Desktop: glass card sticky under header
+ *  - Mobile: sticky bar at bottom
  *  ──────────────────────────────────────────────────────────── */
 function AttentionBanner({
   calendlyUrl = "https://calendly.com/YOUR_CALENDLY_LINK?hide_event_type_details=1&hide_gdpr_banner=1",
 }) {
-  // localStorage keys
+  // Shared keys across desktop + mobile
   const LS_KEY = "mbx_banner_state_v2"; // {mode:'visible'|'minimized'|'permanent', hideUntil:number}
   const BOOKED_KEY = "mbx_banner_booked"; // '1' when Calendly booked
 
-  const TEAL = "#14B8A6";
   const GOLD = "#F59E0B";
+  const TEXT = "#2E3A59";
   const TEMP_HIDE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
   const [mode, setMode] = useState("visible"); // visible | minimized | permanent
@@ -44,33 +45,20 @@ function AttentionBanner({
       } else if (saved?.mode === "minimized" && saved?.hideUntil && saved.hideUntil > Date.now()) {
         setMode("minimized");
       }
-    } catch {
-      /* ignore */
-    }
+    } catch {}
   }, []);
 
-  // Persist state
-  const persist = useCallback(
-    (next) => {
-      try {
-        localStorage.setItem(LS_KEY, JSON.stringify(next));
-      } catch {
-        /* ignore */
-      }
-    },
-    []
-  );
+  // Persist
+  const persist = useCallback((next) => {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch {}
+  }, []);
 
-  // Open Calendly popup
+  // Open Calendly
   const openCalendly = useCallback(() => {
     if (typeof window === "undefined") return;
-    if (window.gtag) window.gtag("event", "banner_click", { component: "attention_banner" });
-
-    if (window.Calendly) {
-      window.Calendly.initPopupWidget({ url: calendlyUrl });
-    } else {
-      window.open(calendlyUrl, "_blank");
-    }
+    window.gtag?.("event", "banner_click", { component: "attention_banner" });
+    if (window.Calendly) window.Calendly.initPopupWidget({ url: calendlyUrl });
+    else window.open(calendlyUrl, "_blank");
   }, [calendlyUrl]);
 
   // Dismiss → minimize for 7 days + toast with Undo
@@ -78,8 +66,6 @@ function AttentionBanner({
     const next = { mode: "minimized", hideUntil: Date.now() + TEMP_HIDE_MS };
     setMode("minimized");
     persist(next);
-
-    // show toast with undo
     setToast({ msg: "Banner hidden", canUndo: true });
     clearTimeout(toastTimerRef.current);
     toastTimerRef.current = setTimeout(() => setToast(null), 5000);
@@ -101,7 +87,7 @@ function AttentionBanner({
     setToast(null);
   }, [persist]);
 
-  // Reopen from pill
+  // Reopen from pill (desktop only)
   const reopen = useCallback(() => {
     setMode("visible");
     persist({ mode: "visible" });
@@ -110,16 +96,13 @@ function AttentionBanner({
   // Listen for Calendly booking success → permanent hide
   useEffect(() => {
     function onMessage(e) {
-      // Calendly posts messages on the same page when the popup completes
       if (!e?.data?.event) return;
       if (e.data.event === "calendly.event_scheduled") {
         try {
           localStorage.setItem(BOOKED_KEY, "1");
           setMode("permanent");
           persist({ mode: "permanent" });
-        } catch {
-          /* ignore */
-        }
+        } catch {}
       }
     }
     window.addEventListener("message", onMessage);
@@ -130,74 +113,112 @@ function AttentionBanner({
 
   return (
     <>
-      {/* Full banner (desktop + tablet + mobile) */}
+      {/* Desktop / Tablet GLASS banner (md+) */}
       {mode === "visible" && (
-        <div
-          className="sticky top-0 z-[1000] border-b border-white/15"
-          role="region"
-          aria-label="We can help you sell instead of closing"
-          style={{ backgroundColor: TEAL, color: "white" }}
-        >
-          <div className="max-w-7xl mx-auto px-3">
-            <div className="h-auto py-2 flex flex-col gap-2 md:h-12 md:flex-row md:items-center md:gap-3">
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm md:text-base">
-                  Don’t just close your business. We can help.
-                </p>
-                <p className="text-xs md:text-sm text-white/90">
-                  Click below to schedule a free 10-minute call.
-                </p>
-              </div>
+        <div className="hidden md:block sticky top-0 z-[1000] px-3 md:px-4 py-3">
+          <div
+            className="max-w-7xl mx-auto flex items-start md:items-center gap-3 md:gap-4 rounded-xl border shadow-md"
+            style={{
+              background: "rgba(255,255,255,0.7)",
+              backdropFilter: "blur(6px)",
+              borderColor: "rgba(255,255,255,0.4)"
+            }}
+            role="region"
+            aria-label="Help selling instead of closing"
+          >
+            <div className="flex-1 min-w-0 px-3 py-2">
+              <p className="text-base md:text-lg font-semibold" style={{ color: TEXT }}>
+                Don’t close your doors just yet — your business might be exactly what another owner needs.
+              </p>
+              <p className="text-sm md:text-base mt-0.5" style={{ color: TEXT, opacity: 0.9 }}>
+                We believe small businesses power our economy. Let’s help you find a buyer who will keep yours thriving.
+              </p>
+            </div>
 
-              <div className="flex items-center gap-2 md:ml-auto">
-                <button
-                  onClick={openCalendly}
-                  className="inline-flex items-center rounded-md px-3 py-1.5 text-sm font-semibold hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
-                  aria-label="Schedule a free 10-minute call"
-                  style={{
-                    backgroundColor: GOLD,
-                    color: "#000",
-                    boxShadow: "0 1px 0 rgba(0,0,0,.05)",
-                  }}
-                >
-                  Schedule Call
-                </button>
-
-                {/* Discreet dismiss, away from CTA */}
-                <button
-                  onClick={dismiss}
-                  aria-label="Hide banner"
-                  className="h-8 w-8 inline-flex items-center justify-center rounded hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-white/60"
-                  title="Hide for now"
-                >
-                  ✕
-                </button>
-
-                {/* Optional menu for 'Don't show again' on larger screens */}
-                <button
-                  onClick={dontShowAgain}
-                  aria-label="Don't show again"
-                  className="hidden md:inline-flex text-xs underline decoration-white/40 underline-offset-2 hover:decoration-white"
-                  title="Don’t show again"
-                >
-                  Don’t show again
-                </button>
-              </div>
+            <div className="flex items-center gap-2 pr-3 pb-2 md:pb-0">
+              <button
+                onClick={openCalendly}
+                className="rounded-full px-4 py-2 text-sm md:text-[15px] font-semibold shadow hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                style={{ backgroundColor: GOLD, color: "#000" }}
+                aria-label="Book a 10-minute call"
+              >
+                Let’s Talk — 10-Minute Call
+              </button>
+              <button
+                onClick={dismiss}
+                className="h-9 w-9 grid place-items-center rounded-md hover:bg-black/5"
+                aria-label="Hide banner for 7 days"
+                title="Hide for now"
+                style={{ color: TEXT }}
+              >
+                ✕
+              </button>
+              <button
+                onClick={dontShowAgain}
+                className="hidden lg:inline-flex text-xs underline underline-offset-2"
+                aria-label="Don't show again"
+                title="Don’t show again"
+                style={{ color: TEXT, opacity: 0.7 }}
+              >
+                Don’t show again
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Reopen pill (shows when minimized) */}
+      {/* Mobile sticky bar (<md) */}
+      {mode === "visible" && (
+        <div className="md:hidden fixed inset-x-0 bottom-0 z-[1000] px-3 pb-3">
+          <div
+            className="rounded-2xl border shadow-lg overflow-hidden"
+            style={{
+              background: "rgba(255,255,255,0.85)",
+              backdropFilter: "blur(6px)",
+              borderColor: "rgba(0,0,0,0.06)"
+            }}
+          >
+            <div className="px-3 pt-2" style={{ color: TEXT }}>
+              <p className="text-[15px] font-semibold leading-snug">
+                Don’t close your doors just yet — your business might be exactly what another owner needs.
+              </p>
+              <p className="text-[12px] opacity-90 -mt-0.5">
+                We believe small businesses power our economy. Let’s help you find a buyer who will keep yours thriving.
+              </p>
+            </div>
+            <div className="flex">
+              <button
+                onClick={openCalendly}
+                className="flex-1 py-2.5 text-sm font-semibold"
+                style={{ backgroundColor: GOLD, color: "#000" }}
+                aria-label="Book a 10-minute call"
+              >
+                Book 10-min Call
+              </button>
+              <button
+                onClick={dismiss}
+                className="w-12 grid place-items-center text-lg"
+                style={{ color: TEXT }}
+                aria-label="Hide banner for 7 days"
+                title="Hide for now"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reopen pill (desktop only, when minimized) */}
       {mode === "minimized" && (
-        <div className="fixed left-3 bottom-3 z-[1000] md:left-4 md:bottom-4">
+        <div className="fixed left-3 bottom-3 z-[1000] hidden md:block">
           <button
             onClick={reopen}
             className="rounded-full px-3 py-2 text-sm font-semibold shadow-lg hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
             aria-label="Reopen banner"
-            style={{ backgroundColor: TEAL, color: "white" }}
+            style={{ backgroundColor: "#14B8A6", color: "white" }}
           >
-            We can help — tap to reopen
+            We can help — click to reopen
           </button>
         </div>
       )}
@@ -287,12 +308,8 @@ export default function Home() {
 
     // Initial check on mount/refresh
     const checkUserAndRedirect = async () => {
-      if (skipRedirect) {
-        return;
-      }
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      if (skipRedirect) return;
+      const { data: { user } } = await supabase.auth.getUser();
       if (user) await redirectAccordingToProfile(user);
     };
     checkUserAndRedirect();
@@ -383,7 +400,7 @@ export default function Home() {
       {/* Calendly widget script (once, page-level) */}
       <Script src="https://assets.calendly.com/assets/external/widget.js" strategy="afterInteractive" />
 
-      {/* ── New attention banner ── */}
+      {/* ── New attention banner (glass desktop + mobile sticky) ── */}
       <AttentionBanner calendlyUrl="https://calendly.com/YOUR_CALENDLY_LINK?hide_event_type_details=1&hide_gdpr_banner=1" />
 
       <div className="max-w-7xl mx-auto">
