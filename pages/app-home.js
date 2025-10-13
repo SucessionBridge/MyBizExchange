@@ -3,7 +3,75 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import supabase from "../lib/supabaseClient";
 import Link from "next/link";
+import Script from "next/script";
 import WhyWeBuilt from "../components/WhyWeBuilt";
+
+/** ─────────────────────────────────────────────────────────────
+ *  Slim professional banner (home-page only)
+ *  Rotates messages, dismissible, opens Calendly popup
+ *  Message theme: "Don't Shut Down Your Business Just Yet"
+ *  ──────────────────────────────────────────────────────────── */
+function PromoBanner({
+  calendlyUrl = "https://calendly.com/YOUR_CALENDLY_LINK?hide_event_type_details=1&hide_gdpr_banner=1",
+}) {
+  const [visible, setVisible] = useState(false);
+  const [msgIndex, setMsgIndex] = useState(0);
+  const msgs = [
+    "Don’t shut down your business just yet — let’s see what it’s worth.",
+    "You might be closer to a buyer than you think.",
+    "A 10-minute call could be the difference between walking away and cashing out.",
+  ];
+
+  useEffect(() => {
+    // Show once per session unless dismissed
+    if (!sessionStorage.getItem("dcPromoDismissed")) setVisible(true);
+    const id = setInterval(() => setMsgIndex((i) => (i + 1) % msgs.length), 6000);
+    return () => clearInterval(id);
+  }, []);
+
+  const openCalendly = () => {
+    if (typeof window === "undefined") return;
+    if (window.gtag) window.gtag("event", "dc_banner_click", { location: window.location.pathname });
+    if (window.Calendly) window.Calendly.initPopupWidget({ url: calendlyUrl });
+    else window.open(calendlyUrl, "_blank");
+  };
+
+  const dismiss = () => {
+    sessionStorage.setItem("dcPromoDismissed", "1");
+    setVisible(false);
+  };
+
+  if (!visible) return null;
+
+  return (
+    <div
+      className="sticky top-0 z-[1000] bg-[#0B3A6D] text-white border-b border-white/15"
+      role="region"
+      aria-label="Don’t Shut Down Yet – quick help"
+    >
+      <div className="max-w-7xl mx-auto h-11 flex items-center gap-3 px-3">
+        <span className="truncate text-sm">{msgs[msgIndex]}</span>
+
+        <button
+          onClick={openCalendly}
+          className="ml-auto inline-flex items-center rounded-md bg-[#2EC2A0] text-[#0B3A6D] text-sm font-semibold px-3 py-1.5 hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#2EC2A0]"
+          aria-label="Book a 10-minute call"
+        >
+          👉 Book a 10-Minute “Don’t Shut Down Yet” Call
+        </button>
+
+        <button
+          onClick={dismiss}
+          aria-label="Dismiss banner"
+          className="ml-1 h-7 w-7 inline-flex items-center justify-center rounded hover:bg-white/10"
+          title="Dismiss"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const router = useRouter();
@@ -160,6 +228,12 @@ export default function Home() {
           }}
         />
       </Head>
+
+      {/* Calendly widget script (once, page-level) */}
+      <Script src="https://assets.calendly.com/assets/external/widget.js" strategy="afterInteractive" />
+
+      {/* ── The professional slim banner under the header ── */}
+      <PromoBanner calendlyUrl="https://calendly.com/YOUR_CALENDLY_LINK?hide_event_type_details=1&hide_gdpr_banner=1" />
 
       <div className="max-w-7xl mx-auto">
         {/* Hero */}
