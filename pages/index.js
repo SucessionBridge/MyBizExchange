@@ -7,69 +7,218 @@ import Script from "next/script";
 import WhyWeBuilt from "../components/WhyWeBuilt";
 
 /** ─────────────────────────────────────────────────────────────
- *  Slim professional banner (home-page only)
- *  Rotates messages, dismissible, opens Calendly popup
- *  Message theme: "Don't Shut Down Your Business Just Yet"
+ *  Attention Banner (home-page only, improved UX)
+ *  - New copy: “Don’t just close your business. We can help.”
+ *  - CTA opens Calendly popup
+ *  - Dismiss = temporary hide (7 days) → shows reopen pill
+ *  - Undo toast (5s)
+ *  - Permanent hide after Calendly booking (postMessage event)
  *  ──────────────────────────────────────────────────────────── */
-function PromoBanner({
+function AttentionBanner({
   calendlyUrl = "https://calendly.com/YOUR_CALENDLY_LINK?hide_event_type_details=1&hide_gdpr_banner=1",
 }) {
-  const [visible, setVisible] = useState(false);
-  const [msgIndex, setMsgIndex] = useState(0);
-  const msgs = [
-    "Don’t shut down your business just yet — let’s see what it’s worth.",
-    "You might be closer to a buyer than you think.",
-    "A 10-minute call could be the difference between walking away and cashing out.",
-  ];
+  // localStorage keys
+  const LS_KEY = "mbx_banner_state_v2"; // {mode:'visible'|'minimized'|'permanent', hideUntil:number}
+  const BOOKED_KEY = "mbx_banner_booked"; // '1' when Calendly booked
 
+  const TEAL = "#14B8A6";
+  const GOLD = "#F59E0B";
+  const TEMP_HIDE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+  const [mode, setMode] = useState("visible"); // visible | minimized | permanent
+  const [toast, setToast] = useState(null); // {msg, canUndo}
+  const toastTimerRef = useRef(null);
+
+  // Load state on mount
   useEffect(() => {
-    // Show once per session unless dismissed
-    if (!sessionStorage.getItem("dcPromoDismissed")) setVisible(true);
-    const id = setInterval(() => setMsgIndex((i) => (i + 1) % msgs.length), 6000);
-    return () => clearInterval(id);
+    try {
+      if (localStorage.getItem(BOOKED_KEY) === "1") {
+        setMode("permanent");
+        return;
+      }
+      const raw = localStorage.getItem(LS_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved?.mode === "permanent") {
+        setMode("permanent");
+      } else if (saved?.mode === "minimized" && saved?.hideUntil && saved.hideUntil > Date.now()) {
+        setMode("minimized");
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
-  const openCalendly = () => {
+  // Persist state
+  const persist = useCallback(
+    (next) => {
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+    },
+    []
+  );
+
+  // Open Calendly popup
+  const openCalendly = useCallback(() => {
     if (typeof window === "undefined") return;
-    if (window.gtag) window.gtag("event", "dc_banner_click", { location: window.location.pathname });
-    if (window.Calendly) window.Calendly.initPopupWidget({ url: calendlyUrl });
-    else window.open(calendlyUrl, "_blank");
-  };
+    if (window.gtag) window.gtag("event", "banner_click", { component: "attention_banner" });
 
-  const dismiss = () => {
-    sessionStorage.setItem("dcPromoDismissed", "1");
-    setVisible(false);
-  };
+    if (window.Calendly) {
+      window.Calendly.initPopupWidget({ url: calendlyUrl });
+    } else {
+      window.open(calendlyUrl, "_blank");
+    }
+  }, [calendlyUrl]);
 
-  if (!visible) return null;
+  // Dismiss → minimize for 7 days + toast with Undo
+  const dismiss = useCallback(() => {
+    const next = { mode: "minimized", hideUntil: Date.now() + TEMP_HIDE_MS };
+    setMode("minimized");
+    persist(next);
+
+    // show toast with undo
+    setToast({ msg: "Banner hidden", canUndo: true });
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 5000);
+  }, [persist]);
+
+  // Undo hide → back to visible
+  const undo = useCallback(() => {
+    setMode("visible");
+    persist({ mode: "visible" });
+    setToast({ msg: "Banner restored", canUndo: false });
+    clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setToast(null), 1800);
+  }, [persist]);
+
+  // "Don't show again" → permanent
+  const dontShowAgain = useCallback(() => {
+    setMode("permanent");
+    persist({ mode: "permanent" });
+    setToast(null);
+  }, [persist]);
+
+  // Reopen from pill
+  const reopen = useCallback(() => {
+    setMode("visible");
+    persist({ mode: "visible" });
+  }, [persist]);
+
+  // Listen for Calendly booking success → permanent hide
+  useEffect(() => {
+    function onMessage(e) {
+      // Calendly posts messages on the same page when the popup completes
+      if (!e?.data?.event) return;
+      if (e.data.event === "calendly.event_scheduled") {
+        try {
+          localStorage.setItem(BOOKED_KEY, "1");
+          setMode("permanent");
+          persist({ mode: "permanent" });
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, [persist]);
+
+  if (mode === "permanent") return null;
 
   return (
-    <div
-      className="sticky top-0 z-[1000] bg-[#0B3A6D] text-white border-b border-white/15"
-      role="region"
-      aria-label="Don’t Shut Down Yet – quick help"
-    >
-      <div className="max-w-7xl mx-auto h-11 flex items-center gap-3 px-3">
-        <span className="truncate text-sm">{msgs[msgIndex]}</span>
-
-        <button
-          onClick={openCalendly}
-          className="ml-auto inline-flex items-center rounded-md bg-[#2EC2A0] text-[#0B3A6D] text-sm font-semibold px-3 py-1.5 hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#2EC2A0]"
-          aria-label="Book a 10-minute call"
+    <>
+      {/* Full banner (desktop + tablet + mobile) */}
+      {mode === "visible" && (
+        <div
+          className="sticky top-0 z-[1000] border-b border-white/15"
+          role="region"
+          aria-label="We can help you sell instead of closing"
+          style={{ backgroundColor: TEAL, color: "white" }}
         >
-          👉 Book a 10-Minute “Don’t Shut Down Yet” Call
-        </button>
+          <div className="max-w-7xl mx-auto px-3">
+            <div className="h-auto py-2 flex flex-col gap-2 md:h-12 md:flex-row md:items-center md:gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm md:text-base">
+                  Don’t just close your business. We can help.
+                </p>
+                <p className="text-xs md:text-sm text-white/90">
+                  Click below to schedule a free 10-minute call.
+                </p>
+              </div>
 
-        <button
-          onClick={dismiss}
-          aria-label="Dismiss banner"
-          className="ml-1 h-7 w-7 inline-flex items-center justify-center rounded hover:bg-white/10"
-          title="Dismiss"
-        >
-          ✕
-        </button>
-      </div>
-    </div>
+              <div className="flex items-center gap-2 md:ml-auto">
+                <button
+                  onClick={openCalendly}
+                  className="inline-flex items-center rounded-md px-3 py-1.5 text-sm font-semibold hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                  aria-label="Schedule a free 10-minute call"
+                  style={{
+                    backgroundColor: GOLD,
+                    color: "#000",
+                    boxShadow: "0 1px 0 rgba(0,0,0,.05)",
+                  }}
+                >
+                  Schedule Call
+                </button>
+
+                {/* Discreet dismiss, away from CTA */}
+                <button
+                  onClick={dismiss}
+                  aria-label="Hide banner"
+                  className="h-8 w-8 inline-flex items-center justify-center rounded hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-white/60"
+                  title="Hide for now"
+                >
+                  ✕
+                </button>
+
+                {/* Optional menu for 'Don't show again' on larger screens */}
+                <button
+                  onClick={dontShowAgain}
+                  aria-label="Don't show again"
+                  className="hidden md:inline-flex text-xs underline decoration-white/40 underline-offset-2 hover:decoration-white"
+                  title="Don’t show again"
+                >
+                  Don’t show again
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reopen pill (shows when minimized) */}
+      {mode === "minimized" && (
+        <div className="fixed left-3 bottom-3 z-[1000] md:left-4 md:bottom-4">
+          <button
+            onClick={reopen}
+            className="rounded-full px-3 py-2 text-sm font-semibold shadow-lg hover:brightness-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+            aria-label="Reopen banner"
+            style={{ backgroundColor: TEAL, color: "white" }}
+          >
+            We can help — tap to reopen
+          </button>
+        </div>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed inset-x-0 bottom-4 flex justify-center z-[1100] px-4">
+          <div className="rounded-lg bg-gray-900 text-white px-3 py-2 text-sm shadow-lg flex items-center gap-3">
+            <span>{toast.msg}</span>
+            {toast.canUndo && (
+              <button
+                onClick={undo}
+                className="rounded bg-white/10 px-2 py-1 text-xs font-semibold hover:bg-white/15"
+              >
+                Undo
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -141,7 +290,9 @@ export default function Home() {
       if (skipRedirect) {
         return;
       }
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (user) await redirectAccordingToProfile(user);
     };
     checkUserAndRedirect();
@@ -232,8 +383,8 @@ export default function Home() {
       {/* Calendly widget script (once, page-level) */}
       <Script src="https://assets.calendly.com/assets/external/widget.js" strategy="afterInteractive" />
 
-      {/* ── The professional slim banner under the header ── */}
-      <PromoBanner calendlyUrl="https://calendly.com/YOUR_CALENDLY_LINK?hide_event_type_details=1&hide_gdpr_banner=1" />
+      {/* ── New attention banner ── */}
+      <AttentionBanner calendlyUrl="https://calendly.com/YOUR_CALENDLY_LINK?hide_event_type_details=1&hide_gdpr_banner=1" />
 
       <div className="max-w-7xl mx-auto">
         {/* Hero */}
