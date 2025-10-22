@@ -6,6 +6,31 @@ import Link from "next/link";
 import Script from "next/script";
 import WhyWeBuilt from "../components/WhyWeBuilt";
 
+/* Outreach Bar (added back, no other changes) */
+function OutreachBar() {
+  return (
+    <div className="w-full bg-gray-100 border-b">
+      <div className="mx-auto max-w-7xl px-4 py-3 flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+        <span className="text-sm sm:text-base font-medium text-gray-800">
+          Are you a business owner thinking about an exit?
+        </span>
+        <div className="flex items-center gap-2">
+          <Link href="/sellers">
+            <a className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-semibold hover:bg-white">
+              List your business
+            </a>
+          </Link>
+          <Link href="/contact">
+            <a className="inline-flex items-center rounded-md bg-black text-white px-3 py-1.5 text-sm font-semibold hover:opacity-90">
+              Talk to us
+            </a>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
   const router = useRouter();
   const [featuredListings, setFeaturedListings] = useState([]);
@@ -162,6 +187,9 @@ export default function Home() {
 
       {/* Calendly widget script (kept; harmless if unused on this page) */}
       <Script src="https://assets.calendly.com/assets/external/widget.js" strategy="afterInteractive" />
+
+      {/* Outreach Bar (rendered right before the hero) */}
+      <OutreachBar />
 
       {/* HERO */}
       <div className="max-w-7xl mx-auto">
@@ -464,3 +492,4 @@ export default function Home() {
     </main>
   );
 }
+
