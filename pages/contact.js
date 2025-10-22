@@ -7,11 +7,21 @@ export default function Contact() {
   const pageDescription =
     "We already have buyers actively looking for service, home services, e-commerce, trucking, restaurants, and more. Tell us about your business and we’ll match you confidentially.";
 
-  // Replace with your real Calendly link when ready
-  const calendlyUrl = "https://calendly.com/your-org/intro-call";
+  // Your live Calendly link
+  const calendlyUrl = "https://calendly.com/thestevelodge/new-meeting";
 
-  // Your public email (stored in memory): update if needed
+  // Public contact email
   const email = "thestevelodge@gmail.com";
+
+  // Popup handler (opens Calendly modal; falls back to direct link if script not ready)
+  const openCalendly = (e) => {
+    e?.preventDefault?.();
+    if (typeof window !== "undefined" && window.Calendly) {
+      window.Calendly.initPopupWidget({ url: calendlyUrl });
+    } else {
+      window.location.href = calendlyUrl;
+    }
+  };
 
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937] font-sans">
@@ -24,7 +34,7 @@ export default function Contact() {
         <meta property="og:image" content="/images/og-hero.jpg" />
       </Head>
 
-      {/* Calendly script for inline widget */}
+      {/* Calendly script for inline widget + popup */}
       <Script
         src="https://assets.calendly.com/assets/external/widget.js"
         strategy="afterInteractive"
@@ -44,6 +54,7 @@ export default function Contact() {
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <a
+                onClick={openCalendly}
                 href={calendlyUrl}
                 className="inline-flex items-center justify-center rounded-xl bg-[#14B8A6] hover:bg-[#0D9488] text-white px-5 py-3 text-base font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#14B8A6]"
                 aria-label="Book an intro call"
@@ -112,7 +123,7 @@ export default function Contact() {
         </div>
       </section>
 
-      {/* What you get */}
+      {/* What you get / How it works */}
       <section className="max-w-7xl mx-auto px-4 pb-10">
         <div className="grid md:grid-cols-2 gap-8 items-stretch">
           <div className="bg-white rounded-xl border border-gray-200 p-6 md:p-8 shadow-sm">
@@ -135,6 +146,7 @@ export default function Contact() {
             </ol>
             <div className="mt-6 flex flex-wrap gap-3">
               <a
+                onClick={openCalendly}
                 href={calendlyUrl}
                 className="inline-flex items-center rounded-lg bg-[#14B8A6] hover:bg-[#0D9488] text-white px-4 py-2 font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#14B8A6]"
               >
@@ -150,7 +162,7 @@ export default function Contact() {
         </div>
       </section>
 
-      {/* Inline Calendly (optional; remove if not ready) */}
+      {/* Inline Calendly */}
       <section className="max-w-7xl mx-auto px-4 pb-12">
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-0 overflow-hidden">
           <div className="px-6 pt-6">
@@ -207,6 +219,7 @@ export default function Contact() {
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             <a
+              onClick={openCalendly}
               href={calendlyUrl}
               className="inline-flex items-center justify-center rounded-xl bg-[#14B8A6] hover:bg-[#0D9488] text-white px-5 py-3 text-base font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#14B8A6]"
             >
@@ -222,7 +235,7 @@ export default function Contact() {
         </div>
       </section>
 
-      {/* Global helpers (optional) */}
+      {/* Global helpers */}
       <style jsx global>{`
         a, button { -webkit-tap-highlight-color: transparent; }
         :focus-visible { outline: none; }
@@ -230,3 +243,4 @@ export default function Contact() {
     </main>
   );
 }
+
