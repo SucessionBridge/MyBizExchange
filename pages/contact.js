@@ -13,16 +13,6 @@ export default function Contact() {
   // Public contact email
   const email = "thestevelodge@gmail.com";
 
-  // Popup handler (opens Calendly modal; falls back to direct link if script not ready)
-  const openCalendly = (e) => {
-    e?.preventDefault?.();
-    if (typeof window !== "undefined" && window.Calendly) {
-      window.Calendly.initPopupWidget({ url: calendlyUrl });
-    } else {
-      window.location.href = calendlyUrl;
-    }
-  };
-
   return (
     <main className="min-h-screen bg-[#F8FAFC] text-[#1F2937] font-sans">
       <Head>
@@ -34,8 +24,9 @@ export default function Contact() {
         <meta property="og:image" content="/images/og-hero.jpg" />
       </Head>
 
-      {/* Calendly script for inline widget + popup */}
+      {/* Calendly script for inline widget (safe to keep for the embed below) */}
       <Script
+        id="calendly-widget"
         src="https://assets.calendly.com/assets/external/widget.js"
         strategy="afterInteractive"
       />
@@ -54,8 +45,9 @@ export default function Contact() {
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <a
-                onClick={openCalendly}
                 href={calendlyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center justify-center rounded-xl bg-[#14B8A6] hover:bg-[#0D9488] text-white px-5 py-3 text-base font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#14B8A6]"
                 aria-label="Book an intro call"
               >
@@ -146,8 +138,9 @@ export default function Contact() {
             </ol>
             <div className="mt-6 flex flex-wrap gap-3">
               <a
-                onClick={openCalendly}
                 href={calendlyUrl}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center rounded-lg bg-[#14B8A6] hover:bg-[#0D9488] text-white px-4 py-2 font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#14B8A6]"
               >
                 Book a Call
@@ -219,8 +212,9 @@ export default function Contact() {
 
           <div className="mt-8 flex flex-col sm:flex-row gap-3">
             <a
-              onClick={openCalendly}
               href={calendlyUrl}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center justify-center rounded-xl bg-[#14B8A6] hover:bg-[#0D9488] text-white px-5 py-3 text-base font-semibold focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#14B8A6]"
             >
               Book an Intro Call
@@ -243,4 +237,3 @@ export default function Contact() {
     </main>
   );
 }
-
