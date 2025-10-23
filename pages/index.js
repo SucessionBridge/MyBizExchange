@@ -6,18 +6,18 @@ import Link from "next/link";
 import Script from "next/script";
 import WhyWeBuilt from "../components/WhyWeBuilt";
 
-/* Outreach Bar (added back, no other changes) */
+/* Outreach Bar (updated wording + CTA text only; no other changes) */
 function OutreachBar() {
   return (
     <div className="w-full bg-gray-100 border-b">
       <div className="mx-auto max-w-7xl px-4 py-3 flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
         <span className="text-sm sm:text-base font-medium text-gray-800">
-          Are you a business owner thinking about an exit?
+          We already have buyers looking for businesses like yours.
         </span>
         <div className="flex items-center gap-2">
           <Link href="/sellers">
             <a className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-semibold hover:bg-white">
-              List your business
+              Find me a buyer
             </a>
           </Link>
           <Link href="/contact">
