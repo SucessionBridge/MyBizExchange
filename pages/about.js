@@ -27,15 +27,15 @@ export default function AboutPage() {
             More qualified eyes on your business. Plain-English tools. Practical financing guidance.
           </p>
 
-          {/* UPDATED: mobile-friendly buttons (stack on small screens) */}
-          <div className="mt-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+          {/* UPDATED: Mobile-friendly stacked buttons with spacing */}
+          <div className="mt-6 flex flex-col items-center justify-center space-y-3">
             <Link href="/sellers">
-              <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-5 py-2.5 rounded-xl font-semibold w-full sm:w-auto text-center">
+              <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-5 py-3 rounded-xl font-semibold w-full sm:w-64 text-center">
                 List your business
               </a>
             </Link>
             <Link href="/listings">
-              <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-5 py-2.5 rounded-xl font-semibold w-full sm:w-auto text-center">
+              <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-5 py-3 rounded-xl font-semibold w-full sm:w-64 text-center">
                 Browse listings
               </a>
             </Link>
@@ -188,7 +188,7 @@ export default function AboutPage() {
                 List my business
               </a>
             </Link>
-          <Link href="/listings">
+            <Link href="/listings">
               <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg">
                 Browse listings
               </a>
@@ -230,3 +230,4 @@ function GuideLink({ href, title }) {
     </Link>
   );
 }
+
