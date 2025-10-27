@@ -27,15 +27,15 @@ export default function AboutPage() {
             More qualified eyes on your business. Plain-English tools. Practical financing guidance.
           </p>
 
-          {/* Stacked on mobile with explicit spacing; side-by-side on desktop */}
-          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center">
+          {/* Buttons - stacked on mobile, side-by-side on desktop */}
+          <div className="mt-6 flex flex-col sm:flex-row items-center justify-center space-y-3 sm:space-y-0 sm:space-x-4">
             <Link href="/sellers">
-              <a className="text-center bg-[#F59E0B] hover:bg-[#D97706] text-white px-6 py-3 rounded-xl font-semibold">
+              <a className="w-full sm:w-auto text-center bg-[#F59E0B] hover:bg-[#D97706] text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200">
                 List your business
               </a>
             </Link>
             <Link href="/listings">
-              <a className="text-center bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold mt-3 sm:mt-0 sm:ml-3">
+              <a className="w-full sm:w-auto text-center bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200">
                 Browse listings
               </a>
             </Link>
