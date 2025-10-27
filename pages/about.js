@@ -1,4 +1,3 @@
-
 // pages/about.js
 import Head from 'next/head'
 import Link from 'next/link'
@@ -38,7 +37,7 @@ export default function AboutPage() {
                 </a>
               </Link>
             </div>
-            {/* Button 2 (margin on wrapper to avoid any collapsing issues) */}
+            {/* Button 2 */}
             <div className="w-full sm:w-auto mt-3 sm:mt-0 sm:ml-4">
               <Link href="/listings">
                 <a className="block w-full text-center bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold transition-all duration-200">
@@ -187,19 +186,23 @@ export default function AboutPage() {
           </div>
         </section>
 
-        {/* CTA footer */}
+        {/* CTA footer - fixed */}
         <section className="text-center mt-10 md:mt-14">
-          <div className="inline-flex flex-col sm:flex-row items-center gap-3">
-            <Link href="/sellers">
-              <a className="bg-[#F59E0B] hover:bg-[#D97706] text-white px-6 py-3 rounded-xl font-semibold text-lg">
-                List my business
-              </a>
-            </Link>
-            <Link href="/listings">
-              <a className="bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg">
-                Browse listings
-              </a>
-            </Link>
+          <div className="inline-flex flex-col sm:flex-row items-center">
+            <div className="w-full sm:w-auto">
+              <Link href="/sellers">
+                <a className="block w-full text-center bg-[#F59E0B] hover:bg-[#D97706] text-white px-6 py-3 rounded-xl font-semibold text-lg">
+                  List my business
+                </a>
+              </Link>
+            </div>
+            <div className="w-full sm:w-auto mt-3 sm:mt-0 sm:ml-4">
+              <Link href="/listings">
+                <a className="block w-full text-center bg-[#14B8A6] hover:bg-[#0D9488] text-white px-6 py-3 rounded-xl font-semibold text-lg">
+                  Browse listings
+                </a>
+              </Link>
+            </div>
           </div>
 
           <p className="mt-4 text-xs text-amber-900 bg-amber-50 border border-amber-200 rounded-lg p-3 inline-block">
@@ -236,4 +239,4 @@ function GuideLink({ href, title }) {
       </a>
     </Link>
   );
-} 
+}
